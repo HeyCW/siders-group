@@ -8,3 +8,7 @@ build/
 coverage/
 *.tsbuildinfo
 .turbo/
+
+# Graphify
+graphify-out/
+packages/db/src/schema/schema.ts

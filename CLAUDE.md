@@ -13,16 +13,16 @@ Backend — Node.js, Express, PostgreSQL
 
 # API
 
-- REST conventions; valnt JSON envelope
-- Handle errors gracefu
+- REST conventions; consistent JSON envelope
+- Handle errors gracefully via typed `AppError` subclasses, formatted once in `errorHandler`
 
 # Database
 
-- UUID PKs, migrations,transactions whereappropriate
+- UUID PKs, migrations, transactions where appropriate
 
 # Frontend
 
-- Reusable components; oks over classes;lazy-load large features
+- Reusable components; hooks over classes; lazy-load large features
 
 # Rich Text Editor
 

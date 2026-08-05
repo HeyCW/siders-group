@@ -105,15 +105,17 @@ apps/api/src/
 │  │   ├─ article.service.ts       rules, permissions, orchestration
 │  │   ├─ article.repository.ts    Drizzle queries only
 │  │   └─ article.mapper.ts        row → DTO
+│  ├─ auth/  staff/  roles/
 │  ├─ comments/  moderation/  analytics/  home/  media/  readers/  users/
 ├─ middleware/
-│  ├─ authenticate.ts    JWT → req.auth
-│  ├─ authorize.ts       role guards
+│  ├─ authenticate.ts    access credential → req.auth; stateless, never rejects
+│  ├─ authorize.ts       declaration guards: public / reader / staff / permission
 │  ├─ rateLimit.ts       per-route buckets
 │  ├─ requestId.ts
 │  └─ errorHandler.ts    the only place that formats errors
 ├─ lib/
 │  ├─ google.ts         OAuth client, ID token verification
+│  ├─ csrf.ts           double-submit token issue + compare
 │  ├─ tokens.ts         sign/verify access JWT, rotate refresh
 │  ├─ password.ts       Argon2id hash + verify
 │  ├─ mailer.ts         Resend — invites, resets
@@ -144,15 +146,47 @@ Written by us, owned by us. Three flows: Google sign-in for readers, email + pas
 No `auth.users` to reference any more. Identity lives in the `app` schema like everything else.
 
 ```sql
+create table app.roles (               -- named bundles of permissions
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null unique,
+  slug        text not null unique,
+  is_system   boolean not null default false,  -- true only for the seeded Owner row
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create table app.permissions (         -- fixed catalog, seeded by migration only
+  id           uuid primary key default gen_random_uuid(),
+  key          text not null unique,   -- news.manage, role.manage, settings.manage, …
+  description  text not null
+);
+
+create table app.role_permissions (
+  role_id        uuid not null references app.roles(id) on delete cascade,
+  permission_id  uuid not null references app.permissions(id) on delete cascade,
+  primary key (role_id, permission_id)
+);
+
 create table app.users (               -- staff only
   id             uuid primary key default gen_random_uuid(),
   email          citext not null unique,
   password_hash  text,                 -- null until the invite is accepted
   name           text not null,
-  role           app.staff_role not null,   -- owner | editor | author
+  role_id        uuid not null references app.roles(id),   -- exactly one role
   status         app.user_status not null default 'invited',
   last_login_at  timestamptz,
-  created_at     timestamptz not null default now()
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create table app.staff_tokens (        -- invite + password reset, single use
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references app.users(id) on delete cascade,
+  purpose      app.staff_token_purpose not null,   -- invite | reset
+  token_hash   text not null unique,               -- ≥128 bits of entropy, hashed
+  expires_at   timestamptz not null,               -- 24 hours from issuance
+  consumed_at  timestamptz,
+  created_at   timestamptz not null default now()
 );
 
 create table app.readers (             -- Google-authenticated readers
@@ -169,18 +203,24 @@ create table app.readers (             -- Google-authenticated readers
 );
 
 create table app.sessions (            -- both audiences, one table
-  id                 uuid primary key default gen_random_uuid(),
-  subject_id         uuid not null,
-  subject_type       app.subject_type not null,   -- staff | reader
-  refresh_token_hash text not null unique,
-  family_id          uuid not null,               -- rotation lineage
-  user_agent         text,
-  ip_hash            text,
-  expires_at         timestamptz not null,
-  revoked_at         timestamptz,
-  created_at         timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),  -- the `sid` claim
+  subject_id          uuid not null,               -- polymorphic: no FK possible
+  subject_type        app.subject_type not null,   -- staff | reader
+  refresh_token_hash  text not null unique,
+  family_id           uuid not null,               -- rotation lineage
+  user_agent          text,
+  ip_hash             text,
+  expires_at          timestamptz not null,        -- sliding
+  absolute_expires_at timestamptz not null,        -- hard cap, never extended
+  revoked_at          timestamptz,
+  created_at          timestamptz not null default now()
 );
 ```
+
+`subject_id` is polymorphic across `app.users` and `app.readers`, so it cannot carry a
+foreign key. Every lookup therefore filters on `subject_type` and joins the correct
+subject table, re-validating that the row still exists and is active. A session whose
+subject has vanished fails closed.
 
 **Key on `google_sub`, not email.** Google's `sub` claim is stable forever; a user's email address is not. Matching on email means someone who changes their Google address loses their comment history, and — worse — someone who acquires a recycled address inherits it.
 
@@ -245,7 +285,7 @@ Two tokens, both in cookies, neither readable by JavaScript.
 
 | Token | Lifetime | Storage | Contents |
 |---|---|---|---|
-| Access | 15 minutes | httpOnly cookie | Signed JWT: `sub`, `type`, `role`, `exp` |
+| Access | 15 minutes | httpOnly cookie | Signed JWT: `sub`, `type`, `sid`, `exp` |
 | Refresh | 30 days, sliding | httpOnly cookie | Opaque 256-bit random; only its SHA-256 hash is stored |
 
 ```ts
@@ -265,22 +305,50 @@ res.cookie('sid_at', accessJwt, {
 
 **Refresh rotation with reuse detection.** Every refresh issues a new token and revokes the old one. If a *already-revoked* token is presented, the entire `family_id` is revoked and the user is signed out everywhere — that pattern means a token was stolen and replayed.
 
-Access tokens are signed with EdDSA using a key pair held by the API. Verification is local; there is no database read on the hot path. Only refresh touches `app.sessions`.
+The access token carries a **session id (`sid`) and deliberately no role or permission data.** Anything embedded in a 15-minute credential is stale for up to 15 minutes, which is unacceptable for a demotion or an account disable. Role and permission state is therefore resolved per request instead — see §5.5.
+
+Access tokens are signed with EdDSA using a key pair held by the API, and verification is local. Anonymous and public traffic touches the database not at all. Gated routes pay one indexed lookup, and refresh touches `app.sessions`.
+
+**Rotating the signing key does not end sessions.** It invalidates access tokens only; refresh tokens are opaque `app.sessions` rows unaffected by the key, so every client silently refreshes and carries on. Key rotation is not the incident response for a stolen session — bulk revocation is, which is why revoking every session for a subject, and every session system-wide, is a first-class operation rather than an afterthought.
 
 ### 5.4 Staff — invite only
 
 No public route creates a staff account.
 
-1. Owner creates the user; API writes `app.users` with `status = 'invited'`, no password hash.
-2. A single-use invite token — random, hashed at rest, 24-hour expiry — is emailed via Resend.
+1. A caller holding `user.manage` creates the user; API writes `app.users` with `status = 'invited'`, no password hash. Granting the **Owner** role additionally requires the caller to already hold it — otherwise `user.manage` alone would be a complete path to Owner.
+2. A single-use invite token — ≥128 bits of entropy, hashed at rest in `app.staff_tokens`, 24-hour expiry, constant-time comparison — is emailed via Resend.
 3. Staff member sets a password. **Argon2id**, memory cost 19 MiB, 2 iterations, parallelism 1 (OWASP baseline).
 4. Status becomes `active`.
 
-Password reset uses the same token mechanism. Both invite and reset responses are deliberately identical whether or not the address exists, so the endpoint cannot be used to enumerate staff emails.
+Creating an account for an email that already belongs to any staff account, in any status, is **rejected**. Upserting here would let a `user.manage` holder submit the Owner's address, receive the invite, and take the account over.
 
-Login is rate limited to 5 attempts per 15 minutes per IP-and-email pair, and always returns the same generic failure message regardless of which half was wrong.
+Password reset uses the same token mechanism. Both invite and reset responses are deliberately identical whether or not the address exists, so the endpoint cannot be used to enumerate staff emails. Setting a new password through either path **revokes every existing session for that account** and invalidates any other outstanding token of that kind — a reset that leaves the attacker's session alive is not a remediation.
+
+Login is rate limited to 5 attempts per 15 minutes per IP-and-email pair, with an additional per-source cap across all addresses so the per-account limit cannot be sidestepped by spraying. Limits also cover invite acceptance and reset-token submission, which are guessable-secret endpoints. Failures always return the same generic message regardless of which half was wrong, and perform **equivalent verification work** for unknown, non-active, and existing accounts — short-circuiting before Argon2id reopens the enumeration channel through response timing. Throttled responses are indistinguishable from ordinary failures.
 
 ### 5.5 Authorisation
+
+Two tiers, and the split is the whole design: **identification is stateless, authorisation is stateful.**
+
+```
+every request
+     │
+     ▼
+authenticate ──────────── local EdDSA verify only, NO database read
+     │                    claims: sub, type, sid
+     │                    populates req.auth; NEVER rejects
+     ▼
+route declaration?
+     ├── public ───────► handler          (DB-free, the high-volume path)
+     └── reader / staff / permission
+             │
+             ▼
+        one indexed query: session ⋈ subject ⋈ role ⋈ role_permissions
+        rejects if: session revoked/expired · subject not active · permission absent
+             │
+             ▼
+          handler
+```
 
 ```ts
 // apps/api/src/middleware/authenticate.ts
@@ -294,9 +362,9 @@ export async function authenticate(req, _res, next) {
       audience: 'siders',
     });
     req.auth = {
-      id: payload.sub,
-      type: payload.type,        // 'staff' | 'reader'
-      role: payload.role,
+      subjectId: payload.sub,
+      subjectType: payload.type,   // 'staff' | 'reader'
+      sessionId: payload.sid,      // no role, no permissions — resolved per request
     };
   } catch {
     /* expired or invalid — treated as anonymous, client will refresh */
@@ -305,7 +373,17 @@ export async function authenticate(req, _res, next) {
 }
 ```
 
-`requireStaff()` rejects anything where `type !== 'staff'`, and every `/admin/*` route sits behind it. A reader token can never reach an admin handler, because the check is on token type, not on a role string that might be absent.
+`authenticate` identifies and nothing else. It never returns a 401 — rejecting is authorisation's job, and conflating the two is what makes anonymous browsing impossible to express.
+
+**Every route carries an explicit declaration** — one of `requirePublic()`, `requireReader()`, `requireStaff()`, or `requirePermission(key)`. A route with no declaration is **denied**, and the API fails to boot if any registered route lacks one. Default-public would turn one forgotten guard into a silently world-readable admin endpoint; a failed deploy is strictly cheaper than that.
+
+`requireStaff()` rejects anything where `subjectType !== 'staff'`, so a reader credential can never reach an admin handler — the check is on credential type, not on a role string that might be absent. It takes no role argument: role-name checks are exactly what `requirePermission` replaces.
+
+`requirePermission(key)` resolves the caller's **current** role from `app.users.role_id` and that role's permissions from `app.role_permissions` on every request, never from the credential. That is what makes revocation honest: sign-out, account disable, reader ban, role reassignment, and permission edits all bite on the caller's very next gated request rather than lingering until a 15-minute credential expires. The cost is one indexed lookup on admin and reader-authored traffic; public reads stay DB-free. No in-process cache — with more than one API instance, in-process invalidation is silently wrong, and correctness here outranks a saved query.
+
+**The Owner role satisfies every permission check**, so role administration can never lock out every staff member. Recognition is by the **seeded row's immutable id**, resolved once at boot — never by a name or slug. That distinction is load-bearing: if a caller-editable string granted the bypass, any holder of `role.manage` could create a role called "Owner" and inherit the entire catalog. For the same reason `is_system` and role identity are set only by migration and rejected from every request payload, assigning the Owner role requires already holding it, and no staff member may change their own role or disable their own account.
+
+Public endpoints must not make access decisions from `req.auth`. A public route sees identity without a revocation check for up to the credential's lifetime — anything access-controlled carries a declaration and goes through the stateful path.
 
 ---
 
@@ -547,15 +625,21 @@ Note what is absent: no Supabase URL, no anon key, no service key. The frontends
 - [ ] CSRF double-submit token on all state-changing requests
 - [ ] Argon2id for staff passwords at OWASP parameters
 - [ ] Invite and reset tokens single-use, hashed, 24-hour expiry
-- [ ] Auth responses identical whether or not the account exists
-- [ ] Admin routes gated on token `type === 'staff'`, not on role presence
+- [ ] Auth responses identical whether or not the account exists, in body **and** timing
+- [ ] Every registered route carries an explicit authorisation declaration; undeclared is denied and fails boot
+- [ ] Admin routes gated on token `type === 'staff'` plus a named permission, never on a role name
+- [ ] Owner-role bypass keyed on the seeded row's immutable id, never a caller-editable slug
+- [ ] Granting the Owner role requires already holding it; no self-reassignment, no self-disable
+- [ ] Session revocation effective on the next gated request, not at credential expiry
+- [ ] Sessions carry an absolute lifetime cap independent of sliding refresh
+- [ ] Post-sign-in redirect targets validated against an origin allowlist
 - [ ] Article HTML sanitised on write with an allowlist
 - [ ] Uploaded file types verified by magic bytes, not the declared header
 - [ ] Zod validation on every request body and query string
-- [ ] Rate limits on login, comment, like, view, contact
+- [ ] Rate limits on login, invite acceptance, reset-token submission, reset request, refresh, OAuth callback, comment, like, view, contact — enforced, not merely mounted
 - [ ] CORS allowlist naming exact origins, `credentials: true`, no wildcard
 - [ ] Helmet, CSP, HSTS
-- [ ] `audit_log` written on every admin mutation
+- [ ] `audit_log` written on every admin mutation — **outstanding**, deferred to an `add-audit-logging` follow-up change (see `openspec/changes/add-auth-foundation/design.md` Non-Goals)
 - [ ] Point-in-time recovery enabled on the production Supabase project
 - [ ] Dependabot on, secrets scanned in CI
 
