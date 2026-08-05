@@ -1,0 +1,4 @@
+{
+  "extends": "@siders/config/tsconfig/node.json",
+  "include": ["src/**/*.ts", "**/*.test.ts"]
+}

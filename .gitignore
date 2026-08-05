@@ -1,0 +1,20 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+build/
+.next/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# Docs
+docs/
+
+# OpenSpec
+openspec/
+
+# Claude
+.claude
+CLAUDE.MD

@@ -1,0 +1,2 @@
+-- Feature changes append their seed data here (categories, sub-brands, first Owner, etc).
+-- Kept empty by bootstrap-monorepo; the auth/users follow-up change seeds the first Owner.
