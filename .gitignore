@@ -8,13 +8,3 @@ build/
 coverage/
 *.tsbuildinfo
 .turbo/
-
-# Docs
-docs/
-
-# OpenSpec
-openspec/
-
-# Claude
-.claude
-CLAUDE.MD
