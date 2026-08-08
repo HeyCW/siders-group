@@ -33,7 +33,7 @@ export function createAuthController(service: AuthService, env: CookieEnv & Sess
     async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const raw = req.cookies?.[REFRESH_TOKEN_COOKIE];
-        await service.logout(typeof raw === 'string' ? raw : undefined);
+        await service.logout(typeof raw === 'string' ? raw : undefined, req.auth?.sessionId);
         clearSessionCookies(res, env);
         clearCsrfCookie(res, sharedCookieOptions(env));
         res.status(204).end();

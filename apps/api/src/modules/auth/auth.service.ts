@@ -30,7 +30,7 @@ export interface IssuedSession {
 export interface AuthService {
   startSession(subjectId: string, subjectType: SubjectType, meta: SessionMeta): Promise<IssuedSession>;
   refresh(rawRefreshToken: string, meta: SessionMeta): Promise<IssuedSession>;
-  logout(rawRefreshToken: string | undefined): Promise<void>;
+  logout(rawRefreshToken: string | undefined, sessionId?: string | undefined): Promise<void>;
   revokeAllForSubject(subjectType: SubjectType, subjectId: string): Promise<void>;
   revokeAllForSubjectExcept(subjectType: SubjectType, subjectId: string, exceptSessionId: string): Promise<void>;
   revokeAll(): Promise<void>;
@@ -116,10 +116,20 @@ export function createAuthService(
       return issueTokens(newRow.id, row.subjectId, row.subjectType, token);
     },
 
-    async logout(rawRefreshToken) {
-      if (!rawRefreshToken) return;
-      const row = await repository.findByRefreshTokenHash(sha256Hex(rawRefreshToken));
-      if (row) await repository.revoke(row.id);
+    async logout(rawRefreshToken, sessionId) {
+      // Falls back to the session id from the access credential. Keyed on the refresh cookie
+      // alone, a caller holding only a valid access cookie was signed out client-side —
+      // cookies cleared — while the session row stayed live until expiry, so a copy of that
+      // access credential kept working (specs/authentication/spec.md - "Signed-out access
+      // credential is no longer accepted").
+      if (rawRefreshToken) {
+        const row = await repository.findByRefreshTokenHash(sha256Hex(rawRefreshToken));
+        if (row) {
+          await repository.revoke(row.id);
+          return;
+        }
+      }
+      if (sessionId) await repository.revoke(sessionId);
     },
 
     async revokeAllForSubject(subjectType, subjectId) {

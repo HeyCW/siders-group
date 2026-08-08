@@ -90,7 +90,7 @@ anything else on this list. If this sequence passes, most of the untested surfac
 - [v] **2.4** `POST /roles` `{"name":"!!!","permissions":[]}` → `400` (slugifies to nothing)
 - [v] **2.5** `POST /staff` `{"email":"editor@test.local","name":"Editor One","roleId":"<Editor id>"}` → `201` **with a `temporaryPassword` in the body**, and the row lands `status = 'active'`, `must_change_password = true`
 - [v] **2.6** `POST /staff` with that same email again → **`409`, not a 500**
-- [v] **2.7** `POST /staff` with a `password` field in the body → `400` (`.strict()` — the initial password is never caller-supplied)
+- [v] **2.7** `POST /staff` with a `password` field in the body → `400` (`.strict()` — the initial password is never caller-supplied). **Was a false tick**: `.strict()` rejected the body, but `errorHandler` had no `ZodError` branch, so every validation failure surfaced as `500 internal_error`. Now genuinely 400, covered by `packages/contracts/src/staff.test.ts`.
 - [v] **2.8** `DELETE /roles/<Editor id>` while that staff member holds it → rejected (FK still referenced)
 - [v] **2.9** `DELETE /roles/<Owner role id>` → rejected
 
@@ -139,6 +139,7 @@ Nothing in this section is covered by any test. It needs real Google credentials
 - [ ] **6.5** Tamper with `state` in the callback URL → rejected
 - [ ] **6.6** `?next=https://evil.example.com` → lands on the default in-app path instead
 - [ ] **6.7** Set that reader's `status = 'banned'` directly in SQL → their next request is rejected
+  *SQL is the only way to do this: nothing in the API sets `readers.status = 'banned'`, because no spec in this change defines a reader-moderation endpoint. The per-request rejection itself is implemented and now covered by `authorize.test.ts` ("rejects a banned reader holding an otherwise-valid session"); what is missing is any path to ban. Tracked under "Known gaps" below.*
 - [ ] **6.8** Set `muted_until` to a future timestamp → reads still work, content-creating requests are refused
 
 ## 7. Credential leakage — cheap to check, expensive to miss
@@ -150,8 +151,8 @@ Nothing in this section is covered by any test. It needs real Google credentials
 
 ## 8. One boot-time check
 
-- [v] **8.1** Add a route with no guard declaration, start the API → **boot fails** naming that route. Remove it again.
-  *(Already confirmed once earlier; re-run only if `authorize.ts` changed since.)*
+- [ ] **8.1** Add a route with no guard declaration, start the API → **boot fails** naming that route. Remove it again.
+  *(Un-ticked: `authorize.ts` has changed since it was confirmed. The audit now also fails boot on a mounted sub-app and on a path-mounted responding middleware, both of which it previously waved through — worth re-running all three shapes. `authorize.test.ts` covers them against a real Express app, and `health.routes.test.ts` boots the real server, so this is confirmation rather than discovery.)*
 
 ---
 
@@ -165,7 +166,8 @@ Cut because the automated suite already proves them, and re-testing by hand buys
 | Sign-in timing equivalence | `staffLogin.service.test.ts` measures it. A stopwatch in Postman is noise, not signal. |
 | CSRF mechanics (missing / mismatched / safe methods / sibling origin) | `csrf.test.ts`, 12 tests. Item 5.3 keeps the one case tests can't reach: rotation across a real cookie round-trip. |
 | Owner bypass with `role_permissions` emptied; look-alike role gets no bypass | `authorize.test.ts` covers both. Item 1.5 proves the bypass works on real rows, which is the part that needed a database. |
-| Role name/slug/`isSystem` validation rules | `role.service.test.ts`, 15 tests. Items 2.2–2.4 keep only the cases where a **database constraint** decides the status code. |
+| Role name/slug validation rules | `role.service.test.ts`. Items 2.2–2.4 keep only the cases where a **database constraint** decides the status code. |
+| `isSystem` / `slug` markers rejected from a request body | `packages/contracts/src/role.test.ts`. **This row previously credited `role.service.test.ts`, which never asserted it** — that file only set `isSystem` on fixtures. The rule lives in the contract's `.strict()`, so that is where it is now tested. |
 | `TRUST_PROXY_HOPS` behind a proxy | There is no proxy in front of the local API. Verify when infrastructure exists, not before. |
 | Anonymous access to `/health`, expired/garbage tokens treated as anonymous | `health.routes.test.ts` boots the real server; `authenticate.test.ts` covers the token cases. |
 
@@ -173,3 +175,4 @@ Cut because the automated suite already proves them, and re-testing by hand buys
 
 - Rate limiting is an **in-process** counter: it resets on restart and does not hold once the API runs more than one instance. Documented in `docs/ARCHITECTURE.md` §13 as a Redis upgrade.
 - Losing every Owner account at once needs a manual database edit — there is no unauthenticated recovery path by design (`design.md` - Risks).
+- **Readers can be rejected once banned, but nothing can ban them.** The gated path checks `readers.status` on every request and refuses a banned reader (covered in `authorize.test.ts`), and `revokeAllForSubject` already accepts `'reader'`. What is absent is any endpoint that sets the status — no spec in this change defines reader moderation, so building one here would be inventing API surface. It needs its own change; until then item 6.7 is only reachable through SQL.

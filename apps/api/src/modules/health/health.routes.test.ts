@@ -29,6 +29,18 @@ beforeAll(async () => {
   app = createServer();
 });
 
+describe('server boot', () => {
+  /**
+   * `createServer` runs `auditAuthorizationDeclarations` as its last step, so a successful boot
+   * here is the audit passing against the *real* route table — every mounted router and every
+   * route in it. The unit tests in `middleware/authorize.test.ts` cover the walker's own
+   * behaviour; this is the one that would catch a genuinely undeclared route being shipped.
+   */
+  it('boots, which means every registered route carries an authorization declaration', () => {
+    expect(app).toBeDefined();
+  });
+});
+
 describe('GET /health', () => {
   it('returns the PingResponse shape', async () => {
     const res = await request(app).get('/health');

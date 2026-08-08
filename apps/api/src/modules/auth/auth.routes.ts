@@ -25,6 +25,16 @@ function respondWithGenericFailure(_req: unknown, _res: unknown, next: (err: unk
   next(new AppError('Invalid email or password', 401, 'invalid_credentials'));
 }
 
+/**
+ * Refresh's own ordinary failure (`auth.service.ts` - "Invalid refresh token"). Throttling here
+ * previously answered 429 while every real rejection answered 401, so the 429 itself told a
+ * caller their guesses had been noticed (specs/authentication/spec.md - "Throttling does not
+ * leak account existence").
+ */
+function respondWithRefreshFailure(_req: unknown, _res: unknown, next: (err: unknown) => void): void {
+  next(new AppError('Invalid refresh token', 401, 'invalid_refresh_token'));
+}
+
 function loginAccountKey(req: Request): string {
   return `${clientIp(req)}:${String(req.body?.email).toLowerCase()}`;
 }
@@ -52,6 +62,11 @@ export function staffLoginRateLimiters(): RequestHandler[] {
   ];
 }
 
+/** Exported for the same reason the sign-in chain is: the tests assert the shipped config. */
+export function refreshRateLimiter() {
+  return rateLimit({ ...REFRESH_RATE_LIMIT, keyGenerator: clientIp, onLimited: respondWithRefreshFailure });
+}
+
 export function authRoutes(db: Database, env: Env) {
   const router = Router();
   const repository = createSessionRepository(db);
@@ -62,7 +77,7 @@ export function authRoutes(db: Database, env: Env) {
   router.post(
     '/refresh',
     requirePublic(),
-    rateLimit({ ...REFRESH_RATE_LIMIT, keyGenerator: clientIp }),
+    refreshRateLimiter(),
     controller.refresh,
   );
   router.post('/logout', requirePublic(), controller.logout);

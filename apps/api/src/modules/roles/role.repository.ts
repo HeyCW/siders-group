@@ -20,6 +20,8 @@ export interface CreateRoleInput {
 
 export interface UpdateRoleInput {
   name?: string | undefined;
+  /** Always travels with `name` — the two are derived from one value and must not drift apart. */
+  slug?: string | undefined;
   permissionKeys?: string[] | undefined;
 }
 
@@ -38,8 +40,12 @@ export interface RoleRepository {
   update(id: string, input: UpdateRoleInput): Promise<RoleWithPermissions>;
   delete(id: string): Promise<void>;
   countStaffWithRole(id: string): Promise<number>;
-  assignRole(staffId: string, roleId: string): Promise<void>;
+  /** Resolves false when no staff member has that id, so the caller can 404 rather than 204. */
+  assignRole(staffId: string, roleId: string): Promise<boolean>;
 }
+
+/** The database handle or an open transaction — the same query surface either way. */
+type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 
 export function createRoleRepository(db: Database): RoleRepository {
   async function loadPermissionKeys(roleId: string): Promise<string[]> {
@@ -51,15 +57,19 @@ export function createRoleRepository(db: Database): RoleRepository {
     return rows.map((r) => r.key);
   }
 
-  async function replacePermissions(roleId: string, permissionKeys: string[]): Promise<void> {
-    await db.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+  /**
+   * Delete-then-insert, so it must run inside a transaction: interrupted between the two, the
+   * role is left holding no permissions at all rather than either its old or its new set.
+   */
+  async function replacePermissions(roleId: string, permissionKeys: string[], tx: Executor): Promise<void> {
+    await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
     if (permissionKeys.length === 0) return;
-    const matched = await db
+    const matched = await tx
       .select({ id: permissions.id })
       .from(permissions)
       .where(inArray(permissions.key, permissionKeys));
     if (matched.length > 0) {
-      await db.insert(rolePermissions).values(matched.map((p) => ({ roleId, permissionId: p.id })));
+      await tx.insert(rolePermissions).values(matched.map((p) => ({ roleId, permissionId: p.id })));
     }
   }
 
@@ -87,19 +97,29 @@ export function createRoleRepository(db: Database): RoleRepository {
     },
 
     async create(input) {
-      const [row] = await db.insert(roles).values({ name: input.name, slug: input.slug }).returning();
-      if (!row) throw new Error('role insert returned no row');
-      await replacePermissions(row.id, input.permissionKeys);
-      return { ...row, permissions: input.permissionKeys };
+      // One transaction: the role row and its grants are a single fact. Written separately, a
+      // failure between them leaves a role that exists and authorizes nothing — and role
+      // creation reports success either way (CLAUDE.md - "transactions where appropriate").
+      return db.transaction(async (tx) => {
+        const [row] = await tx.insert(roles).values({ name: input.name, slug: input.slug }).returning();
+        if (!row) throw new Error('role insert returned no row');
+        await replacePermissions(row.id, input.permissionKeys, tx);
+        return { ...row, permissions: input.permissionKeys };
+      });
     },
 
     async update(id, input) {
-      if (input.name !== undefined) {
-        await db.update(roles).set({ name: input.name, updatedAt: new Date() }).where(eq(roles.id, id));
-      }
-      if (input.permissionKeys !== undefined) {
-        await replacePermissions(id, input.permissionKeys);
-      }
+      await db.transaction(async (tx) => {
+        if (input.name !== undefined) {
+          await tx
+            .update(roles)
+            .set({ name: input.name, ...(input.slug !== undefined && { slug: input.slug }), updatedAt: new Date() })
+            .where(eq(roles.id, id));
+        }
+        if (input.permissionKeys !== undefined) {
+          await replacePermissions(id, input.permissionKeys, tx);
+        }
+      });
       const updated = await findById(id);
       if (!updated) throw new Error('role missing immediately after update');
       return updated;
@@ -115,7 +135,15 @@ export function createRoleRepository(db: Database): RoleRepository {
     },
 
     async assignRole(staffId, roleId) {
-      await db.update(users).set({ roleId, updatedAt: new Date() }).where(eq(users.id, staffId));
+      // `returning` so a staff id matching no row is distinguishable from a real assignment.
+      // Without it the update quietly affects zero rows and the endpoint answers 204, telling
+      // an administrator the role was assigned when nothing happened at all.
+      const assigned = await db
+        .update(users)
+        .set({ roleId, updatedAt: new Date() })
+        .where(eq(users.id, staffId))
+        .returning({ id: users.id });
+      return assigned.length > 0;
     },
   };
 }

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { AppError } from '../middleware/errorHandler.js';
 
 export interface GoogleEnv {
   GOOGLE_CLIENT_ID: string;
@@ -10,6 +11,9 @@ export interface GoogleEnv {
 const AUTHORIZATION_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+
+/** The key-resolver shape `jose.jwtVerify` accepts — a remote JWKS in production, a local key in tests. */
+export type GoogleKeySet = Parameters<typeof jwtVerify>[1];
 
 export interface GoogleAuthorizationRequest {
   url: string;
@@ -71,7 +75,8 @@ export async function exchangeAuthorizationCode(
     body,
   });
   if (!response.ok) {
-    throw new Error(`Google token exchange failed: ${response.status}`);
+    // The code was bad, replayed, or issued for another client — all client-side conditions.
+    throw new AppError('Google authorization code exchange failed', 400, 'invalid_oauth_callback');
   }
   return (await response.json()) as GoogleTokenResponse;
 }
@@ -93,17 +98,26 @@ export async function verifyGoogleIdToken(
   idToken: string,
   env: GoogleEnv,
   expectedNonce: string,
+  /**
+   * Defaults to Google's live JWKS. Injectable so the nonce, audience, and issuer checks are
+   * testable against a locally signed assertion — they are the replay and token-substitution
+   * defences, and reaching them over the network is what left them uncovered.
+   */
+  jwks: GoogleKeySet = GOOGLE_JWKS,
 ): Promise<GoogleIdentity> {
-  const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
+  const { payload } = await jwtVerify(idToken, jwks, {
     issuer: ['https://accounts.google.com', 'accounts.google.com'],
     audience: env.GOOGLE_CLIENT_ID,
   });
 
+  // Typed so the callback answers 400, not 500. A replayed or tampered assertion is a bad
+  // request, and CLAUDE.md asks for errors to travel as AppError subclasses; a plain Error here
+  // fell through errorHandler's final branch and reported a server fault for a client one.
   if (payload.nonce !== expectedNonce) {
-    throw new Error('Google ID token nonce mismatch');
+    throw new AppError('Google ID token nonce mismatch', 400, 'invalid_oauth_callback');
   }
   if (typeof payload.sub !== 'string' || typeof payload.email !== 'string') {
-    throw new Error('malformed Google ID token');
+    throw new AppError('Malformed Google ID token', 400, 'invalid_oauth_callback');
   }
 
   const avatarUrl = typeof payload.picture === 'string' ? payload.picture : undefined;
@@ -124,6 +138,6 @@ export async function verifyGoogleIdToken(
  */
 export function assertVerifiedIdentity(identity: GoogleIdentity): void {
   if (!identity.emailVerified) {
-    throw new Error('Google account email is not verified');
+    throw new AppError('Google account email is not verified', 403, 'email_not_verified');
   }
 }
