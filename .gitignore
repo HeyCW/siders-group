@@ -11,4 +11,3 @@ coverage/
 
 # Graphify
 graphify-out/
-packages/db/src/schema/schema.ts

@@ -1,0 +1,107 @@
+import { Router, type Request, type RequestHandler } from 'express';
+import type { Database } from '@siders/db';
+import { staffSignInRequestSchema } from '@siders/contracts';
+import { createAuthService } from './auth.service.js';
+import { createSessionRepository } from './session.repository.js';
+import { createAuthController } from './auth.controller.js';
+import { createStaffLoginService } from './staffLogin.service.js';
+import { createStaffRepository } from '../staff/staff.repository.js';
+import { rateLimit, clientIp } from '../../middleware/rateLimit.js';
+import { requirePermission, requirePublic, requireReader } from '../../middleware/authorize.js';
+import { AppError } from '../../middleware/errorHandler.js';
+import { setCsrfCookie } from '../../lib/csrf.js';
+import { setSessionCookies, sharedCookieOptions } from '../../lib/cookies.js';
+import { sessionMetaFromRequest } from '../../lib/sessionMeta.js';
+import type { Env } from '../../config/env.js';
+
+const REFRESH_RATE_LIMIT = { windowMs: 15 * 60 * 1000, max: 30 };
+// "5 attempts per 15 minutes per IP-and-email pair" (docs/ARCHITECTURE.md §5.4).
+const STAFF_LOGIN_PER_ACCOUNT_LIMIT = { windowMs: 15 * 60 * 1000, max: 5 };
+// Per-source cap across every email address, so spraying can't sidestep the per-account cap.
+const STAFF_LOGIN_PER_SOURCE_LIMIT = { windowMs: 15 * 60 * 1000, max: 30 };
+
+/** Same AppError, same errorHandler formatting — never a distinct "you're throttled" shape. */
+function respondWithGenericFailure(_req: unknown, _res: unknown, next: (err: unknown) => void): void {
+  next(new AppError('Invalid email or password', 401, 'invalid_credentials'));
+}
+
+function loginAccountKey(req: Request): string {
+  return `${clientIp(req)}:${String(req.body?.email).toLowerCase()}`;
+}
+
+/**
+ * Both sign-in limits, exported so the scenario tests in `authRateLimit.test.ts` exercise the
+ * real configuration rather than a re-declared copy of it. `failuresOnly` because the spec
+ * limits *failed* attempts — a staff member signing in from several devices inside one
+ * window must not lock themselves out.
+ */
+export function staffLoginRateLimiters(): RequestHandler[] {
+  return [
+    rateLimit({
+      ...STAFF_LOGIN_PER_SOURCE_LIMIT,
+      keyGenerator: clientIp,
+      onLimited: respondWithGenericFailure,
+      failuresOnly: true,
+    }),
+    rateLimit({
+      ...STAFF_LOGIN_PER_ACCOUNT_LIMIT,
+      keyGenerator: loginAccountKey,
+      onLimited: respondWithGenericFailure,
+      failuresOnly: true,
+    }),
+  ];
+}
+
+export function authRoutes(db: Database, env: Env) {
+  const router = Router();
+  const repository = createSessionRepository(db);
+  const service = createAuthService(repository, env);
+  const controller = createAuthController(service, env);
+  const staffLoginService = createStaffLoginService(createStaffRepository(db));
+
+  router.post(
+    '/refresh',
+    requirePublic(),
+    rateLimit({ ...REFRESH_RATE_LIMIT, keyGenerator: clientIp }),
+    controller.refresh,
+  );
+  router.post('/logout', requirePublic(), controller.logout);
+  router.get('/me', requireReader(), controller.me);
+
+  // System-wide revocation, the incident-response tool the design names in place of signing-key
+  // rotation (design.md - Risks: "Signing-key rotation does not end sessions"). Ends the
+  // caller's own session too, by design (specs/authentication/spec.md - "Sessions can be
+  // revoked in bulk").
+  router.post(
+    '/sessions/revoke-all',
+    requirePermission('settings.manage'),
+    async (_req, res, next) => {
+      try {
+        await service.revokeAll();
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/staff/login',
+    requirePublic(),
+    ...staffLoginRateLimiters(),
+    async (req, res, next) => {
+      try {
+        const body = staffSignInRequestSchema.parse(req.body);
+        const { subjectId } = await staffLoginService.login(body.email, body.password);
+        const issued = await service.startSession(subjectId, 'staff', sessionMetaFromRequest(req, env));
+        setSessionCookies(res, issued, env);
+        setCsrfCookie(res, issued.csrfToken, sharedCookieOptions(env));
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  return router;
+}

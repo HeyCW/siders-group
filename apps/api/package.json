@@ -12,8 +12,12 @@
   "dependencies": {
     "@siders/contracts": "workspace:*",
     "@siders/db": "workspace:*",
+    "argon2": "^0.41.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "drizzle-orm": "^0.36.4",
     "express": "^4.19.2",
+    "jose": "^5.9.6",
     "node-cron": "^3.0.3",
     "pino": "^9.3.2",
     "pino-http": "^10.2.0",
@@ -21,6 +25,7 @@
   },
   "devDependencies": {
     "@siders/config": "workspace:*",
+    "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/express-serve-static-core": "^4.19.5",

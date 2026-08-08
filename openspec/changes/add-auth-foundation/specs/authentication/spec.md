@@ -128,7 +128,7 @@ Staff SHALL sign in with an email address and password belonging to an active st
 - **THEN** the sign-in is rejected with the same generic failure response
 
 ### Requirement: Authentication attempts are rate limited
-Rate limiting SHALL be enforced, not merely declared. The system SHALL limit failed sign-in attempts per source-and-email pair, SHALL additionally cap failed sign-in attempts per source address across all email addresses, and SHALL limit attempts against invitation acceptance, reset-token submission, reset requests, session refresh, and the sign-in callback. Throttled responses SHALL be indistinguishable from ordinary failure responses for the same endpoint.
+Rate limiting SHALL be enforced, not merely declared. The system SHALL limit failed sign-in attempts per source-and-email pair, SHALL additionally cap failed sign-in attempts per source address across all email addresses, and SHALL limit attempts against the password-change endpoint, session refresh, and the sign-in callback. Throttled responses SHALL be indistinguishable from ordinary failure responses for the same endpoint.
 
 #### Scenario: Repeated failures for one account are throttled
 - **WHEN** sign-in attempts for the same email address from the same source fail repeatedly within a short window
@@ -138,8 +138,8 @@ Rate limiting SHALL be enforced, not merely declared. The system SHALL limit fai
 - **WHEN** a single source makes failed sign-in attempts against many different email addresses, none of which individually exceeds the per-account limit
 - **THEN** further attempts from that source are rejected
 
-#### Scenario: Brute-forcing an invitation or reset token is throttled
-- **WHEN** repeated invalid invitation or reset tokens are submitted from the same source within a short window
+#### Scenario: Brute-forcing a current password at the change endpoint is throttled
+- **WHEN** repeated password-change attempts carrying an incorrect current password are submitted from the same source within a short window
 - **THEN** further attempts are rejected
 
 #### Scenario: Throttling does not leak account existence

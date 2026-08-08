@@ -101,6 +101,25 @@ A staff member holding the Owner role SHALL satisfy every permission-based autho
 - **WHEN** every permission assignment for the Owner role is removed and a staff member holding that role requests a permission-gated endpoint
 - **THEN** the request is still allowed
 
+### Requirement: A pending password change blocks every gated endpoint
+Both the staff-only and permission-based guards SHALL reject a caller whose staff account is marked as requiring a password change, before evaluating any permission, and SHALL do so with a response distinguishable from an ordinary permission denial so the client can route the caller to the password-change screen. Only two endpoints SHALL be exempt: the password-change endpoint itself and the endpoint returning the caller's own account. The Owner role SHALL NOT bypass this check — it is not a permission check, and an Owner holding a temporary password is exactly the case that most needs it.
+
+#### Scenario: Staff-only endpoint is refused while a password change is pending
+- **WHEN** a staff member whose account is marked as requiring a password change requests an endpoint declared staff-only, other than their own-account endpoint
+- **THEN** the request is rejected
+
+#### Scenario: Permission-gated endpoint is refused before the permission is evaluated
+- **WHEN** a staff member whose account is marked as requiring a password change requests an endpoint declaring a permission their role does hold
+- **THEN** the request is still rejected, and the rejection identifies the pending password change rather than a missing permission
+
+#### Scenario: Owner does not bypass a pending password change
+- **WHEN** a staff member holding the Owner role and marked as requiring a password change requests a permission-gated endpoint
+- **THEN** the request is rejected despite the Owner role's permission bypass
+
+#### Scenario: The password-change endpoint stays reachable
+- **WHEN** a staff member marked as requiring a password change requests the password-change endpoint or their own-account endpoint
+- **THEN** the request is allowed
+
 #### Scenario: A role that merely claims the Owner name gets no bypass
 - **WHEN** a staff member holds a role whose name or slug resembles the Owner role's but which is not the seeded Owner record
 - **THEN** that role receives no bypass, and permission checks are evaluated against its assigned permissions only

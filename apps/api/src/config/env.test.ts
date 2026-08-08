@@ -5,6 +5,8 @@ const validEnv = {
   DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
   SESSION_SECRET: 'a'.repeat(32),
   REVALIDATE_SECRET: 'b'.repeat(16),
+  ACCESS_TOKEN_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nZmFrZS1rZXk=\\n-----END PRIVATE KEY-----',
+  ACCESS_TOKEN_PUBLIC_KEY: '-----BEGIN PUBLIC KEY-----\\nZmFrZS1rZXk=\\n-----END PUBLIC KEY-----',
   GOOGLE_CLIENT_ID: 'client-id',
   GOOGLE_CLIENT_SECRET: 'client-secret',
   GOOGLE_REDIRECT_URI: 'https://api.example.com/auth/google/callback',
@@ -12,7 +14,6 @@ const validEnv = {
   R2_ACCESS_KEY_ID: 'key',
   R2_SECRET_ACCESS_KEY: 'secret',
   R2_BUCKET: 'bucket',
-  RESEND_API_KEY: 'resend-key',
   APP_ORIGIN: 'https://example.com',
   ADMIN_ORIGIN: 'https://admin.example.com',
 };
@@ -36,5 +37,17 @@ describe('loadEnv', () => {
 
   it('throws when a secret is too short', () => {
     expect(() => loadEnv({ ...validEnv, SESSION_SECRET: 'short' })).toThrow(/SESSION_SECRET/);
+  });
+
+  it('throws when the access token private key is not PEM-encoded', () => {
+    expect(() =>
+      loadEnv({ ...validEnv, ACCESS_TOKEN_PRIVATE_KEY: 'not-a-pem-key' }),
+    ).toThrow(/ACCESS_TOKEN_PRIVATE_KEY/);
+  });
+
+  it('unescapes literal \\n sequences in PEM keys', () => {
+    const env = loadEnv(validEnv);
+    expect(env.ACCESS_TOKEN_PRIVATE_KEY).toContain('\n');
+    expect(env.ACCESS_TOKEN_PRIVATE_KEY).not.toContain('\\n');
   });
 });

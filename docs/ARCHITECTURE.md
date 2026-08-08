@@ -19,8 +19,8 @@ This is a coherent position, and it has real advantages:
 
 The costs, stated plainly so nobody is surprised in week 11:
 
-- Google OAuth, session issuance, refresh rotation, staff invitations and password reset are now **your code to write and maintain** — roughly 1.5 to 2 weeks that Supabase Auth would have absorbed.
-- You need a transactional email provider for invites and resets.
+- Google OAuth, session issuance, refresh rotation, staff account creation and password reset are now **your code to write and maintain** — roughly 1.5 to 2 weeks that Supabase Auth would have absorbed.
+- Staff have no unauthenticated password recovery. Onboarding and reset both run through an admin (§5.4), so a staff member who forgets their password needs one, and losing every Owner account at once needs a manual database edit.
 - Token rotation, reuse detection and cookie configuration are easy to get subtly wrong. §5 specifies them tightly for that reason.
 
 **In one line:** Supabase stores rows; Node owns identity, authorisation and every write.
@@ -55,13 +55,9 @@ The costs, stated plainly so nobody is surprised in week 11:
                             │ schema `app`      │  │ + image CDN    │
                             │ not API-exposed   │  └────────────────┘
                             └───────────────────┘
-                                     ▲
-                                     │  transactional email
-                            ┌────────┴────────┐
-                            │ Resend/Postmark │
-                            │ invites, resets │
-                            └─────────────────┘
 ```
+
+No transactional email provider appears here, and that is deliberate: staff onboarding and password reset hand a generated temporary password back through the API response rather than mailing a link (§5.4), so the system has no outbound email dependency at all.
 
 **Trust boundary:** the two React apps are untrusted. They hold no keys and no tokens in JavaScript — only httpOnly cookies the browser attaches automatically. Every rule that matters lives in `apps/api`.
 
@@ -117,8 +113,7 @@ apps/api/src/
 │  ├─ google.ts         OAuth client, ID token verification
 │  ├─ csrf.ts           double-submit token issue + compare
 │  ├─ tokens.ts         sign/verify access JWT, rotate refresh
-│  ├─ password.ts       Argon2id hash + verify
-│  ├─ mailer.ts         Resend — invites, resets
+│  ├─ password.ts       Argon2id hash + verify, temporary-password generator
 │  ├─ storage.ts        S3 client, presigned URLs
 │  ├─ sanitizeHtml.ts   allowlist renderer for article bodies
 │  ├─ oembed.ts
@@ -168,25 +163,16 @@ create table app.role_permissions (
 );
 
 create table app.users (               -- staff only
-  id             uuid primary key default gen_random_uuid(),
-  email          citext not null unique,
-  password_hash  text,                 -- null until the invite is accepted
-  name           text not null,
-  role_id        uuid not null references app.roles(id),   -- exactly one role
-  status         app.user_status not null default 'invited',
-  last_login_at  timestamptz,
-  created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now()
-);
-
-create table app.staff_tokens (        -- invite + password reset, single use
-  id           uuid primary key default gen_random_uuid(),
-  user_id      uuid not null references app.users(id) on delete cascade,
-  purpose      app.staff_token_purpose not null,   -- invite | reset
-  token_hash   text not null unique,               -- ≥128 bits of entropy, hashed
-  expires_at   timestamptz not null,               -- 24 hours from issuance
-  consumed_at  timestamptz,
-  created_at   timestamptz not null default now()
+  id                    uuid primary key default gen_random_uuid(),
+  email                 citext not null unique,
+  password_hash         text not null,        -- always set; creation issues a temporary password
+  must_change_password  boolean not null default true,
+  name                  text not null,
+  role_id               uuid not null references app.roles(id),   -- exactly one role
+  status                app.user_status not null default 'active',   -- active | disabled
+  last_login_at         timestamptz,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
 );
 
 create table app.readers (             -- Google-authenticated readers
@@ -209,7 +195,10 @@ create table app.sessions (            -- both audiences, one table
   refresh_token_hash  text not null unique,
   family_id           uuid not null,               -- rotation lineage
   user_agent          text,
-  ip_hash             text,
+  ip_hash             text,                        -- HMAC-SHA256 keyed on SESSION_SECRET,
+                                                   -- never the address itself: an IPv4 is
+                                                   -- only 2^32 candidates, so an unkeyed
+                                                   -- digest is pseudonymous in name only
   expires_at          timestamptz not null,        -- sliding
   absolute_expires_at timestamptz not null,        -- hard cap, never extended
   revoked_at          timestamptz,
@@ -301,6 +290,8 @@ res.cookie('sid_at', accessJwt, {
 
 **Cookies, not localStorage.** A token in `localStorage` is readable by any injected script; one XSS becomes total account takeover. httpOnly cookies survive that. The cost is CSRF exposure, handled by `SameSite=Lax` plus a double-submit CSRF token on state-changing requests.
 
+The CSRF token is signed with `SESSION_SECRET` **and bound to the session id it was issued for**. Binding is what retires the previous token on rotation: refresh mints a new `app.sessions` row, so the caller's next request carries a new `sid` and a token signed against the old one no longer matches. The check stays stateless — it compares against the `sid` claim `authenticate` already verified, never a database read. On `POST /auth/refresh` the access credential has usually expired, leaving no `sid` to bind against; there the signature alone carries the request, and the response immediately issues a token bound to the new session.
+
 **Put the API on a subdomain of the same registrable domain** — `api.siders.id` alongside `siders.id`. Different registrable domains force `SameSite=None`, which requires third-party cookies that browsers are actively killing. Getting this wrong is discovered late and is painful to unwind.
 
 **Refresh rotation with reuse detection.** Every refresh issues a new token and revokes the old one. If a *already-revoked* token is presented, the entire `family_id` is revoked and the user is signed out everywhere — that pattern means a token was stolen and replayed.
@@ -309,22 +300,28 @@ The access token carries a **session id (`sid`) and deliberately no role or perm
 
 Access tokens are signed with EdDSA using a key pair held by the API, and verification is local. Anonymous and public traffic touches the database not at all. Gated routes pay one indexed lookup, and refresh touches `app.sessions`.
 
-**Rotating the signing key does not end sessions.** It invalidates access tokens only; refresh tokens are opaque `app.sessions` rows unaffected by the key, so every client silently refreshes and carries on. Key rotation is not the incident response for a stolen session — bulk revocation is, which is why revoking every session for a subject, and every session system-wide, is a first-class operation rather than an afterthought.
+**Rotating the signing key does not end sessions.** It invalidates access tokens only; refresh tokens are opaque `app.sessions` rows unaffected by the key, so every client silently refreshes and carries on. Key rotation is not the incident response for a stolen session — bulk revocation is, which is why revoking every session for a subject, and every session system-wide, is a first-class operation rather than an afterthought. Per-subject revocation runs automatically on account disable and on any password set; the system-wide sweep is `POST /auth/sessions/revoke-all`, gated on `settings.manage`, and it ends the caller's own session along with everyone else's.
 
-### 5.4 Staff — invite only
+### 5.4 Staff — admin-created, temporary password
 
-No public route creates a staff account.
+No public route creates a staff account, and no email is sent at any point in the staff lifecycle.
 
-1. A caller holding `user.manage` creates the user; API writes `app.users` with `status = 'invited'`, no password hash. Granting the **Owner** role additionally requires the caller to already hold it — otherwise `user.manage` alone would be a complete path to Owner.
-2. A single-use invite token — ≥128 bits of entropy, hashed at rest in `app.staff_tokens`, 24-hour expiry, constant-time comparison — is emailed via Resend.
-3. Staff member sets a password. **Argon2id**, memory cost 19 MiB, 2 iterations, parallelism 1 (OWASP baseline).
-4. Status becomes `active`.
+1. A caller holding `user.manage` creates the user, supplying an email, a name, and a role — but **not** a password. Granting the **Owner** role additionally requires the caller to already hold it, otherwise `user.manage` alone would be a complete path to Owner.
+2. The API generates a temporary password (≥128 bits of entropy, from `node:crypto`), hashes it with **Argon2id** — memory cost 19 MiB, 2 iterations, parallelism 1 (OWASP baseline) — writes `app.users` with `status = 'active'` and `must_change_password = true`, and returns the plaintext **exactly once**, in the creation response. The operator relays it to the staff member out of band. No later read discloses it again.
+3. The staff member signs in with it and receives a session, but every endpoint declaring staff identity or a named permission refuses them — with a distinct error code, not a generic denial — until they replace the password. Only `POST /staff/me/password` and `GET /users/me` are exempt, so the change can actually be made. **The Owner role does not bypass this**: it is not a permission check, and an Owner holding an admin-issued password is exactly the case it exists for.
+4. Changing the password clears `must_change_password` and revokes every *other* session for the account, leaving the caller's own alive so the change does not sign them out of the request that made it.
 
-Creating an account for an email that already belongs to any staff account, in any status, is **rejected**. Upserting here would let a `user.manage` holder submit the Owner's address, receive the invite, and take the account over.
+The admin transiently knows the staff member's password, and that is the accepted cost of dropping the email dependency. `must_change_password` is what bounds it — the window closes at first sign-in, and the admin's knowledge is never a standing credential. The password is generated rather than admin-chosen precisely so it is not one the staff member would carry elsewhere.
 
-Password reset uses the same token mechanism. Both invite and reset responses are deliberately identical whether or not the address exists, so the endpoint cannot be used to enumerate staff emails. Setting a new password through either path **revokes every existing session for that account** and invalidates any other outstanding token of that kind — a reset that leaves the attacker's session alive is not a remediation.
+Creating an account for an email that already belongs to any staff account, in any status, is **rejected**. Upserting here would let a `user.manage` holder submit the Owner's address and take the account over.
 
-Login is rate limited to 5 attempts per 15 minutes per IP-and-email pair, with an additional per-source cap across all addresses so the per-account limit cannot be sidestepped by spraying. Limits also cover invite acceptance and reset-token submission, which are guessable-secret endpoints. Failures always return the same generic message regardless of which half was wrong, and perform **equivalent verification work** for unknown, non-active, and existing accounts — short-circuiting before Argon2id reopens the enumeration channel through response timing. Throttled responses are indistinguishable from ordinary failures.
+Password reset is the same mechanism, admin-triggered: `POST /staff/:id/reset` issues a fresh temporary password, sets `must_change_password`, and **revokes every existing session for that account** — a reset that leaves the attacker's session alive is not a remediation. There is no unauthenticated reset path, so there is nothing to enumerate staff emails through; a `user.manage` holder may legitimately learn which accounts exist, and a missing id is an honest `404`.
+
+Login is rate limited to 5 **failed** attempts per 15 minutes per IP-and-email pair, with an additional per-source cap across all addresses so the per-account limit cannot be sidestepped by spraying. Only failures are counted — a staff member signing in from several devices inside one window must not lock themselves out. Limits also cover `POST /staff/me/password`, which verifies a current password and is therefore the one remaining guessable-secret endpoint. Failures always return the same generic message regardless of which half was wrong, and perform **equivalent verification work** for unknown, non-active, and existing accounts — short-circuiting before Argon2id reopens the enumeration channel through response timing. Throttled responses are indistinguishable from ordinary failures.
+
+Every limit is keyed on `req.ip`, which means `TRUST_PROXY_HOPS` must match the number of reverse proxies actually in front of the API. Set too low, every caller lands in one shared bucket and the first attacker throttles all staff; set too high, a caller spoofs `X-Forwarded-For` and sidesteps the limits entirely. It defaults to `0` — trust nothing — so the failure is a wrong bucket rather than no protection.
+
+Disabling a staff account holding the Owner role requires the caller to *hold* Owner, the same rule that governs granting it. Combined with the bar on disabling your own account, at least one active Owner always survives, so `user.manage` alone can never leave role administration unreachable.
 
 ### 5.5 Authorisation
 
@@ -603,7 +600,6 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET=
 
-RESEND_API_KEY=
 REVALIDATE_SECRET=
 SENTRY_DSN=
 ```
@@ -624,7 +620,8 @@ Note what is absent: no Supabase URL, no anon key, no service key. The frontends
 - [ ] Refresh tokens rotated on every use, stored only as hashes, with family revocation on reuse
 - [ ] CSRF double-submit token on all state-changing requests
 - [ ] Argon2id for staff passwords at OWASP parameters
-- [ ] Invite and reset tokens single-use, hashed, 24-hour expiry
+- [ ] Temporary passwords generated server-side, ≥128 bits of entropy, hashed at rest, disclosed in exactly one response and never re-read
+- [ ] `must_change_password` enforced by both staff and permission guards, with no Owner bypass
 - [ ] Auth responses identical whether or not the account exists, in body **and** timing
 - [ ] Every registered route carries an explicit authorisation declaration; undeclared is denied and fails boot
 - [ ] Admin routes gated on token `type === 'staff'` plus a named permission, never on a role name
@@ -636,7 +633,7 @@ Note what is absent: no Supabase URL, no anon key, no service key. The frontends
 - [ ] Article HTML sanitised on write with an allowlist
 - [ ] Uploaded file types verified by magic bytes, not the declared header
 - [ ] Zod validation on every request body and query string
-- [ ] Rate limits on login, invite acceptance, reset-token submission, reset request, refresh, OAuth callback, comment, like, view, contact — enforced, not merely mounted
+- [ ] Rate limits on login, password change, refresh, OAuth callback, comment, like, view, contact — enforced, not merely mounted
 - [ ] CORS allowlist naming exact origins, `credentials: true`, no wildcard
 - [ ] Helmet, CSP, HSTS
 - [ ] `audit_log` written on every admin mutation — **outstanding**, deferred to an `add-audit-logging` follow-up change (see `openspec/changes/add-auth-foundation/design.md` Non-Goals)
