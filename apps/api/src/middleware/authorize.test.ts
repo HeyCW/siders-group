@@ -96,6 +96,50 @@ describe('requireReader', () => {
     await requireReader()(req, {} as Response, next as NextFunction);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'reader_muted' }));
   });
+
+  /**
+   * The mute restricts *authoring*, and the request method is only a proxy for that. A route
+   * where the two diverge — a profile update, say — says so rather than inheriting the guess.
+   */
+  it('lets a muted reader through a mutating route that declares it authors no content', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'reader-1', ...liveSession(), status: 'active', mutedUntil: new Date(Date.now() + 60_000) },
+      ]) as never,
+    );
+    const req = { ...makeReq({ subjectId: 'reader-1', subjectType: 'reader', sessionId: 'sess-1' }), method: 'PATCH' } as Request;
+    const next = vi.fn();
+    await requireReader({ createsContent: false })(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a muted reader at a read-method route that declares it authors content', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'reader-1', ...liveSession(), status: 'active', mutedUntil: new Date(Date.now() + 60_000) },
+      ]) as never,
+    );
+    const next = vi.fn();
+    const req = makeReq({ subjectId: 'reader-1', subjectType: 'reader', sessionId: 'sess-1' });
+    await requireReader({ createsContent: true })(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'reader_muted' }));
+  });
+
+  /**
+   * The subject-status half of the gated path, as distinct from the session-status half the
+   * revoked/expired tests cover: the session is perfectly valid, the account is not
+   * (specs/authorization/spec.md - "Deactivated reader is rejected and loses existing
+   * sessions").
+   */
+  it('rejects a banned reader holding an otherwise-valid session', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([{ subjectId: 'reader-1', ...liveSession(), status: 'banned', mutedUntil: null }]) as never,
+    );
+    const next = vi.fn();
+    const req = makeReq({ subjectId: 'reader-1', subjectType: 'reader', sessionId: 'sess-1' });
+    await requireReader()(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 401, code: 'unauthenticated' }));
+  });
 });
 
 describe('requireStaff', () => {
@@ -117,6 +161,31 @@ describe('requireStaff', () => {
     await requireStaff()(req, {} as Response, next as NextFunction);
     expect(next).toHaveBeenCalledWith();
     expect(req.staffRole).toEqual({ roleId: 'author-role-id', isOwner: false });
+  });
+
+  /**
+   * The staff counterpart to the banned-reader case: a live session against a disabled
+   * account. `disable` revokes sessions eagerly, but this is the check that holds if a row is
+   * flipped out of band (specs/staff-account-management/spec.md - "Disabling revokes existing
+   * sessions on the next request").
+   */
+  it('rejects a disabled staff account holding an otherwise-valid session', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        {
+          subjectId: 'staff-1',
+          ...liveSession(),
+          status: 'disabled',
+          roleId: 'editor-role-id',
+          mustChangePassword: false,
+          permissionKey: 'news.manage',
+        },
+      ]) as never,
+    );
+    const next = vi.fn();
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    await requireStaff()(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'forbidden' }));
   });
 
   it('rejects a revoked session', async () => {

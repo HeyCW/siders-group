@@ -19,6 +19,8 @@ function createFakeRoleRepository() {
   });
 
   const staffRoleCounts = new Map<string, number>();
+  /** The fake has no staff table; ids added here stand in for "matches no row". */
+  const missingStaffIds = new Set<string>();
 
   const repository: RoleRepository = {
     async findByName(name) {
@@ -53,6 +55,8 @@ function createFakeRoleRepository() {
       const row = rows.get(id);
       if (!row) throw new Error('not found');
       if (input.name !== undefined) row.name = input.name;
+      // Mirrors the real repository: the slug is rewritten with the name, never left behind.
+      if (input.slug !== undefined) row.slug = input.slug;
       if (input.permissionKeys !== undefined) row.permissions = input.permissionKeys;
       return row;
     },
@@ -62,12 +66,12 @@ function createFakeRoleRepository() {
     async countStaffWithRole(id) {
       return staffRoleCounts.get(id) ?? 0;
     },
-    async assignRole() {
-      // no staff table in this fake; assignment success is asserted via no-throw
+    async assignRole(staffId) {
+      return !missingStaffIds.has(staffId);
     },
   };
 
-  return { repository, rows, staffRoleCounts };
+  return { repository, rows, staffRoleCounts, missingStaffIds };
 }
 
 describe('RoleService', () => {
@@ -178,5 +182,46 @@ describe('RoleService', () => {
     await expect(
       service.assign('target-1', 'editor-role-id', { subjectId: 'caller-1', isOwner: false }),
     ).resolves.toBeUndefined();
+  });
+
+  /**
+   * A `roleId` that matches no role is rejected by the FK; a `staffId` that matches no staff
+   * member was not rejected by anything. The UPDATE simply matched zero rows and the endpoint
+   * answered 204, reporting success for an assignment that never happened.
+   */
+  it('rejects assigning a role to a staff id that matches no account', async () => {
+    fake.missingStaffIds.add('ghost-1');
+    await expect(
+      service.assign('ghost-1', 'editor-role-id', { subjectId: 'caller-1', isOwner: false }),
+    ).rejects.toMatchObject({ status: 404, code: 'not_found' });
+  });
+
+  /**
+   * The slug used to be written once at creation and never again, so it drifted into a record
+   * of what the role was previously called — and went on colliding under the old name.
+   */
+  it('rewrites the slug when the name changes, freeing the old name for reuse', async () => {
+    const created = await service.create({ name: 'Editor', permissions: [] });
+    expect(created.slug).toBe('editor');
+
+    const renamed = await service.update(created.id, { name: 'Publisher' });
+    expect(renamed.slug).toBe('publisher');
+
+    // No role is named or slugged "Editor" any more, so creating one must succeed rather than
+    // collide with the renamed role's stale slug.
+    await expect(service.create({ name: 'Editor', permissions: [] })).resolves.toMatchObject({
+      name: 'Editor',
+      slug: 'editor',
+    });
+  });
+
+  it('still rejects a rename whose slug collides with another live role', async () => {
+    await service.create({ name: 'Editor', permissions: [] });
+    const other = await service.create({ name: 'Reviewer', permissions: [] });
+
+    await expect(service.update(other.id, { name: 'editor' })).rejects.toMatchObject({
+      status: 409,
+      code: 'role_name_exists',
+    });
   });
 });

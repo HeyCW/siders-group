@@ -5,6 +5,10 @@ function unescapeNewlines(value: string): string {
   return value.replace(/\\n/g, '\n');
 }
 
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
 const pemPrivateKeySchema = z
   .string()
   .min(1)
@@ -48,8 +52,12 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_BUCKET: z.string().min(1),
 
-  APP_ORIGIN: z.string().url(),
-  ADMIN_ORIGIN: z.string().url(),
+  // Trailing slashes are stripped so these compare equal to a parsed `URL.origin`, which never
+  // carries one. `redirect.ts` matches the post-sign-in target's origin against this set; with
+  // a trailing slash in the environment nothing ever matched and every redirect silently fell
+  // back to the default path — a misconfiguration with no error, only quietly wrong behaviour.
+  APP_ORIGIN: z.string().url().transform(stripTrailingSlash),
+  ADMIN_ORIGIN: z.string().url().transform(stripTrailingSlash),
 
   // Number of reverse proxies in front of the API, so Express can resolve `req.ip` to the
   // real client rather than the proxy. Defaults to 0 (trust nothing): every rate limit here

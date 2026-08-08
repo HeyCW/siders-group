@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { assertVerifiedIdentity, createAuthorizationRequest, type GoogleEnv, type GoogleIdentity } from './google.js';
+import { generateKeyPair, SignJWT } from 'jose';
+import {
+  assertVerifiedIdentity,
+  createAuthorizationRequest,
+  verifyGoogleIdToken,
+  type GoogleEnv,
+  type GoogleIdentity,
+  type GoogleKeySet,
+} from './google.js';
+
+/** Stands in for Google's remote JWKS with the local public key these tests signed against. */
+function createLocalJwks(publicKey: Awaited<ReturnType<typeof generateKeyPair>>['publicKey']): GoogleKeySet {
+  return (() => Promise.resolve(publicKey)) as unknown as GoogleKeySet;
+}
 
 const env: GoogleEnv = {
   GOOGLE_CLIENT_ID: 'client-id',
@@ -35,7 +48,78 @@ describe('assertVerifiedIdentity', () => {
     expect(() => assertVerifiedIdentity(baseIdentity)).not.toThrow();
   });
 
-  it('rejects an unverified identity', () => {
-    expect(() => assertVerifiedIdentity({ ...baseIdentity, emailVerified: false })).toThrow(/not verified/);
+  /**
+   * A plain `Error` here reached `errorHandler`'s final branch and became a 500 — the API
+   * reporting a server fault for a Google account that simply has no verified email
+   * (specs/authentication/spec.md - "Unverified Google email cannot create a reader").
+   */
+  it('rejects an unverified identity as a client error, not a server fault', () => {
+    expect(() => assertVerifiedIdentity({ ...baseIdentity, emailVerified: false })).toThrow(
+      expect.objectContaining({ status: 403, code: 'email_not_verified' }),
+    );
+  });
+});
+
+describe('verifyGoogleIdToken', () => {
+  /**
+   * The nonce check is the replay defence: without it a callback captured from one sign-in can
+   * be replayed into another. It threw a plain `Error`, so a replay surfaced as a 500 rather
+   * than a rejection (specs/authentication/spec.md - "Mismatched nonce is rejected").
+   */
+  it('rejects a nonce mismatch as a 400 rather than an unhandled server error', async () => {
+    const { privateKey, publicKey } = await generateKeyPair('RS256');
+    const idToken = await new SignJWT({ nonce: 'the-wrong-nonce', email: 'a@example.com', email_verified: true })
+      .setProtectedHeader({ alg: 'RS256' })
+      .setIssuer('https://accounts.google.com')
+      .setAudience(env.GOOGLE_CLIENT_ID)
+      .setSubject('sub-1')
+      .setExpirationTime('5m')
+      .sign(privateKey);
+
+    await expect(verifyGoogleIdToken(idToken, env, 'the-expected-nonce', createLocalJwks(publicKey))).rejects.toThrow(
+      expect.objectContaining({ status: 400, code: 'invalid_oauth_callback' }),
+    );
+  });
+
+  it('accepts an assertion whose nonce matches the one bound to this sign-in', async () => {
+    const { privateKey, publicKey } = await generateKeyPair('RS256');
+    const idToken = await new SignJWT({ nonce: 'bound-nonce', email: 'a@example.com', email_verified: true })
+      .setProtectedHeader({ alg: 'RS256' })
+      .setIssuer('https://accounts.google.com')
+      .setAudience(env.GOOGLE_CLIENT_ID)
+      .setSubject('sub-1')
+      .setExpirationTime('5m')
+      .sign(privateKey);
+
+    const identity = await verifyGoogleIdToken(idToken, env, 'bound-nonce', createLocalJwks(publicKey));
+    expect(identity).toMatchObject({ sub: 'sub-1', email: 'a@example.com', emailVerified: true });
+  });
+
+  it('reports email_verified false rather than assuming verification', async () => {
+    const { privateKey, publicKey } = await generateKeyPair('RS256');
+    const idToken = await new SignJWT({ nonce: 'bound-nonce', email: 'a@example.com', email_verified: false })
+      .setProtectedHeader({ alg: 'RS256' })
+      .setIssuer('https://accounts.google.com')
+      .setAudience(env.GOOGLE_CLIENT_ID)
+      .setSubject('sub-1')
+      .setExpirationTime('5m')
+      .sign(privateKey);
+
+    const identity = await verifyGoogleIdToken(idToken, env, 'bound-nonce', createLocalJwks(publicKey));
+    expect(identity.emailVerified).toBe(false);
+    expect(() => assertVerifiedIdentity(identity)).toThrow(expect.objectContaining({ status: 403 }));
+  });
+
+  it('rejects an assertion issued for a different client', async () => {
+    const { privateKey, publicKey } = await generateKeyPair('RS256');
+    const idToken = await new SignJWT({ nonce: 'bound-nonce', email: 'a@example.com', email_verified: true })
+      .setProtectedHeader({ alg: 'RS256' })
+      .setIssuer('https://accounts.google.com')
+      .setAudience('some-other-client')
+      .setSubject('sub-1')
+      .setExpirationTime('5m')
+      .sign(privateKey);
+
+    await expect(verifyGoogleIdToken(idToken, env, 'bound-nonce', createLocalJwks(publicKey))).rejects.toThrow();
   });
 });

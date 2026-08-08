@@ -59,9 +59,8 @@ export function createRoleService(db: Database, repository: RoleRepository): Rol
       // `permissions` is already restricted to the catalog by `roleCreateRequestSchema`
       // (a Zod enum of PERMISSION_KEYS) before this ever runs.
       const slug = await assertUsableName(input.name);
-      // `update` never rewrites a slug, so create is the only path that can collide on one.
-      // Two distinct names ("Content Editor" and "content editor") slugify identically;
-      // without this the unique constraint surfaces as a 500 instead of a 409.
+      // Two distinct names ("Content Editor" and "content editor") slugify identically; without
+      // this the unique constraint surfaces as a 500 instead of a 409.
       if (await repository.findBySlug(slug)) {
         throw duplicateNameError();
       }
@@ -73,13 +72,22 @@ export function createRoleService(db: Database, repository: RoleRepository): Rol
       if (!role) {
         throw new AppError('Role not found', 404, 'not_found');
       }
+      let slug: string | undefined;
       if (input.name !== undefined) {
-        await assertUsableName(input.name, id);
+        // The slug is recomputed with the name and written alongside it. Leaving it behind made
+        // it a stale record of what the role used to be called: renaming "Editor" to "Publisher"
+        // kept slug `editor`, so a later, legitimate role named "Editor" collided on `findBySlug`
+        // and was rejected as a duplicate of a name no role held any more.
+        slug = await assertUsableName(input.name, id);
+        const slugHolder = await repository.findBySlug(slug);
+        if (slugHolder && slugHolder.id !== id) {
+          throw duplicateNameError();
+        }
       }
       if (role.isSystem && input.permissions !== undefined && !input.permissions.includes('role.manage')) {
         throw new AppError('Cannot remove role management from the Owner role', 403, 'owner_role_protected');
       }
-      return repository.update(id, { name: input.name, permissionKeys: input.permissions });
+      return repository.update(id, { name: input.name, slug, permissionKeys: input.permissions });
     },
 
     async delete(id) {
@@ -105,7 +113,10 @@ export function createRoleService(db: Database, repository: RoleRepository): Rol
       if (roleId === ownerRoleId && !caller.isOwner) {
         throw new AppError('Only an Owner may assign the Owner role', 403, 'forbidden');
       }
-      await repository.assignRole(targetStaffId, roleId);
+      const assigned = await repository.assignRole(targetStaffId, roleId);
+      if (!assigned) {
+        throw new AppError('Staff member not found', 404, 'not_found');
+      }
     },
   };
 }

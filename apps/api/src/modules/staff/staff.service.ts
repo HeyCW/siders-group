@@ -123,8 +123,8 @@ export function createStaffService(
         throw new AppError('Current password is incorrect', 401, 'invalid_credentials');
       }
       const passwordHash = await hashPassword(newPassword);
+      // `setPassword` clears the forced-change flag in the same statement.
       await staffRepository.setPassword(subjectId, passwordHash);
-      await staffRepository.clearPasswordChangeFlag(subjectId);
       // Self-service: spare the caller's own session so changing a password doesn't sign the
       // caller out of the request that changed it (specs/staff-account-management/spec.md -
       // "Changing a password ends the account's other sessions").

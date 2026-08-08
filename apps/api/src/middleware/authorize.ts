@@ -84,12 +84,26 @@ async function resolveReaderAccess(sessionId: string): Promise<ReaderAccess | nu
   return { subjectId: row.subjectId, status: row.status, mutedUntil: row.mutedUntil };
 }
 
+export interface RequireReaderOptions {
+  /**
+   * Whether this endpoint creates reader-authored content, which is what a mute actually
+   * restricts (specs/authorization/spec.md - "Muted reader cannot author content").
+   *
+   * Defaults to the request's method being mutating. That heuristic is the safe default for a
+   * route nobody thought about — a new POST is assumed to author content — but it is only a
+   * proxy, and it is wrong in both directions: a `PATCH /reader/me` updating a display name
+   * authors nothing and would be blocked, while a hypothetical content endpoint reached by GET
+   * would not be. Say so explicitly wherever the method and the meaning diverge.
+   */
+  createsContent?: boolean;
+}
+
 /**
- * Reachable only by an authenticated reader whose account is active. A muted reader keeps
- * read access but is rejected at content-creating (non-safe-method) endpoints
+ * Reachable only by an authenticated reader whose account is active. A muted reader keeps read
+ * access but is rejected at content-creating endpoints
  * (specs/authorization/spec.md - "Reader-only authorization").
  */
-export function requireReader() {
+export function requireReader(options: RequireReaderOptions = {}) {
   return markDeclaration(async (req: Request, _res: Response, next: NextFunction) => {
     try {
       if (!req.auth || req.auth.subjectType !== 'reader') {
@@ -99,7 +113,8 @@ export function requireReader() {
       if (!access || access.subjectId !== req.auth.subjectId || access.status !== 'active') {
         throw new AppError('Reader session required', 401, 'unauthenticated');
       }
-      if (access.mutedUntil && access.mutedUntil.getTime() > Date.now() && MUTATING_METHODS.has(req.method)) {
+      const createsContent = options.createsContent ?? MUTATING_METHODS.has(req.method);
+      if (createsContent && access.mutedUntil && access.mutedUntil.getTime() > Date.now()) {
         throw new AppError('Reader is muted', 403, 'reader_muted');
       }
       next();

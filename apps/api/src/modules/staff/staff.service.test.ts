@@ -51,8 +51,12 @@ function createFakeStaffRepository() {
       return row;
     },
     async setPassword(id, passwordHash) {
+      // Mirrors the real repository: the hash and the flag move together, in one statement.
       const row = rows.get(id);
-      if (row) row.passwordHash = passwordHash;
+      if (row) {
+        row.passwordHash = passwordHash;
+        row.mustChangePassword = false;
+      }
     },
     async resetPassword(id, passwordHash) {
       const row = rows.get(id);

@@ -134,4 +134,12 @@ SELECT r.id, p.id
 FROM "app"."roles" r
 CROSS JOIN "app"."permissions" p
 WHERE r.slug = 'owner'
-ON CONFLICT DO NOTHING;
+ON CONFLICT DO NOTHING;--> statement-breakpoint
+-- Staff email uniqueness is case-insensitive. The application lowercases every address at the
+-- contract boundary, but the plain UNIQUE("email") above is byte-comparing, so anything that
+-- reaches the table without passing through that boundary could still land `Owner@x.com`
+-- alongside `owner@x.com` — two staff accounts for one mailbox, which defeats
+-- specs/staff-account-management/spec.md - "Creating an account for an email that already has
+-- one is rejected". The constraint is what actually guarantees it; normalization only keeps
+-- callers from tripping over it.
+CREATE UNIQUE INDEX IF NOT EXISTS "users_email_lower_unique" ON "app"."users" (lower("email"));
