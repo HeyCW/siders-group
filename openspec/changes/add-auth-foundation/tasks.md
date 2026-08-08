@@ -102,6 +102,7 @@
 - [x] 11.5 Reject deleting the seeded Owner role and reject removing `role.manage` from it
 - [x] 11.6 Implement role assignment (replaces the staff member's single prior role), rejecting self-reassignment
 - [x] 11.7 Require the caller to hold the Owner role (not merely `role.manage`) when assigning the Owner role
+- [x] 11.10 Require the caller to hold the Owner role when *removing* it too — replacing the role on an account that currently holds Owner. **Added after review**: 11.7 guarded only the granting direction, so a non-Owner holding `role.manage` could reassign the last Owner to an ordinary role, leaving nobody holding Owner and nobody able to grant it back. `assign` now reads the target's current role before writing, which also moves the unknown-`staffId` 404 ahead of the update.
 - [x] 11.8 Implement the permission-catalog read endpoint, and reject assigning any permission outside the catalog — the latter is enforced upstream by `permissionKeySchema` (a Zod enum of `PERMISSION_KEYS`) on every request body before the service runs, not by a redundant service-level check
 - [x] 11.9 Add tests per scenario in `specs/rbac-management/spec.md` — `role.service.test.ts` (13 tests) against an in-memory fake, `../../lib/ownerRole.js` mocked
 
