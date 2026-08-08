@@ -40,6 +40,12 @@ export interface RoleRepository {
   update(id: string, input: UpdateRoleInput): Promise<RoleWithPermissions>;
   delete(id: string): Promise<void>;
   countStaffWithRole(id: string): Promise<number>;
+  /**
+   * The role a staff member currently holds, or null when no such staff member exists.
+   * Assignment needs this before it writes: whether the operation is privileged depends on the
+   * target's *existing* role, not only on the role being assigned.
+   */
+  findAssignedRoleId(staffId: string): Promise<string | null>;
   /** Resolves false when no staff member has that id, so the caller can 404 rather than 204. */
   assignRole(staffId: string, roleId: string): Promise<boolean>;
 }
@@ -132,6 +138,11 @@ export function createRoleRepository(db: Database): RoleRepository {
     async countStaffWithRole(id) {
       const rows = await db.select({ id: users.id }).from(users).where(eq(users.roleId, id));
       return rows.length;
+    },
+
+    async findAssignedRoleId(staffId) {
+      const [row] = await db.select({ roleId: users.roleId }).from(users).where(eq(users.id, staffId)).limit(1);
+      return row?.roleId ?? null;
     },
 
     async assignRole(staffId, roleId) {

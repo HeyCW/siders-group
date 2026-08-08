@@ -70,19 +70,29 @@ A caller holding the role-management permission SHALL be able to assign a role t
 - **WHEN** a staff member attempts to change the role assigned to their own account
 - **THEN** the request is rejected and their assignment is unchanged
 
-### Requirement: Only an Owner may assign the Owner role
-Assigning the Owner role to any staff member SHALL require that the caller already holds the Owner role. Holding the role-management permission SHALL NOT be sufficient.
+### Requirement: Only an Owner may grant or remove the Owner role
+Changing which role a staff member holds SHALL require that the caller already holds the Owner role whenever either side of the change is the Owner role — that is, both assigning the Owner role to an account and replacing the Owner role on an account that currently holds it. Holding the role-management permission SHALL NOT be sufficient for either.
+
+Guarding only the granting direction is insufficient. If removing the Owner role required no more than the role-management permission, a non-Owner could reassign the last remaining Owner to an ordinary role, after which no staff member holds Owner and no staff member can grant it back, since granting requires already holding it. That is not privilege escalation but permanent loss of role administration, recoverable only outside the API.
 
 #### Scenario: Non-Owner with role-management permission cannot grant the Owner role
 - **WHEN** a staff member holding the role-management permission but not the Owner role assigns the Owner role to any account, including their own
 - **THEN** the request is rejected and no assignment occurs
 
+#### Scenario: Non-Owner with role-management permission cannot remove the Owner role
+- **WHEN** a staff member holding the role-management permission but not the Owner role assigns a different role to an account that currently holds the Owner role
+- **THEN** the request is rejected and the target's assignment is unchanged
+
 #### Scenario: Owner may grant the Owner role
 - **WHEN** a staff member holding the Owner role assigns the Owner role to another staff member
 - **THEN** the assignment succeeds
 
+#### Scenario: Owner may change another Owner's role
+- **WHEN** a staff member holding the Owner role assigns a different role to another account that currently holds the Owner role
+- **THEN** the assignment succeeds
+
 ### Requirement: The Owner role identity is reserved and immutable
-The identity by which the system recognizes the Owner role SHALL be reserved to the single seeded Owner record. No role created or updated through any API SHALL be able to take that identity, no role's identity SHALL be changeable to it, and any system-role marker SHALL be settable only by seeding, never through a request payload.
+The identity by which the system recognizes the Owner role SHALL be reserved to the single seeded Owner record. No role created or updated through any API SHALL be able to take that identity, and no role's identity SHALL be changeable to it. A system-role marker SHALL be settable only by seeding; a request payload carrying one SHALL be rejected outright rather than accepted with the marker silently dropped, so a caller who believes they are setting it is told otherwise instead of receiving a success response that did something different from what they asked.
 
 #### Scenario: Creating a role that claims the Owner identity is rejected
 - **WHEN** a caller creates a role whose name or slug would resolve to the reserved Owner identity
@@ -94,7 +104,7 @@ The identity by which the system recognizes the Owner role SHALL be reserved to 
 
 #### Scenario: System-role marker cannot be set through a request
 - **WHEN** a role create or update request includes a system-role marker
-- **THEN** the marker is ignored, and no role other than the seeded Owner record becomes a system role
+- **THEN** the request is rejected rather than the marker being silently dropped, and no role other than the seeded Owner record becomes a system role
 
 ### Requirement: The Owner role cannot be deleted or stripped of role management
 The system SHALL prevent the Owner role from being deleted and SHALL prevent the role-management permission from being removed from it, so role administration can never become inaccessible to every staff member.

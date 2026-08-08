@@ -19,8 +19,11 @@ function createFakeRoleRepository() {
   });
 
   const staffRoleCounts = new Map<string, number>();
-  /** The fake has no staff table; ids added here stand in for "matches no row". */
-  const missingStaffIds = new Set<string>();
+  /** Stands in for the staff table: staff id -> the role that staff member currently holds. */
+  const staffRoles = new Map<string, string>([
+    ['target-1', 'editor-role-id'],
+    ['owner-target', 'owner-role-id'],
+  ]);
 
   const repository: RoleRepository = {
     async findByName(name) {
@@ -66,12 +69,17 @@ function createFakeRoleRepository() {
     async countStaffWithRole(id) {
       return staffRoleCounts.get(id) ?? 0;
     },
-    async assignRole(staffId) {
-      return !missingStaffIds.has(staffId);
+    async findAssignedRoleId(staffId) {
+      return staffRoles.get(staffId) ?? null;
+    },
+    async assignRole(staffId, roleId) {
+      if (!staffRoles.has(staffId)) return false;
+      staffRoles.set(staffId, roleId);
+      return true;
     },
   };
 
-  return { repository, rows, staffRoleCounts, missingStaffIds };
+  return { repository, rows, staffRoleCounts, staffRoles };
 }
 
 describe('RoleService', () => {
@@ -185,12 +193,34 @@ describe('RoleService', () => {
   });
 
   /**
+   * The mirror image of "only an Owner may grant Owner", and the door that was left open:
+   * removing Owner was unguarded. A non-Owner holding `role.manage` could assign an ordinary
+   * role to the last Owner, after which nobody holds Owner and nobody can grant it back —
+   * granting requires already holding it. Not escalation, but permanent loss of role
+   * administration, recoverable only by editing the database.
+   */
+  it('rejects a non-Owner caller demoting an Owner, which would strip Owner from the system', async () => {
+    await expect(
+      service.assign('owner-target', 'editor-role-id', { subjectId: 'caller-1', isOwner: false }),
+    ).rejects.toMatchObject({ status: 403, code: 'forbidden' });
+
+    // The Owner still holds Owner — the write never happened.
+    expect(fake.staffRoles.get('owner-target')).toBe('owner-role-id');
+  });
+
+  it('allows an Owner caller to change another Owner’s role', async () => {
+    await expect(
+      service.assign('owner-target', 'editor-role-id', { subjectId: 'owner-caller', isOwner: true }),
+    ).resolves.toBeUndefined();
+    expect(fake.staffRoles.get('owner-target')).toBe('editor-role-id');
+  });
+
+  /**
    * A `roleId` that matches no role is rejected by the FK; a `staffId` that matches no staff
    * member was not rejected by anything. The UPDATE simply matched zero rows and the endpoint
    * answered 204, reporting success for an assignment that never happened.
    */
   it('rejects assigning a role to a staff id that matches no account', async () => {
-    fake.missingStaffIds.add('ghost-1');
     await expect(
       service.assign('ghost-1', 'editor-role-id', { subjectId: 'caller-1', isOwner: false }),
     ).rejects.toMatchObject({ status: 404, code: 'not_found' });

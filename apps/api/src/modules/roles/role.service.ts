@@ -109,12 +109,28 @@ export function createRoleService(db: Database, repository: RoleRepository): Rol
       if (targetStaffId === caller.subjectId) {
         throw new AppError('You cannot change the role assigned to your own account', 400, 'self_reassignment_forbidden');
       }
+      const currentRoleId = await repository.findAssignedRoleId(targetStaffId);
+      if (currentRoleId === null) {
+        throw new AppError('Staff member not found', 404, 'not_found');
+      }
       const ownerRoleId = await getOwnerRoleId(db);
       if (roleId === ownerRoleId && !caller.isOwner) {
         throw new AppError('Only an Owner may assign the Owner role', 403, 'forbidden');
       }
+      // Removing Owner is as privileged as granting it. Guarding only the role being *assigned*
+      // left the mirror-image door open: a non-Owner holding `role.manage` could assign an
+      // ordinary role to the last Owner, after which nobody holds Owner and nobody can grant it
+      // back, because granting requires already holding it. That is not escalation — it is
+      // permanent loss of role administration, recoverable only by editing the database. It also
+      // falsified design.md's claim that "at least one active Owner always survives the API's own
+      // operations", which held for disable and self-mutation but never for reassignment.
+      if (currentRoleId === ownerRoleId && !caller.isOwner) {
+        throw new AppError('Only an Owner may change the role assigned to an Owner', 403, 'forbidden');
+      }
       const assigned = await repository.assignRole(targetStaffId, roleId);
       if (!assigned) {
+        // The target existed a moment ago, so it was deleted mid-request. Still a 404, never a
+        // silent 204 reporting an assignment that did not happen.
         throw new AppError('Staff member not found', 404, 'not_found');
       }
     },
