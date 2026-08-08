@@ -26,6 +26,20 @@ import { createReaderRepository } from './reader.repository.js';
 
 const CALLBACK_RATE_LIMIT = { windowMs: 15 * 60 * 1000, max: 20 };
 
+/**
+ * The callback's own ordinary failure — the same 400 a mismatched or absent `state` produces
+ * below. A 429 here would single out the throttled caller against every other rejection
+ * (specs/authentication/spec.md - "Throttling does not leak account existence").
+ */
+function respondWithCallbackFailure(_req: Request, _res: Response, next: NextFunction): void {
+  next(new AppError('Missing or expired sign-in state', 400, 'invalid_oauth_state'));
+}
+
+/** Exported for the same reason the sign-in chain is: the tests assert the shipped config. */
+export function googleCallbackRateLimiter() {
+  return rateLimit({ ...CALLBACK_RATE_LIMIT, keyGenerator: clientIp, onLimited: respondWithCallbackFailure });
+}
+
 export function googleAuthRoutes(db: Database, env: Env) {
   const router = Router();
   const readerRepository = createReaderRepository(db);
@@ -53,7 +67,7 @@ export function googleAuthRoutes(db: Database, env: Env) {
   router.get(
     '/google/callback',
     requirePublic(),
-    rateLimit({ ...CALLBACK_RATE_LIMIT, keyGenerator: clientIp }),
+    googleCallbackRateLimiter(),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const cookieValue = req.cookies?.[OAUTH_STATE_COOKIE];

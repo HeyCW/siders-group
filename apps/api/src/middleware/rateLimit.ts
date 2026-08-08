@@ -7,17 +7,25 @@ export interface RateLimitOptions {
   /** Derives the bucket key from the request — e.g. `${ip}:${email}`, or `ip` alone. */
   keyGenerator: (req: Request) => string;
   /**
-   * Called instead of the default 429 when the limit is exceeded. A route uses this to make
-   * the throttled response indistinguishable from its own ordinary failure response
+   * Called instead of a 429 when the limit is exceeded, to make the throttled response
+   * indistinguishable from this endpoint's own ordinary failure response
    * (specs/authentication/spec.md - "Throttling does not leak account existence").
+   *
+   * Required, not optional: the spec's indistinguishability rule is per endpoint, so there is
+   * no correct default a limiter could fall back to — a 429 is distinguishable from every
+   * ordinary failure by construction. Four of the five rate-limited endpoints originally
+   * omitted this, which is what an optional field invites. A limiter that genuinely wants the
+   * generic 429 says so with `respondWithTooManyRequests`.
    */
-  onLimited?: (req: Request, res: Response, next: NextFunction) => void;
+  onLimited: (req: Request, res: Response, next: NextFunction) => void;
   /**
-   * Count only attempts whose response fails (status >= 400), tallied once the response is
-   * finished. The specs limit *failed* sign-in attempts and *invalid* token submissions
-   * (specs/authentication/spec.md - "Authentication attempts are rate limited"); counting
-   * successes as well would lock out a staff member who legitimately signs in from several
-   * devices inside one window.
+   * Charge only attempts whose response fails (status >= 400). The specs limit *failed*
+   * sign-in attempts and *invalid* token submissions (specs/authentication/spec.md -
+   * "Authentication attempts are rate limited"); counting successes as well would lock out a
+   * staff member who legitimately signs in from several devices inside one window.
+   *
+   * Implemented as reserve-then-refund rather than count-on-failure, so the ceiling still
+   * holds against concurrent attempts — see the note in the middleware below.
    */
   failuresOnly?: boolean;
 }
@@ -56,28 +64,44 @@ export function rateLimit(options: RateLimitOptions) {
     const now = Date.now();
     if (buckets.size > MAX_TRACKED_BUCKETS) sweepExpired(now);
 
-    const bucket = currentBucket(options.keyGenerator(req), now, options.windowMs);
+    const key = options.keyGenerator(req);
+    const bucket = currentBucket(key, now, options.windowMs);
 
-    if (bucket.count >= options.max) {
-      if (options.onLimited) {
-        options.onLimited(req, res, next);
-      } else {
-        next(new AppError('Too many requests', 429, 'rate_limited'));
-      }
+    // Reserve the slot *before* the handler runs, and hand it back afterward if the attempt
+    // turned out not to be chargeable. Checking the ceiling at entry while only incrementing in
+    // `finish` bounds nothing under concurrency: N requests issued in parallel all read the
+    // pre-increment count and all pass, so `max` caps sequential attempts only. Attackers do not
+    // attack sequentially.
+    bucket.count += 1;
+    if (bucket.count > options.max) {
+      options.onLimited(req, res, next);
       return;
     }
 
     if (options.failuresOnly) {
-      // Tallied after the handler has ruled, so a successful sign-in costs nothing.
       res.on('finish', () => {
-        if (res.statusCode >= FAILURE_STATUS_FLOOR) bucket.count += 1;
+        if (res.statusCode >= FAILURE_STATUS_FLOOR) return;
+        // A success costs nothing, so refund — but only into the same bucket we charged. The
+        // window may have rolled over while the handler ran, in which case `currentBucket`
+        // has already replaced this key's bucket and crediting the captured object would
+        // write to an orphan (and crediting the new one would refund a slot never charged
+        // there). Dropping the refund is the safe end of that race: it can only leave the
+        // caller marginally more limited, never less.
+        if (buckets.get(key) === bucket) bucket.count -= 1;
       });
-    } else {
-      bucket.count += 1;
     }
 
     next();
   };
+}
+
+/**
+ * The explicit opt-in to a distinguishable 429, for limiters whose endpoint has no ordinary
+ * failure response to blend into. Spelling it out keeps the choice visible at the call site
+ * rather than implied by an omitted option.
+ */
+export function respondWithTooManyRequests(_req: Request, _res: Response, next: NextFunction): void {
+  next(new AppError('Too many requests', 429, 'rate_limited'));
 }
 
 /** Test-only: clears every tracked bucket so tests don't leak state into each other. */

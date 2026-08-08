@@ -8,6 +8,11 @@ vi.mock('../../lib/ownerRole.js', () => ({
 import { createStaffService } from './staff.service.js';
 import { verifyPassword } from '../../lib/password.js';
 import type { CreateStaffInput, StaffRepository, StaffRow } from './staff.repository.js';
+import type { CallerContext } from '../../lib/callerContext.js';
+
+/** A `user.manage` holder who is not an Owner — the caller every Owner-only bar exists to stop. */
+const ADMIN_CALLER: CallerContext = { subjectId: 'caller-1', isOwner: false };
+const OWNER_CALLER: CallerContext = { subjectId: 'owner-caller', isOwner: true };
 
 function makeStaffRow(overrides: Partial<StaffRow> = {}): StaffRow {
   return {
@@ -141,7 +146,7 @@ describe('StaffService', () => {
       passwordHash: 'original-hash',
     });
 
-    const { temporaryPassword } = await service.triggerReset(created.id);
+    const { temporaryPassword } = await service.triggerReset(created.id, ADMIN_CALLER);
 
     const updated = staff.rows.get(created.id);
     expect(updated?.mustChangePassword).toBe(true);
@@ -159,7 +164,7 @@ describe('StaffService', () => {
     await staff.repository.clearPasswordChangeFlag(created.id);
     expect(staff.rows.get(created.id)?.mustChangePassword).toBe(false);
 
-    await service.triggerReset(created.id);
+    await service.triggerReset(created.id, ADMIN_CALLER);
 
     expect(staff.rows.get(created.id)?.mustChangePassword).toBe(true);
   });
@@ -171,8 +176,8 @@ describe('StaffService', () => {
       roleId: 'author-role-id',
       passwordHash: 'original-hash',
     });
-    const first = await service.triggerReset(created.id);
-    const second = await service.triggerReset(created.id);
+    const first = await service.triggerReset(created.id, ADMIN_CALLER);
+    const second = await service.triggerReset(created.id, ADMIN_CALLER);
 
     const updated = staff.rows.get(created.id);
     await expect(verifyPassword(first.temporaryPassword, updated!.passwordHash)).resolves.toBe(false);
@@ -180,7 +185,63 @@ describe('StaffService', () => {
   });
 
   it('triggerReset rejects an unknown staff id — reset is authenticated, so a 404 is honest', async () => {
-    await expect(service.triggerReset('does-not-exist')).rejects.toMatchObject({ status: 404, code: 'not_found' });
+    await expect(service.triggerReset('does-not-exist', ADMIN_CALLER)).rejects.toMatchObject({
+      status: 404,
+      code: 'not_found',
+    });
+  });
+
+  /**
+   * The escalation this bar exists to close: `POST /staff/:id/reset` gates on `user.manage`
+   * alone, and its 200 body carries a *working* credential for the target. Without an Owner
+   * check a non-Owner Editor could reset the Owner, read the temporary password, sign in, and
+   * clear the forced-change flag at `/staff/me/password` — which is deliberately exempt from
+   * the pending-change gate. That makes `user.manage` a complete path to Owner
+   * (design.md - "Granting Owner is Owner-only"; specs/staff-account-management/spec.md -
+   * "Holding the user-management permission SHALL NOT be sufficient").
+   */
+  it('triggerReset refuses a non-Owner caller resetting an Owner, leaving the credential intact', async () => {
+    const owner = await staff.repository.create({
+      email: 'owner@example.com',
+      name: 'The Owner',
+      roleId: 'owner-role-id',
+      passwordHash: 'owner-original-hash',
+    });
+
+    await expect(service.triggerReset(owner.id, ADMIN_CALLER)).rejects.toMatchObject({
+      status: 403,
+      code: 'forbidden',
+    });
+
+    // No new credential was minted, and no session of the Owner's was touched.
+    expect(staff.rows.get(owner.id)?.passwordHash).toBe('owner-original-hash');
+    expect(revokeSessions).not.toHaveBeenCalled();
+  });
+
+  it('triggerReset allows an Owner caller to reset another Owner', async () => {
+    const owner = await staff.repository.create({
+      email: 'owner@example.com',
+      name: 'The Owner',
+      roleId: 'owner-role-id',
+      passwordHash: 'owner-original-hash',
+    });
+
+    const { temporaryPassword } = await service.triggerReset(owner.id, OWNER_CALLER);
+
+    await expect(verifyPassword(temporaryPassword, staff.rows.get(owner.id)!.passwordHash)).resolves.toBe(true);
+  });
+
+  it('triggerReset still allows a non-Owner caller to reset an ordinary account', async () => {
+    const created = await staff.repository.create({
+      email: 'author@example.com',
+      name: 'Author',
+      roleId: 'author-role-id',
+      passwordHash: 'original-hash',
+    });
+
+    const { temporaryPassword } = await service.triggerReset(created.id, ADMIN_CALLER);
+
+    await expect(verifyPassword(temporaryPassword, staff.rows.get(created.id)!.passwordHash)).resolves.toBe(true);
   });
 
   it('changePassword requires the current password to verify', async () => {

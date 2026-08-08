@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { NextFunction, Request, Response } from 'express';
+import express, { Router, type NextFunction, type Request, type Response } from 'express';
 
 vi.mock('../lib/db.js', () => ({ getDatabase: vi.fn() }));
 vi.mock('../config/env.js', () => ({ loadEnv: vi.fn().mockReturnValue({}) }));
@@ -295,48 +295,86 @@ describe('requirePermission', () => {
   });
 });
 
+/**
+ * These run against a **real Express app**, not hand-built objects shaped like one. The
+ * previous fakes modelled the internals the walker reads, so they kept passing while the
+ * walker missed real structures — a mounted sub-app's routes hang off `handle._router`, not
+ * `handle.stack`, and the fakes never had a `_router` to miss. A test that asserts against a
+ * model of Express can only ever verify the model.
+ */
 describe('auditAuthorizationDeclarations', () => {
-  function declared() {
-    return requirePublic();
-  }
-  function undeclared(_req: Request, _res: Response, next: NextFunction) {
-    next();
+  function undeclared(_req: Request, res: Response) {
+    res.status(200).end();
   }
 
   it('passes when every route carries a declaration', () => {
-    const app = {
-      _router: {
-        stack: [
-          { route: { path: '/health', methods: { get: true }, stack: [{ handle: declared() }] } },
-        ],
-      },
-    };
+    const app = express();
+    app.get('/health', requirePublic(), undeclared);
+    expect(() => auditAuthorizationDeclarations(app)).not.toThrow();
+  });
+
+  it('passes with ordinary global middleware mounted, which carries no declaration by design', () => {
+    const app = express();
+    app.use(express.json());
+    app.use((_req: Request, _res: Response, next: NextFunction) => next());
+    app.get('/health', requirePublic(), undeclared);
     expect(() => auditAuthorizationDeclarations(app)).not.toThrow();
   });
 
   it('throws when a route carries no declaration', () => {
-    const app = {
-      _router: {
-        stack: [
-          { route: { path: '/oops', methods: { get: true }, stack: [{ handle: undeclared }] } },
-        ],
-      },
-    };
+    const app = express();
+    app.get('/oops', undeclared);
     expect(() => auditAuthorizationDeclarations(app)).toThrow(/oops/);
   });
 
   it('walks into mounted sub-routers', () => {
-    const app = {
-      _router: {
-        stack: [
-          {
-            handle: {
-              stack: [{ route: { path: '/nested', methods: { post: true }, stack: [{ handle: undeclared }] } }],
-            },
-          },
-        ],
-      },
-    };
+    const app = express();
+    const router = Router();
+    router.post('/nested', undeclared);
+    app.use('/parent', router);
     expect(() => auditAuthorizationDeclarations(app)).toThrow(/nested/);
   });
+
+  it('recognizes a declaration on a router-level use(), not only on the route itself', () => {
+    const app = express();
+    const router = Router();
+    router.use(requirePublic());
+    router.get('/inherited', undeclared);
+    app.use('/parent', router);
+    expect(() => auditAuthorizationDeclarations(app)).not.toThrow();
+  });
+
+  /**
+   * The hole the fakes could not see. Express wraps a mounted sub-app in a `mounted_app`
+   * closure and keeps no reference to the app on the layer, so its routes cannot be reached
+   * from the parent's table at all — the old walker skipped it and reported a clean boot,
+   * meaning an entire application could be mounted and served with no declaration.
+   * Un-introspectable has to mean rejected.
+   */
+  it('rejects a mounted sub-app, whose routes Express does not expose to the walker', () => {
+    const app = express();
+    const subApp = express();
+    subApp.get('/inside-subapp', undeclared);
+    app.use('/mounted', subApp);
+    expect(() => auditAuthorizationDeclarations(app)).toThrow(/\/mounted/);
+  });
+
+  it('flags a path-mounted responding middleware, which is an endpoint with no declaration', () => {
+    const app = express();
+    app.use('/responds', undeclared);
+    expect(() => auditAuthorizationDeclarations(app)).toThrow(/\/responds/);
+  });
+
+  it('does not flag a path-mounted error handler, which never serves a route', () => {
+    const app = express();
+    app.get('/fine', requirePublic(), undeclared);
+    app.use('/scoped', (_err: unknown, _req: Request, _res: Response, _next: NextFunction) => {});
+    expect(() => auditAuthorizationDeclarations(app)).not.toThrow();
+  });
+
+  it('fails closed on a layer shape it cannot introspect rather than assuming it is declared', () => {
+    const app = { _router: { stack: [{ handle: 'not-a-function' }] } };
+    expect(() => auditAuthorizationDeclarations(app)).toThrow(/unrecognized Express layer shape/);
+  });
+
 });

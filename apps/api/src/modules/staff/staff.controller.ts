@@ -48,8 +48,9 @@ export function createStaffController(service: StaffService) {
 
     async triggerReset(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
+        const caller = requireCaller(req);
         const targetId = requireParam(req, 'id');
-        const { temporaryPassword } = await service.triggerReset(targetId);
+        const { temporaryPassword } = await service.triggerReset(targetId, caller);
         res.status(200).json({ success: true, data: toStaffResetResponse(temporaryPassword) });
       } catch (err) {
         next(err);

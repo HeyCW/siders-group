@@ -21,7 +21,7 @@ export interface CreatedStaff {
 export interface StaffService {
   create(input: { email: string; name: string; roleId: string }, caller: CallerContext): Promise<CreatedStaff>;
   disable(targetId: string, caller: CallerContext): Promise<void>;
-  triggerReset(targetId: string): Promise<{ temporaryPassword: string }>;
+  triggerReset(targetId: string, caller: CallerContext): Promise<{ temporaryPassword: string }>;
   changePassword(
     subjectId: string,
     sessionId: string,
@@ -36,6 +36,22 @@ export function createStaffService(
   revokeSessions: RevokeStaffSessions,
   revokeSessionsExcept: RevokeStaffSessionsExcept,
 ): StaffService {
+  /**
+   * The Owner-only bar every privileged staff operation shares: `user.manage` lets a caller
+   * administer ordinary accounts, but touching an Owner — granting the role, disabling one, or
+   * resetting one's credentials — additionally requires already holding it. Without this,
+   * `user.manage` is a complete path to Owner (design.md - "Granting Owner is Owner-only").
+   *
+   * One function owns the rule so a new privileged operation inherits it by calling this rather
+   * than by remembering to re-derive it; `triggerReset` shipped without the check precisely
+   * because it was open-coded in the other two.
+   */
+  async function assertMayActOnOwner(targetRoleId: string, caller: CallerContext, action: string): Promise<void> {
+    if (targetRoleId !== (await getOwnerRoleId(db))) return;
+    if (caller.isOwner) return;
+    throw new AppError(`Only an Owner may ${action} an Owner account`, 403, 'forbidden');
+  }
+
   return {
     async create(input, caller) {
       // Rejects an email that already belongs to any staff account in any status — an
@@ -47,8 +63,7 @@ export function createStaffService(
         throw new AppError('An account with this email already exists', 409, 'email_exists');
       }
 
-      const ownerRoleId = await getOwnerRoleId(db);
-      if (input.roleId === ownerRoleId && !caller.isOwner) {
+      if (input.roleId === (await getOwnerRoleId(db)) && !caller.isOwner) {
         throw new AppError('Only an Owner may grant the Owner role', 403, 'forbidden');
       }
 
@@ -66,18 +81,14 @@ export function createStaffService(
       if (!target) {
         throw new AppError('Staff member not found', 404, 'not_found');
       }
-      // Disabling an Owner is Owner-only, for the same reason granting Owner is: otherwise
-      // `user.manage` alone could disable every Owner and leave role administration
-      // permanently unreachable (design.md - "Granting Owner is Owner-only"). Combined with
-      // the self-disable bar above, at least one active Owner always survives — the caller.
-      if (target.roleId === (await getOwnerRoleId(db)) && !caller.isOwner) {
-        throw new AppError('Only an Owner may disable an Owner account', 403, 'forbidden');
-      }
+      // Combined with the self-disable bar above, at least one active Owner always survives —
+      // the caller.
+      await assertMayActOnOwner(target.roleId, caller, 'disable');
       await staffRepository.setStatus(targetId, 'disabled');
       await revokeSessions('staff', targetId);
     },
 
-    async triggerReset(targetId) {
+    async triggerReset(targetId, caller) {
       // Reset is authenticated (user.manage) now that there is no unauthenticated path, so a
       // missing id is an honest 404 rather than the identical-response enumeration guard the
       // old unauthenticated reset needed (specs/staff-account-management/spec.md - "Credential
@@ -86,6 +97,12 @@ export function createStaffService(
       if (!staff) {
         throw new AppError('Staff member not found', 404, 'not_found');
       }
+      // Reset is the most powerful of the three Owner-protected operations: it hands the caller
+      // a *working* credential for the target account in the response body, so a non-Owner
+      // holding `user.manage` could otherwise reset an Owner, read the temporary password, sign
+      // in as them, and clear the forced-change flag at `/staff/me/password` — which is exempt
+      // from the pending-change gate precisely so it stays reachable.
+      await assertMayActOnOwner(staff.roleId, caller, 'reset');
       const temporaryPassword = generateTemporaryPassword();
       const passwordHash = await hashPassword(temporaryPassword);
       await staffRepository.resetPassword(targetId, passwordHash);

@@ -3,7 +3,8 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import request from 'supertest';
 import { AppError, createErrorHandler } from '../../middleware/errorHandler.js';
 import { __resetRateLimitStoreForTests } from '../../middleware/rateLimit.js';
-import { staffLoginRateLimiters } from './auth.routes.js';
+import { refreshRateLimiter, staffLoginRateLimiters } from './auth.routes.js';
+import { googleCallbackRateLimiter } from './google.routes.js';
 import { passwordChangeRateLimiter } from '../staff/staff.routes.js';
 import type { Logger } from '../../lib/logger.js';
 
@@ -119,6 +120,61 @@ describe('sign-in rate limiting', () => {
   });
 });
 
+/**
+ * The spec's indistinguishability rule is per endpoint, so each rate-limited endpoint needs its
+ * own assertion — only sign-in had one, and refresh (429 vs its ordinary 401) and the OAuth
+ * callback (429 vs its ordinary 400) both gave the throttle away.
+ */
+describe.each([
+  {
+    name: 'session refresh',
+    limiter: refreshRateLimiter,
+    max: 30,
+    path: '/auth/refresh',
+    ordinaryFailure: new AppError('Invalid refresh token', 401, 'invalid_refresh_token'),
+  },
+  {
+    name: 'Google sign-in callback',
+    limiter: googleCallbackRateLimiter,
+    max: 20,
+    path: '/auth/google/callback',
+    ordinaryFailure: new AppError('Missing or expired sign-in state', 400, 'invalid_oauth_state'),
+  },
+])('$name rate limiting', ({ limiter, max, path, ordinaryFailure }) => {
+  let app: Express;
+
+  beforeEach(() => {
+    __resetRateLimitStoreForTests();
+    app = express();
+    app.use(express.json());
+    app.post(path, limiter(), (_req: Request, _res: Response, next: NextFunction) => {
+      next(ordinaryFailure);
+    });
+    app.use(createErrorHandler(silentLogger));
+  });
+
+  it('returns a throttled response indistinguishable from an ordinary failure', async () => {
+    const ordinary = await request(app).post(path).send({});
+    expect(ordinary.status).toBe(ordinaryFailure.status);
+
+    for (let attempt = 1; attempt < max; attempt += 1) await request(app).post(path).send({});
+    const throttled = await request(app).post(path).send({});
+
+    expect(throttled.status).toBe(ordinary.status);
+    expect(throttled.body).toEqual(ordinary.body);
+    expect(throttled.status).not.toBe(429);
+    expect(throttled.headers['retry-after']).toBeUndefined();
+  });
+
+  it('actually throttles past the ceiling', async () => {
+    // These limiters are not `failuresOnly` — every attempt counts, failed or not — so the
+    // ceiling is reached by volume alone.
+    for (let attempt = 0; attempt < max; attempt += 1) await request(app).post(path).send({});
+    const throttled = await request(app).post(path).send({});
+    expect(throttled.status).toBe(ordinaryFailure.status);
+  });
+});
+
 describe('password-change rate limiting', () => {
   let app: Express;
 
@@ -128,17 +184,30 @@ describe('password-change rate limiting', () => {
   });
 
   it('throttles repeated wrong-current-password guesses from one account', async () => {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      const res = await request(app)
+    const ordinaryFailure = await request(app)
+      .post('/staff/me/password')
+      .send({ subjectId: 'staff-1', currentPassword: 'guess-0' });
+    expect(ordinaryFailure.status).toBe(401);
+
+    for (let attempt = 1; attempt < 10; attempt += 1) {
+      await request(app)
         .post('/staff/me/password')
         .send({ subjectId: 'staff-1', currentPassword: `guess-${attempt}` });
-      expect(res.status).toBe(401);
     }
 
-    const res = await request(app)
+    // The 11th attempt carries the *correct* current password and is still refused — and is
+    // refused in the endpoint's ordinary shape. This previously asserted a 429, encoding the
+    // very leak the spec forbids (specs/authentication/spec.md - "Throttling does not leak
+    // account existence"): a distinct status told the caller their guessing had been detected,
+    // which an ordinary wrong-password response does not.
+    const throttled = await request(app)
       .post('/staff/me/password')
       .send({ subjectId: 'staff-1', currentPassword: 'correct-current' });
-    expect(res.status).toBe(429);
+
+    expect(throttled.status).toBe(ordinaryFailure.status);
+    expect(throttled.body).toEqual(ordinaryFailure.body);
+    expect(throttled.status).not.toBe(429);
+    expect(throttled.headers['retry-after']).toBeUndefined();
   });
 
   it('does not spend the budget on a current password that verifies', async () => {

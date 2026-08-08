@@ -1,5 +1,6 @@
-import { Router, type Request } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import type { Database } from '@siders/db';
+import { AppError } from '../../middleware/errorHandler.js';
 import { createStaffRepository } from './staff.repository.js';
 import { createStaffService } from './staff.service.js';
 import { createStaffController } from './staff.controller.js';
@@ -16,6 +17,17 @@ function callerSubjectKey(req: Request): string {
 }
 
 /**
+ * The change endpoint's own ordinary failure (`staff.service.ts` - "Current password is
+ * incorrect"). Answering 429 instead confirmed to a caller guessing a hijacked session's
+ * current password that they had reached the ceiling, which an ordinary wrong-password
+ * response does not (specs/authentication/spec.md - "Throttling does not leak account
+ * existence").
+ */
+function respondWithPasswordChangeFailure(_req: Request, _res: Response, next: NextFunction): void {
+  next(new AppError('Current password is incorrect', 401, 'invalid_credentials'));
+}
+
+/**
  * Caps guesses at the caller's own current password (specs/authentication/spec.md -
  * "Brute-forcing a current password at the change endpoint is throttled"). Keyed on the
  * caller's own account rather than on source alone, since this endpoint is authenticated —
@@ -24,7 +36,12 @@ function callerSubjectKey(req: Request): string {
  * Exported so the scenario tests exercise the real configuration.
  */
 export function passwordChangeRateLimiter() {
-  return rateLimit({ ...PASSWORD_CHANGE_RATE_LIMIT, keyGenerator: callerSubjectKey, failuresOnly: true });
+  return rateLimit({
+    ...PASSWORD_CHANGE_RATE_LIMIT,
+    keyGenerator: callerSubjectKey,
+    onLimited: respondWithPasswordChangeFailure,
+    failuresOnly: true,
+  });
 }
 
 export function staffRoutes(db: Database, env: Env) {

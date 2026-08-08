@@ -227,36 +227,100 @@ function isDeclared(handle: unknown): boolean {
   return typeof handle === 'function' && Boolean((handle as unknown as Record<symbol, boolean>)[DECLARATION_MARKER]);
 }
 
+/** A nested `Router`'s layer stack, or null when the handle is not a router. */
+function nestedStack(handle: unknown): unknown[] | null {
+  if (typeof handle !== 'function' && (typeof handle !== 'object' || handle === null)) return null;
+  const candidate = handle as { stack?: unknown; _router?: { stack?: unknown }; router?: { stack?: unknown } };
+  for (const stack of [candidate.stack, candidate._router?.stack, candidate.router?.stack]) {
+    if (Array.isArray(stack)) return stack;
+  }
+  return null;
+}
+
 /**
- * Fails boot rather than serving a route with no declaration. Walks Express's own route
- * table (undocumented but stable across the 4.x line, and duck-typed here rather than
- * strictly modeled — these are private internals, not a contract worth over-fitting a type
- * to) looking for the declaration marker on at least one middleware in each terminal
- * route's stack (specs/authorization/spec.md - "Startup fails on an undeclared route").
+ * Recovers a readable mount path from the layer's compiled regexp. Express keeps no copy of the
+ * original path string on the layer, and `layer.path` is only populated during dispatch, so at
+ * audit time this is the only way to name the offending mount in an error message.
+ */
+function mountPathOf(layer: Record<string, unknown>): string {
+  const regexp = layer.regexp as { source?: string; fast_slash?: boolean } | undefined;
+  if (!regexp?.source || regexp.fast_slash === true) return '';
+  const match = /^\^\\\/(?<path>[^\\]*)/.exec(regexp.source);
+  return match?.groups?.path ? `/${match.groups.path}` : '';
+}
+
+/** Global middleware (`app.use(fn)`); Express marks the no-path case with `regexp.fast_slash`. */
+function isGloballyMounted(layer: Record<string, unknown>): boolean {
+  return (layer.regexp as { fast_slash?: boolean } | undefined)?.fast_slash === true;
+}
+
+/**
+ * Fails boot rather than serving a route with no declaration. Walks Express's own route table
+ * (undocumented but stable across the 4.x line, and duck-typed here rather than strictly
+ * modeled — these are private internals, not a contract worth over-fitting a type to) looking
+ * for the declaration marker on at least one middleware in each terminal route's stack
+ * (specs/authorization/spec.md - "Startup fails on an undeclared route").
+ *
+ * Fails **closed** on anything it cannot see into. An audit that silently skips the shapes it
+ * does not recognize is not an audit — it reports success exactly where it has no evidence.
+ * Two cases matter, and both used to pass silently:
+ *
+ * - A **mounted sub-app** (`app.use('/x', express())`). Express wraps it in a `mounted_app`
+ *   closure and keeps no reference to the sub-app on the layer, so its routes are genuinely
+ *   unreachable from here. Un-introspectable means rejected, not assumed fine.
+ * - A **path-mounted plain function** (`app.use('/x', handler)`), which can respond and so is
+ *   an endpoint, unlike global middleware such as `express.json()`.
  */
 export function auditAuthorizationDeclarations(app: unknown): void {
   const undeclared: string[] = [];
 
-  function walk(stack: unknown): void {
+  function walk(stack: unknown, mountPath: string, inheritedDeclaration: boolean): void {
     if (!Array.isArray(stack)) return;
+    // A declaration mounted with `router.use()` covers every route registered after it in that
+    // router, so it is tracked as the walk proceeds rather than looked for per route.
+    let declaredHere = inheritedDeclaration;
+
     for (const layer of stack as Array<Record<string, unknown>>) {
       const route = layer.route as { path?: string; methods?: Record<string, boolean>; stack?: unknown[] } | undefined;
       if (route) {
-        const methods = Object.keys(route.methods ?? {}).join(',').toUpperCase();
-        const declared = (route.stack ?? []).some(
-          (l) => isDeclared((l as Record<string, unknown>).handle),
-        );
-        if (!declared) undeclared.push(`${methods} ${route.path}`);
+        const declared =
+          declaredHere || (route.stack ?? []).some((l) => isDeclared((l as Record<string, unknown>).handle));
+        if (!declared) {
+          const methods = Object.keys(route.methods ?? {}).join(',').toUpperCase();
+          undeclared.push(`${methods} ${mountPath}${route.path ?? ''}`);
+        }
         continue;
       }
-      const handle = layer.handle as { stack?: unknown[] } | undefined;
-      if (handle && !isDeclared(handle) && Array.isArray(handle.stack)) {
-        walk(handle.stack);
+
+      const handle = layer.handle;
+      if (isDeclared(handle)) {
+        declaredHere = true;
+        continue;
       }
+
+      const nested = nestedStack(handle);
+      if (nested) {
+        walk(nested, `${mountPath}${mountPathOf(layer)}`, declaredHere);
+        continue;
+      }
+
+      if (typeof handle === 'function') {
+        // Error-handling middleware takes (err, req, res, next) and never serves a route.
+        if (isGloballyMounted(layer) || handle.length >= 4 || declaredHere) continue;
+        const name = typeof handle.name === 'string' && handle.name ? handle.name : 'anonymous';
+        undeclared.push(`ALL ${mountPath}${mountPathOf(layer)} (${name}, not introspectable)`);
+        continue;
+      }
+
+      throw new Error(
+        `Cannot audit authorization: unrecognized Express layer shape at "${mountPath}". ` +
+          'Refusing to boot rather than assume it is declared.',
+      );
     }
   }
 
-  walk((app as { _router?: { stack?: unknown[] } })._router?.stack);
+  const root = app as { _router?: { stack?: unknown[] }; router?: { stack?: unknown[] } };
+  walk(root._router?.stack ?? root.router?.stack, '', false);
 
   if (undeclared.length > 0) {
     throw new Error(
