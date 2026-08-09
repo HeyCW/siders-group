@@ -52,6 +52,21 @@ The editor SHALL support creating and editing: paragraphs; headings H1-H3; bold,
 - **WHEN** the user inserts a checklist block and adds items, checking one of them
 - **THEN** that item is persisted with a checked state distinct from unchecked items
 
+### Requirement: Image insertion uploads through the media endpoint
+Inserting an image SHALL upload the file through the admin media endpoint, which validates and stores it and returns a media record. The editor SHALL reference the returned media item in the article content, and SHALL NOT embed raw file data in the document or upload directly to any external storage service.
+
+#### Scenario: Insert an image from the local machine
+- **WHEN** the user inserts an image by choosing a file from their machine
+- **THEN** the editor uploads it through the admin media endpoint and inserts a block referencing the resulting media item
+
+#### Scenario: Rejected upload surfaces in the editor
+- **WHEN** the user attempts to insert a file that the media endpoint rejects for type or size
+- **THEN** the editor reports the failure to the user and no image block is inserted
+
+#### Scenario: Featured image uses the same upload path
+- **WHEN** the user sets an article's featured image
+- **THEN** the file is uploaded through the same admin media endpoint and the article stores a reference to the resulting media record
+
 ### Requirement: Keyboard-first workflow
 The editor SHALL support common keyboard shortcuts for formatting and block operations (at minimum: bold, italic, underline, undo, redo, and Enter/Backspace-driven block splitting and merging) without requiring mouse interaction.
 
