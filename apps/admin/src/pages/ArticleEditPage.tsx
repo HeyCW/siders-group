@@ -99,12 +99,17 @@ export function ArticleEditPage() {
       const updated = await articlesApi.autosave(id, {
         title: formRef.current.title,
         bodyJson: formRef.current.bodyJson,
-        excerpt: formRef.current.excerpt || undefined,
+        // Sent as-is, not `|| undefined`: the service treats an `undefined` field as "don't
+        // touch this", so coercing an empty string to undefined here would make clearing the
+        // field impossible — the save would report success while silently leaving the old
+        // value in place. An empty string is a valid, intentional value for all three
+        // (articleAutosaveRequestSchema has no `.min()` on any of them).
+        excerpt: formRef.current.excerpt,
         categoryIds: formRef.current.categoryIds,
         tagIds: formRef.current.tagIds,
         featuredMediaId: formRef.current.featuredMediaId,
-        seoTitle: formRef.current.seoTitle || undefined,
-        seoDescription: formRef.current.seoDescription || undefined,
+        seoTitle: formRef.current.seoTitle,
+        seoDescription: formRef.current.seoDescription,
       });
       setArticle(updated);
       setSaveStatus('saved');

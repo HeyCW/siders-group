@@ -1,14 +1,14 @@
 # Verification Fixes
 
-Remediation plan for defects found by `/opsx:verify` and a follow-up manual re-review against
-the implementation on `claude/implement-news-management-system` (PR #4). All four are small and
+Remediation plan for defects found by `/opsx:verify` and two follow-up manual re-reviews against
+the implementation on `claude/implement-news-management-system` (PR #4). All five are small and
 contained; none require a database. Everything here should land on the PR branch **before
 archiving the change**.
 
-Fixes 1-3 came from `/opsx:verify`. Fix 4 came from a manual re-review after 1-3 landed, which
-traced every touched code path for regressions and — while doing so — caught a fourth, unrelated
-defect the automated pass had not been looking for. Status: **all four fixed, committed, and
-live-verified** (see each fix's own section).
+Fixes 1-3 came from `/opsx:verify`. Fixes 4 and 5 each came from a manual re-review after the
+prior batch landed — each pass traced every touched code path for regressions and, while doing
+so, caught one more defect the previous passes hadn't been looking for. Status: **all five
+fixed, committed, and live-verified** (see each fix's own section).
 
 Nothing in this document covers the eight environment-blocked tasks (2.9, 13.2, 13.4, 13.7–13.11,
 13.13) — those need a live Postgres and are tracked in `tasks.md` with their reasons.
@@ -290,6 +290,75 @@ out of scope for a fix this size.
 
 ---
 
+## Fix 5 — Clearing Excerpt, SEO Title, or SEO Description via autosave silently did nothing
+
+**Severity:** critical · **Scope:** 3 lines (`ArticleEditPage.tsx`) · **Status:** ✅ fixed
+**Found by:** manual re-review after Fix 4 landed.
+
+### The defect
+
+`ArticleEditPage.tsx`'s autosave payload coerced these three fields with `|| undefined`:
+
+```ts
+excerpt: formRef.current.excerpt || undefined,
+seoTitle: formRef.current.seoTitle || undefined,
+seoDescription: formRef.current.seoDescription || undefined,
+```
+
+`||` treats an empty string as falsy, so the moment a user deleted all the text in any of these
+fields, the coercion sent `undefined` for it. That collides with how `toRepositoryFields` in
+`article.service.ts` interprets `undefined` — as PATCH semantics, "don't touch this field," not
+"clear it":
+
+```ts
+if (input.excerpt !== undefined) fields.excerpt = input.excerpt;   // undefined ⇒ omitted entirely
+```
+
+The full chain: user deletes all text in Excerpt → textarea shows empty → autosave fires with
+`excerpt: undefined` → `JSON.stringify` drops the key entirely → the service sees no `excerpt`
+key and never touches the column → the old value persists in the database forever → the save
+still reports "Saved," with nothing to indicate the clear had no effect. `setArticle(updated)`
+overwrites `article` state with the server's response (which still carries the stale value), but
+`form` state — what the textarea is bound to — is untouched, so the UI kept showing empty while
+the database, and everything the public site reads from it, kept the old content silently.
+
+None of the three write-side schemas have `.min()` on these fields, so an empty string was
+always a valid value to send — the fix only needed to stop suppressing it.
+
+### Changes
+
+**`apps/admin/src/pages/ArticleEditPage.tsx`:** removed the `|| undefined` coercion from all
+three fields; they are now sent as-is.
+
+### Verification
+
+Live-tested with the same real A/B methodology as Fix 4 — not just re-running the suite. Built a
+mock API that faithfully replicates the real service's PATCH-omit-means-untouched semantics
+(only overwrites a field when the JSON key is actually present), then:
+
+1. Loaded an article with a real excerpt, cleared the Excerpt textarea, waited past the 1200ms
+   debounce, and inspected the actual PATCH request body.
+2. **Old code:** `excerpt` key absent from the payload entirely (`hasOwnProperty` false).
+3. Restored the fix, repeated the identical steps.
+4. **New code:** `excerpt` key present with value `""` (`hasOwnProperty` true).
+
+```
+old code →  PATCH body keys: [title, bodyJson, categoryIds, tagIds, featuredMediaId, seoTitle, seoDescription]
+                                                 ^ excerpt missing entirely
+new code →  PATCH body keys: [title, bodyJson, excerpt, categoryIds, tagIds, featuredMediaId, seoTitle, seoDescription]
+                                                 excerpt: ""  (present, clears correctly)
+```
+
+### Tests
+
+No new automated test, for the same reason as Fix 4 — this is UI-to-API wiring, not business
+logic, and the admin app has no integration-test harness to extend cheaply. Swept the rest of
+`apps/admin/src` for the same `|| undefined` pattern during this fix; these three lines were the
+only occurrences. `categoryIds`/`tagIds` are arrays (always truthy, even `[]`, so immune to this
+class of bug) and `featuredMediaId`/`title`/`bodyJson` were already sent without the coercion.
+
+---
+
 ## Sequencing
 
 Fixes 1-3 were independent, touched disjoint files, and were executed in the planned order
@@ -318,12 +387,18 @@ automated test, per its own section above), typecheck/lint/build all still clean
 live-verified in a real browser per Fix 4's own "Verification" subsection: an A/B comparison
 against the actual pre-fix code, not just re-running the existing suite.
 
+**Result, after Fix 5 (third commit):** same gate, still 297/297, clean typecheck/lint/build. Same
+live A/B methodology as Fix 4, this time against a mock API purpose-built to replicate the real
+service's PATCH-omit-means-untouched semantics — see Fix 5's own "Verification" subsection for
+the actual before/after request payloads captured.
+
 ### `tasks.md` updates
 
 - §13.11: the Fix 3 predicate note was added to the database-blocked list.
 - No task checkboxes changed state. Fix 1 and Fix 2 were defects in tasks 6.4 / 7.3 and 3.6 / 8.4
-  respectively; Fix 4 was a defect in the UI work under task 11.2 ("create/edit view"). All three
-  are corrections to work already marked complete, not new scope — the tasks remain `[x]`.
+  respectively; Fixes 4 and 5 were both defects in the UI work under task 11.2 ("create/edit
+  view"). All five are corrections to work already marked complete, not new scope — the tasks
+  remain `[x]`.
 
 ---
 
