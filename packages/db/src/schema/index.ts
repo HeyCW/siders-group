@@ -3,3 +3,6 @@ export * from './rbac';
 export * from './users';
 export * from './readers';
 export * from './sessions';
+export * from './media';
+export * from './articles';
+export * from './taxonomy';

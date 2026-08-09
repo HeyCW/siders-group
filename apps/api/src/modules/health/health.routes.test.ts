@@ -17,6 +17,8 @@ const requiredEnv = {
   R2_SECRET_ACCESS_KEY: 'secret',
   R2_BUCKET: 'bucket',
   RESEND_API_KEY: 'resend-key',
+  MEDIA_STORAGE_PATH: '/var/data/media',
+  MEDIA_PUBLIC_BASE_URL: 'https://cdn.example.com',
   APP_ORIGIN: 'https://example.com',
   ADMIN_ORIGIN: 'https://admin.example.com',
 };

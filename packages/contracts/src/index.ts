@@ -5,3 +5,7 @@ export * from './auth.js';
 export * from './role.js';
 export * from './staff.js';
 export * from './session.js';
+export * from './category.js';
+export * from './tag.js';
+export * from './media.js';
+export * from './article.js';
