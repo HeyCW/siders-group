@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import type { Editor, Range } from '@tiptap/core';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { buildEditorExtensions } from './extensions.js';
@@ -9,7 +8,6 @@ export interface EditorCanvasProps {
   onUpdate: (json: unknown) => void;
   onImageCommand: (props: { editor: Editor; range: Range }) => void;
   onVideoCommand: (props: { editor: Editor; range: Range }) => void;
-  onEditorReady?: (editor: Editor) => void;
 }
 
 /**
@@ -17,8 +15,11 @@ export interface EditorCanvasProps {
  * floating contextual toolbar on selection, and the `/` slash-command menu — no toolbar chrome
  * visible until the user selects text or places the cursor
  * (specs/article-editor/spec.md - "Distraction-free writing canvas").
+ *
+ * Lifecycle is left entirely to `useEditor` — it already destroys the editor on unmount
+ * internally, so a manual `editor.destroy()` here would just call it a second time.
  */
-export function EditorCanvas({ initialContent, onUpdate, onImageCommand, onVideoCommand, onEditorReady }: EditorCanvasProps) {
+export function EditorCanvas({ initialContent, onUpdate, onImageCommand, onVideoCommand }: EditorCanvasProps) {
   const editor = useEditor({
     extensions: buildEditorExtensions({ onImageCommand, onVideoCommand }),
     content: (initialContent as never) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
@@ -30,14 +31,6 @@ export function EditorCanvas({ initialContent, onUpdate, onImageCommand, onVideo
     },
     onUpdate: ({ editor: currentEditor }) => onUpdate(currentEditor.getJSON()),
   });
-
-  useEffect(() => {
-    if (editor && onEditorReady) onEditorReady(editor);
-  }, [editor, onEditorReady]);
-
-  useEffect(() => {
-    return () => editor?.destroy();
-  }, [editor]);
 
   if (!editor) return null;
 

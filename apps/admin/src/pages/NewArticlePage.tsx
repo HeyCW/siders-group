@@ -17,8 +17,14 @@ export function NewArticlePage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    // The title alone can't seed the slug here: slugs freeze after first save and are never
+    // auto-suffixed on collision (design.md - "it does not auto-append -2, -3 variants"), so a
+    // shared literal title like "Untitled" would make every "New article" click after the first
+    // one fail with a slug conflict, forever, until that first draft's slug was manually
+    // changed. A random suffix makes the placeholder slug collision-proof; the title stays
+    // editable and human-friendly.
     articlesApi
-      .create({ title: 'Untitled' })
+      .create({ title: 'Untitled', slug: `untitled-${crypto.randomUUID().slice(0, 8)}` })
       .then((article) => navigate(`/articles/${article.id}`, { replace: true }))
       .catch((err: unknown) => {
         setError(err instanceof ApiError ? err.message : 'Could not create a new article');

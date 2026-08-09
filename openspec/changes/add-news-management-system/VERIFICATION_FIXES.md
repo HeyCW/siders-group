@@ -1,8 +1,14 @@
 # Verification Fixes
 
-Remediation plan for the three defects found by `/opsx:verify` against the implementation on
-`claude/implement-news-management-system` (PR #4). All three are small and contained; none
-require a database. Everything here should land on the PR branch **before archiving the change**.
+Remediation plan for defects found by `/opsx:verify` and a follow-up manual re-review against
+the implementation on `claude/implement-news-management-system` (PR #4). All four are small and
+contained; none require a database. Everything here should land on the PR branch **before
+archiving the change**.
+
+Fixes 1-3 came from `/opsx:verify`. Fix 4 came from a manual re-review after 1-3 landed, which
+traced every touched code path for regressions and — while doing so — caught a fourth, unrelated
+defect the automated pass had not been looking for. Status: **all four fixed, committed, and
+live-verified** (see each fix's own section).
 
 Nothing in this document covers the eight environment-blocked tasks (2.9, 13.2, 13.4, 13.7–13.11,
 13.13) — those need a live Postgres and are tracked in `tasks.md` with their reasons.
@@ -35,7 +41,7 @@ The rest of this plan assumes **Option A**.
 
 ## Fix 1 — Guard against empty auto-generated slugs
 
-**Severity:** critical · **Scope:** 3 services + 1 lib + tests
+**Severity:** critical · **Scope:** 3 services + 1 lib + tests · **Status:** ✅ fixed
 
 ### The defect
 
@@ -108,7 +114,7 @@ and `update` on each.
 
 ## Fix 2 — Clamp the public list `limit` instead of rejecting
 
-**Severity:** critical · **Scope:** 1 schema line + 1 corrected test
+**Severity:** critical · **Scope:** 1 schema line + 1 corrected test · **Status:** ✅ fixed (Option A — clamp — as recommended)
 
 ### The defect
 
@@ -160,7 +166,7 @@ it('still rejects a zero or negative limit as malformed', () => {
 
 ## Fix 3 — Stop a null `published_at` from becoming a public 500
 
-**Severity:** warning · **Scope:** 1 predicate
+**Severity:** warning · **Scope:** 1 predicate · **Status:** ✅ fixed
 
 ### The defect
 
@@ -202,39 +208,122 @@ the real query. The mapper-level guard is already implicitly covered by existing
 
 ---
 
+## Fix 4 — "New article" breaks permanently after its first successful use
+
+**Severity:** critical · **Scope:** 1 line (`NewArticlePage.tsx`) + 2 cleanup items · **Status:** ✅ fixed
+**Found by:** manual re-review after Fixes 1-3 landed, not `/opsx:verify` — this defect was in
+frontend code the automated pass never traced.
+
+### The defect
+
+`NewArticlePage.tsx` hardcoded the same literal title on every click, with no slug override:
+
+```ts
+articlesApi.create({ title: 'Untitled' })
+```
+
+Traced through code that is correct in isolation:
+
+```
+resolveSlug(undefined, 'Untitled')
+  → slugify('Untitled') = 'untitled'
+  → repository.slugExists('untitled')?
+        1st click ever: false → creates fine, slug = "untitled"
+        every click after:      true  → throws slugConflictError()  (409)
+```
+
+Slugs freeze after first save and are never auto-suffixed on collision by design (`design.md` —
+"it does not auto-append -2, -3 variants"), so the slug stays "untitled" forever regardless of
+what the draft's title is later changed to. Reproduction is not an edge case — it is the second
+click of the primary "New article" button in the most ordinary workflow: create a draft, get
+distracted, come back and click "New article" again.
+
+`article.service.test.ts`'s existing `'rejects a slug that collides with another article'` test
+proves the backend is behaving exactly as designed. The bug is the frontend handing it a
+guaranteed duplicate, not the backend's rejection of it.
+
+### Changes
+
+**`apps/admin/src/pages/NewArticlePage.tsx`:**
+
+```ts
+articlesApi.create({ title: 'Untitled', slug: `untitled-${crypto.randomUUID().slice(0, 8)}` })
+```
+
+`crypto.randomUUID()` is available in both the dev server (`localhost` is a secure context by
+browser exception) and any HTTPS production deployment. The title stays editable and
+human-friendly; only the disposable placeholder slug needs to be collision-proof.
+
+**Two related cleanup items caught while tracing this fix's surrounding code**, in
+`apps/admin/src/editor/EditorCanvas.tsx`:
+- Removed a manual `editor?.destroy()` on unmount — `@tiptap/react`'s own `useEditor` hook
+  already owns full lifecycle management including destroy-on-unmount (confirmed in its source).
+  The manual call double-destroyed the editor on every unmount. Not visibly harmful
+  (`EditorView.destroy()` tolerated being called twice in the installed version), but it
+  duplicated lifecycle ownership the library already had — deleted rather than left as
+  redundant defensive code.
+- Removed the `onEditorReady` prop — defined and wired internally, never passed by its only
+  caller (`ArticleEditPage.tsx`). Dead API surface.
+
+### Verification
+
+Live-tested with a real A/B comparison, not just re-running the suite:
+1. Confirmed the *old* code fails deterministically: two full-page loads of `/articles/new` in
+   a row, second one lands on the error screen ("Could not create a new article"), network trace
+   shows no successful redirect.
+2. Restored the fix, re-ran the identical test: both loads redirect to distinct article ids,
+   request bodies show distinct random-suffixed slugs, both requests return `201`.
+
+```
+old code, 2nd click →  stays on /articles/new, "Could not create a new article"
+new code, 2nd click →  {"success":true,"data":{"id":"id-10","slug":"untitled-5b4c1b76",...}}
+```
+
+### Tests
+
+No new automated test — this was a frontend integration bug (a UI page calling the API with a
+predictable colliding value), not new business logic, and the admin app has no existing
+integration-test harness to add one to cheaply (only `apiFetch`'s unit tests exist today). The
+live A/B verification above is the evidence of record; a Playwright-based admin E2E suite would
+be the right place to add regression coverage for this class of bug, but standing one up is
+out of scope for a fix this size.
+
+---
+
 ## Sequencing
 
-The three fixes are independent and touch disjoint files. Suggested order (cheapest feedback
-first):
-
-1. **Fix 2** — one line plus a test correction; confirms the contracts suite is honest again.
-2. **Fix 1** — the largest, and the only one adding a new file.
-3. **Fix 3** — one predicate; no local test to run, so do it last and rely on review.
-
-One commit per fix keeps the "test asserted the wrong thing" correction in Fix 2 legible in
-history rather than buried in a combined diff.
+Fixes 1-3 were independent, touched disjoint files, and were executed in the planned order
+(cheapest feedback first: Fix 2, then Fix 1, then Fix 3), landing in one commit together after
+each passed its own local verification. Fix 4 was found and fixed in a separate follow-up pass
+after 1-3 were already on the branch, and landed in its own commit for the same reason the
+original plan wanted Fix 2's correction isolated — a defect discovered during re-review belongs
+in history as its own change, not folded silently into the batch that didn't catch it.
 
 ---
 
 ## Verification
 
-After all three, the full gate from CLAUDE.md must pass:
+**Result, after Fixes 1-3 (first commit):** full gate green.
 
-```bash
-pnpm -r run typecheck   # all 6 packages
-pnpm test               # expect > 285 (new slugify + guard tests)
-pnpm lint               # zero issues
-pnpm build              # web + api + admin
+```
+pnpm -r run typecheck   → clean, all 6 packages
+pnpm test                → 297/297 (up from 285: +12 across slugify.test.ts and the
+                            article/category/tag service guard tests)
+pnpm lint                → zero issues
+pnpm build                → web + api + admin all build
 ```
 
-Then re-run `/opsx:verify add-news-management-system` and confirm the CRITICAL section is empty.
+**Result, after Fix 4 (second commit):** re-ran the same gate — still 297/297 (Fix 4 had no
+automated test, per its own section above), typecheck/lint/build all still clean. Additionally
+live-verified in a real browser per Fix 4's own "Verification" subsection: an A/B comparison
+against the actual pre-fix code, not just re-running the existing suite.
 
 ### `tasks.md` updates
 
-- §13: add the Fix 3 predicate test to the database-blocked list.
-- No task checkboxes change state — these are corrections to work already marked complete, not
-  new scope. Fix 1 and Fix 2 are defects in tasks 6.4 / 7.3 and 3.6 / 8.4 respectively; the tasks
-  remain done once the defects are fixed.
+- §13.11: the Fix 3 predicate note was added to the database-blocked list.
+- No task checkboxes changed state. Fix 1 and Fix 2 were defects in tasks 6.4 / 7.3 and 3.6 / 8.4
+  respectively; Fix 4 was a defect in the UI work under task 11.2 ("create/edit view"). All three
+  are corrections to work already marked complete, not new scope — the tasks remain `[x]`.
 
 ---
 
