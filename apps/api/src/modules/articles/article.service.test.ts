@@ -136,6 +136,13 @@ describe('ArticleService', () => {
       expect(article.slug).toBe('custom-slug');
     });
 
+    it('rejects a title with no ASCII alphanumerics rather than saving an empty slug', async () => {
+      const { repository, rows } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      await expect(service.create({ title: '!!!' }, 'author-1')).rejects.toMatchObject({ code: 'invalid_slug' });
+      expect(rows.size).toBe(0);
+    });
+
     it('rejects a slug that collides with another article', async () => {
       const { repository } = createFakeArticleRepository();
       const service = createArticleService(repository, revalidateEnv, logger);

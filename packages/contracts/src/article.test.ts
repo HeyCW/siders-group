@@ -5,6 +5,7 @@ import {
   articlePublicListQuerySchema,
   articleSlugSchema,
   articleUpdateRequestSchema,
+  MAX_PUBLIC_LIST_LIMIT,
 } from './article.js';
 
 describe('articleCreateRequestSchema', () => {
@@ -72,9 +73,14 @@ describe('articlePublicListQuerySchema', () => {
     expect(parsed.offset).toBe(0);
   });
 
-  it('caps the limit at 100', () => {
-    const result = articlePublicListQuerySchema.safeParse({ limit: '500' });
-    expect(result.success).toBe(false);
+  it('clamps a limit above the maximum down to the cap, rather than rejecting it', () => {
+    const parsed = articlePublicListQuerySchema.parse({ limit: '500' });
+    expect(parsed.limit).toBe(MAX_PUBLIC_LIST_LIMIT);
+  });
+
+  it('still rejects a zero or negative limit as malformed', () => {
+    expect(articlePublicListQuerySchema.safeParse({ limit: '0' }).success).toBe(false);
+    expect(articlePublicListQuerySchema.safeParse({ limit: '-5' }).success).toBe(false);
   });
 
   it('coerces string query values to numbers', () => {

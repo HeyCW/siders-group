@@ -50,6 +50,20 @@ describe('CategoryService', () => {
     await expect(service.create('Business')).rejects.toMatchObject({ code: 'slug_conflict' });
   });
 
+  it('rejects a name with no ASCII alphanumerics rather than saving an empty slug', async () => {
+    const { repository, rows } = createFakeCategoryRepository();
+    const service = createCategoryService(repository);
+    await expect(service.create('!!!')).rejects.toMatchObject({ code: 'invalid_slug' });
+    expect(rows.size).toBe(0);
+  });
+
+  it('rejects renaming a category to a name with no ASCII alphanumerics', async () => {
+    const { repository } = createFakeCategoryRepository();
+    const service = createCategoryService(repository);
+    const category = await service.create('Usable Name');
+    await expect(service.update(category.id, '???')).rejects.toMatchObject({ code: 'invalid_slug' });
+  });
+
   it('allows renaming a category to a new, unused slug', async () => {
     const { repository } = createFakeCategoryRepository();
     const service = createCategoryService(repository);

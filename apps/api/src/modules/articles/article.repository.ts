@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lte, notInArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import {
   articles,
   articleCategories,
@@ -110,7 +110,13 @@ function invalidTaxonomyError(): AppError {
  * by-slug endpoints can never disagree about whether a scheduled-but-due article is visible.
  */
 function publiclyVisible(now: Date) {
-  return or(eq(articles.status, 'published'), and(eq(articles.status, 'scheduled'), lte(articles.publishedAt, now)));
+  return or(
+    // `published` requires a timestamp too: without this, a row whose publishedAt is somehow
+    // null would reach the mapper, which cannot build a public DTO for it and throws — turning
+    // one bad row into a 500 for the whole listing instead of simply omitting it.
+    and(eq(articles.status, 'published'), isNotNull(articles.publishedAt)),
+    and(eq(articles.status, 'scheduled'), lte(articles.publishedAt, now)),
+  );
 }
 
 type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];

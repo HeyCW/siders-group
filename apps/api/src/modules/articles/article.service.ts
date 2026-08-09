@@ -1,7 +1,7 @@
 import type { ArticleStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
-import { slugify } from '../../lib/slugify.js';
+import { slugifyRequired } from '../../lib/slugify.js';
 import { revalidateArticlePaths, type RevalidateEnv } from '../../lib/revalidate.js';
 import type { Logger } from '../../lib/logger.js';
 import type {
@@ -75,7 +75,7 @@ export function createArticleService(
 ): ArticleService {
   /** Only touched when the article has no slug yet, or the caller explicitly overrides it. */
   async function resolveSlug(desired: string | undefined, title: string, excludeId?: string): Promise<string> {
-    const candidate = desired && desired.length > 0 ? desired : slugify(title);
+    const candidate = desired && desired.length > 0 ? desired : slugifyRequired(title, 'Title');
     if (await repository.slugExists(candidate, excludeId)) {
       throw slugConflictError();
     }

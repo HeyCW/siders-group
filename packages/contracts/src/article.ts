@@ -69,13 +69,25 @@ export const articleScheduleRequestSchema = z
   .strict();
 export type ArticleScheduleRequest = z.infer<typeof articleScheduleRequestSchema>;
 
+export const DEFAULT_PUBLIC_LIST_LIMIT = 20;
+export const MAX_PUBLIC_LIST_LIMIT = 100;
+
 /**
  * `excludeIds` arrives as a comma-separated query string and is split before validation, since
  * a repeated-key array isn't guaranteed across every HTTP client
  * (specs/public-news-api/spec.md - "Excluding specific articles from the list").
  */
 export const articlePublicListQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  // Clamped, not rejected: a client asking for more than the cap gets the cap, not a 400
+  // (specs/public-news-api/spec.md - "Scenario: Limit is capped"). `.min(1)` still rejects zero
+  // and negatives — those are malformed, not merely oversized, and no scenario asks for them to
+  // be clamped.
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(DEFAULT_PUBLIC_LIST_LIMIT)
+    .transform((n) => Math.min(n, MAX_PUBLIC_LIST_LIMIT)),
   offset: z.coerce.number().int().min(0).default(0),
   categorySlug: z.string().optional(),
   tagSlug: z.string().optional(),

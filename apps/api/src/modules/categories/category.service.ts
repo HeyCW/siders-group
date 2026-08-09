@@ -1,5 +1,5 @@
 import { AppError } from '../../middleware/errorHandler.js';
-import { slugify } from '../../lib/slugify.js';
+import { slugifyRequired } from '../../lib/slugify.js';
 import type { CategoryRepository, CategoryRow } from './category.repository.js';
 
 function slugConflictError(): AppError {
@@ -20,7 +20,7 @@ export interface CategoryService {
 export function createCategoryService(repository: CategoryRepository): CategoryService {
   return {
     async create(name) {
-      const slug = slugify(name);
+      const slug = slugifyRequired(name, 'Category name');
       if (await repository.slugExists(slug)) throw slugConflictError();
       return repository.create({ name, slug });
     },
@@ -28,7 +28,7 @@ export function createCategoryService(repository: CategoryRepository): CategoryS
     async update(id, name) {
       const existing = await repository.findById(id);
       if (!existing) throw notFoundError();
-      const slug = slugify(name);
+      const slug = slugifyRequired(name, 'Category name');
       if (slug !== existing.slug && (await repository.slugExists(slug, id))) throw slugConflictError();
       return repository.update(id, { name, slug });
     },

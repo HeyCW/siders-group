@@ -50,6 +50,13 @@ describe('TagService', () => {
     await expect(service.create('Elections')).rejects.toMatchObject({ code: 'slug_conflict' });
   });
 
+  it('rejects a name with no ASCII alphanumerics rather than saving an empty slug', async () => {
+    const { repository, rows } = createFakeTagRepository();
+    const service = createTagService(repository);
+    await expect(service.create('!!!')).rejects.toMatchObject({ code: 'invalid_slug' });
+    expect(rows.size).toBe(0);
+  });
+
   it('404s updating an unknown tag', async () => {
     const { repository } = createFakeTagRepository();
     const service = createTagService(repository);
