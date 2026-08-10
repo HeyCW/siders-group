@@ -1,14 +1,19 @@
 # Verification Fixes
 
-Remediation plan for defects found by `/opsx:verify` and two follow-up manual re-reviews against
-the implementation on `claude/implement-news-management-system` (PR #4). All five are small and
-contained; none require a database. Everything here should land on the PR branch **before
-archiving the change**.
+Remediation log for defects found in the implementation on
+`claude/implement-news-management-system` (PR #4). All six are small and contained; none require
+a database. Everything here should land on the PR branch **before archiving the change**.
 
-Fixes 1-3 came from `/opsx:verify`. Fixes 4 and 5 each came from a manual re-review after the
-prior batch landed — each pass traced every touched code path for regressions and, while doing
-so, caught one more defect the previous passes hadn't been looking for. Status: **all five
-fixed, committed, and live-verified** (see each fix's own section).
+Provenance is worth keeping straight, because it says something about which methods actually
+catch things:
+
+| Fixes | Found by |
+|---|---|
+| 1-3 | `/opsx:verify` — spec-vs-code cross-checking |
+| 4, 5 | manual re-review passes, tracing touched code paths |
+| **6** | **the human author, driving the real API while writing `MANUAL_QA.md`** — the two most severe UI bugs (4, 5) were "live-verified" against a mock that was more permissive than the real server, which is exactly how 6 stayed hidden through three passes |
+
+Status: **all six fixed, committed, and verified** (see each fix's own section).
 
 Nothing in this document covers the eight environment-blocked tasks (2.9, 13.2, 13.4, 13.7–13.11,
 13.13) — those need a live Postgres and are tracked in `tasks.md` with their reasons.
@@ -356,6 +361,72 @@ logic, and the admin app has no integration-test harness to extend cheaply. Swep
 `apps/admin/src` for the same `|| undefined` pattern during this fix; these three lines were the
 only occurrences. `categoryIds`/`tagIds` are arrays (always truthy, even `[]`, so immune to this
 class of bug) and `featuredMediaId`/`title`/`bodyJson` were already sent without the coercion.
+
+---
+
+## Fix 6 — The admin SPA could not perform a single write
+
+**Severity:** critical · **Scope:** `apps/admin/src/lib/api.ts` + 4 regression tests · **Status:** ✅ fixed
+**Found by:** the human author, while writing `MANUAL_QA.md` and driving the real API — **not** by
+`/opsx:verify`, and not by any of the three prior automated re-review passes.
+
+### The defect
+
+`apiFetch` and `apiUpload` never sent an `x-csrf-token` header. `createCsrfMiddleware` rejects
+**every** `POST`/`PATCH`/`DELETE` carrying a session cookie without one, so in a real browser
+autosave, publish, unpublish, schedule, delete, category/tag CRUD and image upload **all**
+returned `403 csrf_failed`. The admin app was read-only in practice.
+
+This is unambiguously a product bug, not a QA inconvenience. `csrf_token` is deliberately set
+`httpOnly: false`, and `apps/api/src/lib/csrf.ts` says why in as many words:
+
+```ts
+httpOnly: false, // must be script-readable — the client echoes it back as a header
+```
+
+The server was holding up its half of a double-submit pair the client never implemented.
+
+### Why three review passes missed it
+
+Worth recording, because the failure mode is reusable:
+
+- **Unit tests mocked `fetch`.** A mock accepts any headers, so an absent one asserts nothing.
+- **The browser testing used a mock API that did not enforce CSRF.** Every "live-verified in a
+  real browser" claim in Fixes 4 and 5 was true of the UI logic and false of the security
+  middleware, because the mock was more permissive than the real server. Fix 4's own two-clicks
+  test *would have 403'd against the real API* — it passed only because the mock let it.
+- **Typecheck and lint cannot see a missing HTTP header.**
+
+The bug was invisible until someone drove the actual server. That is exactly what
+`MANUAL_QA.md` exists for, and it paid for itself before it was even run to completion.
+
+### Changes
+
+**`apps/admin/src/lib/api.ts`:** added a `csrfHeader()` reader that pulls `csrf_token` out of
+`document.cookie` and returns it as `x-csrf-token`; spread into `apiFetch`'s headers and passed
+as `apiUpload`'s only header (`FormData` must keep its browser-generated `Content-Type` boundary,
+so nothing else may be set there).
+
+### Tests
+
+Four regression tests in `apps/admin/src/lib/api.test.ts`, **verified to fail against the
+pre-fix code** (confirmed by reverting `api.ts` and re-running: 4 failed / 4 passed):
+
+- header echoed on `apiFetch`
+- header echoed on `apiUpload`
+- `apiUpload` still sets no `Content-Type`, so the multipart boundary survives
+- the cookie is matched exactly, not by prefix, among other cookies
+
+Plus one for the absent-cookie case (header omitted rather than sent empty). Total admin suite:
+2 → 8 tests.
+
+### Follow-up this exposes
+
+`MANUAL_QA.md` §14 remains the only coverage for admin UI behavior, and its "Read this first"
+note now records that the mock-API blind spot is what hid this. A Playwright suite for
+`apps/admin` driving the **real** API — already listed as out of scope for Fixes 4 and 5 — would
+have caught all three, and is the single highest-value piece of test infrastructure this change
+still lacks.
 
 ---
 

@@ -24,26 +24,26 @@ surfaces early. Section 15 lists what is deliberately **not** here.
 
 ---
 
-## Read this first — two things will block you
+## Read this first — one thing will block you
 
-**1. The admin SPA cannot perform any write.** `apps/admin/src/lib/api.ts` never sends an
-`x-csrf-token` header, but `createCsrfMiddleware` rejects every `POST`/`PATCH`/`DELETE` that carries
-a session cookie without one. Autosave, publish, delete, taxonomy CRUD, and image upload will all
-return `403 csrf_failed` through the browser. Sections 1–12 drive the **API directly**
-(Postman/curl) and are unaffected. Section 14 (editor UX), plus items 13.4 and 13.5, need this
-local-dev patch first — three lines, do **not** commit it:
+> **~~1. The admin SPA cannot perform any write.~~ Fixed — no patch needed.**
+> This list originally called for a local-dev patch here, because `apps/admin/src/lib/api.ts`
+> never sent an `x-csrf-token` header while `createCsrfMiddleware` rejects every
+> `POST`/`PATCH`/`DELETE` carrying a session cookie without one — so autosave, publish, delete,
+> taxonomy CRUD and image upload all returned `403 csrf_failed` in a browser.
+>
+> That was a genuine product bug, not a QA inconvenience: `csrf_token` is deliberately set
+> `httpOnly: false` *precisely* so the client can read it and echo it back
+> (`apps/api/src/lib/csrf.ts` — "must be script-readable — the client echoes it back as a
+> header"). `apiFetch` and `apiUpload` now both send it, covered by four regression tests in
+> `apps/admin/src/lib/api.test.ts` that fail without the fix. **Sections 13.4, 13.5 and 14 now
+> run against the app as shipped — apply no patch.**
+>
+> Worth recording why every prior review missed it: the admin UI was browser-tested against a
+> mock API that did not enforce CSRF. The mock was more permissive than the real server, so the
+> bug was invisible until this list drove the real one.
 
-```ts
-// apps/admin/src/lib/api.ts — LOCAL DEV ONLY, for section 11
-function csrfHeader(): Record<string, string> {
-  const raw = document.cookie.split('; ').find((c) => c.startsWith('csrf_token='));
-  return raw ? { 'x-csrf-token': raw.slice('csrf_token='.length) } : {};
-}
-// then spread `...csrfHeader()` into apiFetch's `headers` and add `headers: csrfHeader()`
-// to apiUpload's fetch call.
-```
-
-**2. The admin app has no login screen.** `App.tsx`'s `LoginPage` is a `<div>Login</div>` stub. Sign
+**1. The admin app has no login screen.** `App.tsx`'s `LoginPage` is a `<div>Login</div>` stub. Sign
 in from the admin origin's devtools console instead — cookies are set on `localhost` and shared
 across ports:
 
@@ -339,7 +339,8 @@ Each of these was a real defect found after implementation. Re-check them by han
 
 ## 14. Admin editor UI (browser)
 
-Needs the section-0 CSRF patch and a console sign-in. Everything here is UX that no test covers.
+Needs a console sign-in (see "Read this first"). No CSRF patch is required any more — the app
+sends the header itself. Everything here is UX that no test covers.
 
 - [ ] **14.1** `/articles` lists articles with author and status; the All / Draft / Scheduled /
   Published filters each narrow the list
