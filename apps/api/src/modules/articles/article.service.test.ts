@@ -108,6 +108,14 @@ function createFakeArticleRepository() {
     async findDueScheduled() {
       return [];
     },
+    async promoteScheduled(id: string, now: Date) {
+      const existing = rows.get(id);
+      if (!existing) return false;
+      if (existing.status !== 'scheduled') return false;
+      if (existing.publishedAt === null || existing.publishedAt.getTime() > now.getTime()) return false;
+      rows.set(id, { ...existing, status: 'published', updatedAt: new Date() });
+      return true;
+    },
   };
 
   return { repository, rows };
@@ -298,6 +306,92 @@ describe('ArticleService', () => {
       const service = createArticleService(repository, revalidateEnv, logger);
       const article = await service.create({ title: 'T' }, 'the-real-author');
       expect(article.authorId).toBe('the-real-author');
+    });
+  });
+
+  /**
+   * A `scheduled` article whose `published_at` has already passed is publicly visible via the
+   * read-time fallback (specs/public-news-api/spec.md - "Scheduled article whose time has passed
+   * is served immediately"), so every write to it changes public output and must revalidate.
+   * Gating on `status === 'published'` missed exactly this state.
+   */
+  describe('revalidation covers due-but-unflipped scheduled articles', () => {
+    /** Bypasses `schedule()`'s future-time guard to construct the due-but-unflipped state. */
+    async function createDueScheduled(repository: ArticleRepository, service: ReturnType<typeof createArticleService>) {
+      const created = await service.create({ title: 'Due Article', slug: 'due-article' }, 'author-1');
+      await repository.updateStatus(created.id, 'scheduled', new Date(Date.now() - 60_000));
+      revalidateArticlePathsMock.mockClear();
+      return created;
+    }
+
+    it('revalidates when a due-but-unflipped scheduled article is deleted', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await createDueScheduled(repository, service);
+
+      await service.delete(created.id);
+
+      expect(revalidateArticlePathsMock).toHaveBeenCalledWith(revalidateEnv, logger, 'due-article');
+    });
+
+    it('revalidates when a due-but-unflipped scheduled article is rescheduled into the future', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await createDueScheduled(repository, service);
+
+      await service.schedule(created.id, new Date(Date.now() + 86_400_000));
+
+      expect(revalidateArticlePathsMock).toHaveBeenCalledWith(revalidateEnv, logger, 'due-article');
+    });
+
+    it('revalidates when a due-but-unflipped scheduled article is edited', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await createDueScheduled(repository, service);
+
+      await service.update(created.id, { title: 'Edited Title' });
+
+      expect(revalidateArticlePathsMock).toHaveBeenCalledWith(revalidateEnv, logger, 'due-article');
+    });
+
+    it('does not revalidate a scheduled article whose time has not yet arrived', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await service.create({ title: 'Future', slug: 'future' }, 'author-1');
+      await service.schedule(created.id, new Date(Date.now() + 86_400_000));
+      revalidateArticlePathsMock.mockClear();
+
+      await service.delete(created.id);
+
+      expect(revalidateArticlePathsMock).not.toHaveBeenCalled();
+    });
+
+    it('revalidates the old slug as well as the new one when a live article is renamed', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await service.create({ title: 'T', slug: 'old-slug' }, 'author-1');
+      await service.publish(created.id);
+      revalidateArticlePathsMock.mockClear();
+
+      await service.update(created.id, { slug: 'new-slug' });
+
+      // Both slugs, and in a single call — `/news` and `/` are shared by both detail paths and
+      // must not be requested twice.
+      expect(revalidateArticlePathsMock).toHaveBeenCalledTimes(1);
+      const revalidatedSlugs = revalidateArticlePathsMock.mock.calls[0]?.slice(2);
+      expect(revalidatedSlugs).toEqual(expect.arrayContaining(['new-slug', 'old-slug']));
+    });
+
+    it('revalidates only the current slug when an edit leaves the slug alone', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await service.create({ title: 'T', slug: 'stable' }, 'author-1');
+      await service.publish(created.id);
+      revalidateArticlePathsMock.mockClear();
+
+      await service.update(created.id, { title: 'New Title' });
+
+      expect(revalidateArticlePathsMock).toHaveBeenCalledWith(revalidateEnv, logger, 'stable');
     });
   });
 });

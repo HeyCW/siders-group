@@ -48,12 +48,14 @@ function loginAccountKey(req: Request): string {
 export function staffLoginRateLimiters(): RequestHandler[] {
   return [
     rateLimit({
+      name: 'staff-login-per-source',
       ...STAFF_LOGIN_PER_SOURCE_LIMIT,
       keyGenerator: clientIp,
       onLimited: respondWithGenericFailure,
       failuresOnly: true,
     }),
     rateLimit({
+      name: 'staff-login-per-account',
       ...STAFF_LOGIN_PER_ACCOUNT_LIMIT,
       keyGenerator: loginAccountKey,
       onLimited: respondWithGenericFailure,
@@ -64,7 +66,12 @@ export function staffLoginRateLimiters(): RequestHandler[] {
 
 /** Exported for the same reason the sign-in chain is: the tests assert the shipped config. */
 export function refreshRateLimiter() {
-  return rateLimit({ ...REFRESH_RATE_LIMIT, keyGenerator: clientIp, onLimited: respondWithRefreshFailure });
+  return rateLimit({
+    name: 'auth-refresh',
+    ...REFRESH_RATE_LIMIT,
+    keyGenerator: clientIp,
+    onLimited: respondWithRefreshFailure,
+  });
 }
 
 export function authRoutes(db: Database, env: Env) {

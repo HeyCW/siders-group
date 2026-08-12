@@ -12,6 +12,7 @@ import {
 import type { ArticleStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
+import { isForeignKeyViolation, isUniqueViolationOn, violatedConstraint } from '../../lib/pgErrors.js';
 
 export interface ArticleRow {
   id: string;
@@ -93,14 +94,44 @@ export interface ArticleRepository {
   findPublishedBySlug(slug: string, now: Date): Promise<ArticleWithRelations | null>;
   /** `scheduled` articles whose `published_at` has passed — the scheduled-publish worker's input. */
   findDueScheduled(now: Date): Promise<{ id: string; slug: string; publishedAt: Date }[]>;
+  /**
+   * Promotes an article to `published` only if it is *still* `scheduled` and still due as of
+   * `now`. Returns false when the row moved underneath the worker, so the caller can skip the
+   * revalidation that would otherwise publish a view the worker did not create.
+   */
+  promoteScheduled(id: string, now: Date): Promise<boolean>;
 }
 
-function isForeignKeyViolation(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === '23503';
-}
+const SLUG_CONSTRAINT = 'articles_slug_unique';
+const FEATURED_MEDIA_CONSTRAINT = 'featured_media_id';
 
 function invalidTaxonomyError(): AppError {
   return new AppError('One or more category or tag ids do not exist', 400, 'invalid_taxonomy_reference');
+}
+
+function invalidFeaturedMediaError(): AppError {
+  return new AppError('The referenced featured media item does not exist', 400, 'invalid_media_reference');
+}
+
+function slugConflictError(): AppError {
+  return new AppError('That slug is already in use by another article', 409, 'slug_conflict');
+}
+
+/**
+ * One article write touches several constraints of the same SQLSTATE class, so the translation
+ * has to discriminate on *which* constraint fired rather than on the code alone. Keying on the
+ * bare code reported a repeated `categoryIds` entry (a join-table composite-PK violation) as a
+ * slug conflict, and an unknown `featuredMediaId` (an FK to `app.media`) as a taxonomy error —
+ * both naming a field the caller never got wrong.
+ */
+function translateArticleWriteError(err: unknown): AppError | null {
+  if (isUniqueViolationOn(err, SLUG_CONSTRAINT)) return slugConflictError();
+  if (isForeignKeyViolation(err)) {
+    return violatedConstraint(err)?.includes(FEATURED_MEDIA_CONSTRAINT)
+      ? invalidFeaturedMediaError()
+      : invalidTaxonomyError();
+  }
+  return null;
 }
 
 /**
@@ -119,6 +150,22 @@ function publiclyVisible(now: Date) {
   );
 }
 
+/**
+ * The same predicate as `publiclyVisible()` above, evaluated in JS against an already-loaded
+ * row instead of built into a SQL `where` clause. Callers outside the query layer (the article
+ * service's revalidation gating) need this shape — deciding "is this article currently public"
+ * from a row they already have, not filtering a table scan. Kept in lockstep with
+ * `publiclyVisible()` by hand since Drizzle's query builder and a plain object predicate can't
+ * share one implementation; a scheduled-but-due row must be treated as public in both places or
+ * revalidation silently misses exactly the case the read-time fallback exists for
+ * (specs/article-management/spec.md - "Public pages are revalidated when an article changes").
+ */
+export function isPubliclyVisible(row: { status: ArticleStatus; publishedAt: Date | null }, now: Date): boolean {
+  if (row.status === 'published') return row.publishedAt !== null;
+  if (row.status === 'scheduled') return row.publishedAt !== null && row.publishedAt.getTime() <= now.getTime();
+  return false;
+}
+
 type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 
 async function replaceTaxonomy(
@@ -126,18 +173,22 @@ async function replaceTaxonomy(
   articleId: string,
   input: { categoryIds?: string[] | undefined; tagIds?: string[] | undefined },
 ): Promise<void> {
+  // Deduplicated before insert: the join tables' composite primary keys make a repeated id in
+  // the request a 23505, and "assign this category twice" is a no-op the caller plainly meant,
+  // not a conflict worth surfacing. Assigning a set is idempotent by definition
+  // (specs/article-management/spec.md - "Articles carry multiple categories and multiple tags").
   if (input.categoryIds !== undefined) {
+    const categoryIds = [...new Set(input.categoryIds)];
     await tx.delete(articleCategories).where(eq(articleCategories.articleId, articleId));
-    if (input.categoryIds.length > 0) {
-      await tx
-        .insert(articleCategories)
-        .values(input.categoryIds.map((categoryId) => ({ articleId, categoryId })));
+    if (categoryIds.length > 0) {
+      await tx.insert(articleCategories).values(categoryIds.map((categoryId) => ({ articleId, categoryId })));
     }
   }
   if (input.tagIds !== undefined) {
+    const tagIds = [...new Set(input.tagIds)];
     await tx.delete(articleTags).where(eq(articleTags.articleId, articleId));
-    if (input.tagIds.length > 0) {
-      await tx.insert(articleTags).values(input.tagIds.map((tagId) => ({ articleId, tagId })));
+    if (tagIds.length > 0) {
+      await tx.insert(articleTags).values(tagIds.map((tagId) => ({ articleId, tagId })));
     }
   }
 }
@@ -223,7 +274,8 @@ export function createArticleRepository(db: Database): ArticleRepository {
         if (!withRelations) throw new Error('article missing immediately after create');
         return withRelations;
       } catch (err) {
-        if (isForeignKeyViolation(err)) throw invalidTaxonomyError();
+        const translated = translateArticleWriteError(err);
+        if (translated) throw translated;
         throw err;
       }
     },
@@ -233,13 +285,18 @@ export function createArticleRepository(db: Database): ArticleRepository {
         await db.transaction(async (tx) => {
           const { categoryIds, tagIds, ...fields } = input;
           const definedFields = stripUndefined(fields);
-          if (Object.keys(definedFields).length > 0) {
+          // Bumped even when `definedFields` is empty but the taxonomy assignment changed — a
+          // category/tag-only edit is still an edit, and the admin list orders by `updatedAt`
+          // (specs/article-management/spec.md - "Articles carry multiple categories and
+          // multiple tags").
+          if (Object.keys(definedFields).length > 0 || categoryIds !== undefined || tagIds !== undefined) {
             await tx.update(articles).set({ ...definedFields, updatedAt: new Date() }).where(eq(articles.id, id));
           }
           await replaceTaxonomy(tx, id, { categoryIds, tagIds });
         });
       } catch (err) {
-        if (isForeignKeyViolation(err)) throw invalidTaxonomyError();
+        const translated = translateArticleWriteError(err);
+        if (translated) throw translated;
         throw err;
       }
       const row = await findRowById(id);
@@ -256,6 +313,32 @@ export function createArticleRepository(db: Database): ArticleRepository {
       const [withRelations] = await attachRelations(db, [row]);
       if (!withRelations) throw new Error('article missing immediately after status update');
       return withRelations;
+    },
+
+    async promoteScheduled(id, now) {
+      // Re-checks the due condition inside the UPDATE. The worker reads a batch of due articles
+      // and then updates them one at a time; in that window a staff member can reschedule the
+      // article into the future or unpublish it, and an unconditional `WHERE id = ?` would
+      // silently revert that and publish an article the editor had just pulled back
+      // (specs/article-management/spec.md - "Reschedule before the time arrives").
+      //
+      // The guard is `published_at <= now`, deliberately not equality against the timestamp the
+      // batch read: a JS `Date` carries milliseconds while `timestamptz` carries microseconds,
+      // so exact equality would start silently matching nothing the moment any write to this
+      // column came from SQL rather than from a JS value. `<=` is also the precise condition
+      // being asserted — "still due" — and re-publishing an article rescheduled to a *different*
+      // past time is correct rather than something to skip.
+      //
+      // `published_at` is left untouched, so promotion preserves the scheduled time
+      // (specs/article-management/spec.md - "Worker promotion preserves the scheduled time").
+      const updated = await db
+        .update(articles)
+        .set({ status: 'published', updatedAt: new Date() })
+        .where(
+          and(eq(articles.id, id), eq(articles.status, 'scheduled'), lte(articles.publishedAt, now)),
+        )
+        .returning({ id: articles.id });
+      return updated.length > 0;
     },
 
     async findById(id) {

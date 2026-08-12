@@ -99,6 +99,16 @@ describe('articlePublicListQuerySchema', () => {
     ]);
   });
 
+  it('accepts excludeIds already parsed as an array (repeated query key form)', () => {
+    const parsed = articlePublicListQuerySchema.parse({
+      excludeIds: ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'],
+    });
+    expect(parsed.excludeIds).toEqual([
+      '11111111-1111-1111-1111-111111111111',
+      '22222222-2222-2222-2222-222222222222',
+    ]);
+  });
+
   it('leaves excludeIds undefined when omitted', () => {
     const parsed = articlePublicListQuerySchema.parse({});
     expect(parsed.excludeIds).toBeUndefined();

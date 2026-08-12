@@ -1,10 +1,16 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { categories, type Database } from '@siders/db';
+import { AppError } from '../../middleware/errorHandler.js';
+import { isUniqueViolationOn } from '../../lib/pgErrors.js';
 
 export interface CategoryRow {
   id: string;
   name: string;
   slug: string;
+}
+
+function slugConflictError(): AppError {
+  return new AppError('That slug is already in use by another category', 409, 'slug_conflict');
 }
 
 export interface CategoryRepository {
@@ -25,15 +31,25 @@ export interface CategoryRepository {
 export function createCategoryRepository(db: Database): CategoryRepository {
   return {
     async create(input) {
-      const [row] = await db.insert(categories).values(input).returning();
-      if (!row) throw new Error('category insert returned no row');
-      return row;
+      try {
+        const [row] = await db.insert(categories).values(input).returning();
+        if (!row) throw new Error('category insert returned no row');
+        return row;
+      } catch (err) {
+        if (isUniqueViolationOn(err, 'categories_slug_unique')) throw slugConflictError();
+        throw err;
+      }
     },
 
     async update(id, input) {
-      const [row] = await db.update(categories).set(input).where(eq(categories.id, id)).returning();
-      if (!row) throw new Error('category missing immediately after update');
-      return row;
+      try {
+        const [row] = await db.update(categories).set(input).where(eq(categories.id, id)).returning();
+        if (!row) throw new Error('category missing immediately after update');
+        return row;
+      } catch (err) {
+        if (isUniqueViolationOn(err, 'categories_slug_unique')) throw slugConflictError();
+        throw err;
+      }
     },
 
     async findById(id) {

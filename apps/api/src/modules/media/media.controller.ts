@@ -3,18 +3,13 @@ import { mediaUpdateRequestSchema, mediaUploadMetadataSchema } from '@siders/con
 import type { MediaService } from './media.service.js';
 import { toMediaResponse } from './media.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { requireUuidParam } from '../../lib/requireParam.js';
 import type { Env } from '../../config/env.js';
 
 function requireCaller(req: Request): { subjectId: string } {
   const subjectId = req.auth?.subjectId;
   if (!subjectId) throw new AppError('Not authenticated', 401, 'unauthenticated');
   return { subjectId };
-}
-
-function requireParam(req: Request, name: string): string {
-  const value = req.params[name];
-  if (!value) throw new AppError(`Missing path parameter: ${name}`, 400, 'bad_request');
-  return value;
 }
 
 /** Parse, delegate, respond. No `if` about business meaning lives here. */
@@ -43,7 +38,7 @@ export function createMediaController(service: MediaService, env: Pick<Env, 'MED
 
     async get(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const row = await service.get(id);
         res.json({ success: true, data: toMediaResponse(env, row) });
       } catch (err) {
@@ -53,7 +48,7 @@ export function createMediaController(service: MediaService, env: Pick<Env, 'MED
 
     async update(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const body = mediaUpdateRequestSchema.parse(req.body);
         const row = await service.update(id, body);
         res.json({ success: true, data: toMediaResponse(env, row) });
@@ -64,7 +59,7 @@ export function createMediaController(service: MediaService, env: Pick<Env, 'MED
 
     async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         await service.delete(id);
         res.status(204).end();
       } catch (err) {

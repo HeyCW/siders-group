@@ -16,8 +16,14 @@ import { SlashCommand } from './slashCommand.js';
 
 /**
  * Adds `caption`, `align`, and a numeric `width` on top of the stock image node — the exact
- * attribute set `sanitizeHtml.ts`'s `renderImage` reads
- * (specs/article-editor/spec.md - "Add a caption to an image", "Insert and resize an image").
+ * attribute set `sanitizeHtml.ts`'s `renderImage` reads (specs/article-editor/spec.md -
+ * "Supported content blocks": the image node "MAY carry width, alignment, and caption
+ * attributes for future use").
+ *
+ * Nothing in the editor sets these today: there is no drag-to-resize handle, alignment picker
+ * or caption field, so in practice `width` stays null and `align` stays 'center'. That authoring
+ * UI is a deferred follow-up (tasks.md - 10.6), and the spec deliberately does not require it —
+ * carrying the attributes now keeps the persisted document shape stable for when it lands.
  */
 export const Image = TiptapImage.extend({
   addAttributes() {

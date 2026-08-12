@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 
 /** `.env` files can't hold real newlines cleanly, so PEM keys travel as one line with literal `\n`. */
@@ -56,7 +57,9 @@ const envSchema = z.object({
   // the local filesystem, not R2"). Deliberately separate from the R2 variables above, which
   // remain unused by this change. MEDIA_STORAGE_PATH must be absolute so the storage root is
   // unambiguous regardless of the process's working directory.
-  MEDIA_STORAGE_PATH: z.string().min(1).refine((v) => v.startsWith('/'), {
+  // `isAbsolute` (not `.startsWith('/')`) so this accepts a Windows-style root (`C:\data\media`)
+  // as well as a POSIX one — local dev on Windows was otherwise rejected at boot.
+  MEDIA_STORAGE_PATH: z.string().min(1).refine((v) => isAbsolute(v), {
     message: 'must be an absolute path',
   }),
   MEDIA_PUBLIC_BASE_URL: z.string().url().transform(stripTrailingSlash),

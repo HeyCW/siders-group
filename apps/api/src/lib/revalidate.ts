@@ -29,10 +29,16 @@ async function revalidatePath(env: RevalidateEnv, logger: Logger, path: string):
  * Called on publish, unpublish, delete, worker promotion, and any update to a currently
  * visible article.
  */
-export async function revalidateArticlePaths(env: RevalidateEnv, logger: Logger, slug: string): Promise<void> {
-  await Promise.all([
-    revalidatePath(env, logger, `/news/${slug}`),
-    revalidatePath(env, logger, '/news'),
-    revalidatePath(env, logger, '/'),
-  ]);
+export async function revalidateArticlePaths(
+  env: RevalidateEnv,
+  logger: Logger,
+  ...slugs: string[]
+): Promise<void> {
+  // Variadic so a slug change revalidates both the old and new detail paths in one pass. Calling
+  // this twice instead would re-request `/news` and `/` a second time — six POSTs where four do,
+  // on the critical path of an admin save.
+  const detailPaths = [...new Set(slugs)].map((slug) => `/news/${slug}`);
+  await Promise.all(
+    [...detailPaths, '/news', '/'].map((path) => revalidatePath(env, logger, path)),
+  );
 }

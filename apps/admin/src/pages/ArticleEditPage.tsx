@@ -143,15 +143,40 @@ export function ArticleEditPage() {
       .run();
   }, []);
 
+  /**
+   * The upload is awaited while the editor stays live, so the range captured when `/image` ran
+   * can be stale by the time we come back: the user may have typed, undone, or navigated away.
+   * ProseMirror's `deleteRange` throws `RangeError` on an out-of-bounds position, and deleting a
+   * still-in-bounds but shifted range would silently eat unrelated text — so the range is only
+   * used when the editor is alive and the document is still at least that long.
+   */
+  function removeTriggerText(pending: { editor: Editor; range: Range }): boolean {
+    if (pending.editor.isDestroyed) return false;
+    if (pending.range.to > pending.editor.state.doc.content.size) return false;
+    try {
+      return pending.editor.chain().focus().deleteRange(pending.range).run();
+    } catch {
+      return false;
+    }
+  }
+
   async function handleFileChosen(file: File) {
     const pending = pendingInsertRef.current;
     pendingInsertRef.current = null;
     if (!pending) return;
+    let uploaded: Awaited<ReturnType<typeof mediaApi.upload>>;
     try {
-      const uploaded = await mediaApi.upload(file);
-      pending.editor.chain().focus().deleteRange(pending.range).setImage({ src: uploaded.url, alt: '' }).run();
+      uploaded = await mediaApi.upload(file);
     } catch (err) {
+      // Reported before touching the document: the `/image` trigger cleanup below is best-effort
+      // and must never be able to throw away the only feedback the user gets about the failure.
       window.alert(errorMessage(err, 'Image upload failed'));
+      removeTriggerText(pending);
+      return;
+    }
+    if (pending.editor.isDestroyed) return;
+    if (removeTriggerText(pending)) {
+      pending.editor.chain().focus().setImage({ src: uploaded.url, alt: '' }).run();
     }
   }
 

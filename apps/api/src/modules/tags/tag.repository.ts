@@ -1,10 +1,16 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { tags, type Database } from '@siders/db';
+import { AppError } from '../../middleware/errorHandler.js';
+import { isUniqueViolationOn } from '../../lib/pgErrors.js';
 
 export interface TagRow {
   id: string;
   name: string;
   slug: string;
+}
+
+function slugConflictError(): AppError {
+  return new AppError('That slug is already in use by another tag', 409, 'slug_conflict');
 }
 
 export interface TagRepository {
@@ -24,15 +30,25 @@ export interface TagRepository {
 export function createTagRepository(db: Database): TagRepository {
   return {
     async create(input) {
-      const [row] = await db.insert(tags).values(input).returning();
-      if (!row) throw new Error('tag insert returned no row');
-      return row;
+      try {
+        const [row] = await db.insert(tags).values(input).returning();
+        if (!row) throw new Error('tag insert returned no row');
+        return row;
+      } catch (err) {
+        if (isUniqueViolationOn(err, 'tags_slug_unique')) throw slugConflictError();
+        throw err;
+      }
     },
 
     async update(id, input) {
-      const [row] = await db.update(tags).set(input).where(eq(tags.id, id)).returning();
-      if (!row) throw new Error('tag missing immediately after update');
-      return row;
+      try {
+        const [row] = await db.update(tags).set(input).where(eq(tags.id, id)).returning();
+        if (!row) throw new Error('tag missing immediately after update');
+        return row;
+      } catch (err) {
+        if (isUniqueViolationOn(err, 'tags_slug_unique')) throw slugConflictError();
+        throw err;
+      }
     },
 
     async findById(id) {

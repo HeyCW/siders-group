@@ -10,6 +10,7 @@ import type {
   CreateArticleInput,
   UpdateArticleInput,
 } from './article.repository.js';
+import { isPubliclyVisible } from './article.repository.js';
 
 export interface ArticleCreateInput {
   title: string;
@@ -138,12 +139,19 @@ export function createArticleService(
         ...(input.tagIds !== undefined && { tagIds: input.tagIds }),
       });
 
-      // Only an article that is *currently* published can have public output for this edit to
-      // change — a draft or scheduled article has nothing on the public site yet to invalidate
+      // Gated on whether the article was *already* publicly visible before this edit — a draft
+      // or not-yet-due scheduled article has nothing on the public site yet to invalidate. Uses
+      // the same predicate the public read path applies (`isPubliclyVisible`), not a bare
+      // `status === 'published'` check: a due-but-unflipped scheduled article is just as public
+      // as a `published` one, and skipping it here left its cached pages stale
       // (specs/article-management/spec.md - "Public pages are revalidated when an article
-      // changes").
-      if (existing.status === 'published') {
-        await revalidateArticlePaths(revalidateEnv, logger, updated.slug);
+      // changes"; specs/public-news-api/spec.md - "One canonical public visibility rule").
+      if (isPubliclyVisible(existing, new Date())) {
+        // The old slug too when the slug moved: its cached detail page would otherwise keep
+        // serving stale content (or a 404) forever, since nothing revalidates it again. Passed
+        // in one call so the shared `/news` and `/` paths are only requested once.
+        const movedFrom = updated.slug === existing.slug ? [] : [existing.slug];
+        await revalidateArticlePaths(revalidateEnv, logger, updated.slug, ...movedFrom);
       }
       return updated;
     },
@@ -161,7 +169,7 @@ export function createArticleService(
         ...(input.categoryIds !== undefined && { categoryIds: input.categoryIds }),
         ...(input.tagIds !== undefined && { tagIds: input.tagIds }),
       });
-      if (existing.status === 'published') {
+      if (isPubliclyVisible(existing, new Date())) {
         await revalidateArticlePaths(revalidateEnv, logger, updated.slug);
       }
       return updated;
@@ -218,14 +226,24 @@ export function createArticleService(
       if (publishedAt.getTime() <= Date.now()) {
         throw new AppError('Scheduled time must be in the future', 400, 'invalid_schedule_time');
       }
-      return repository.updateStatus(id, 'scheduled' satisfies ArticleStatus, publishedAt);
+      const updated = await repository.updateStatus(id, 'scheduled' satisfies ArticleStatus, publishedAt);
+      // Rescheduling a due-but-unflipped scheduled article into the future *removes* it from
+      // public view (the new `published_at` is by construction in the future, so
+      // `isPubliclyVisible` now reads false) — without this the cached detail/listing/homepage
+      // pages kept serving it until ISR's own window happened to expire
+      // (specs/article-management/spec.md - "Public pages are revalidated when an article
+      // changes").
+      if (isPubliclyVisible(existing, new Date())) {
+        await revalidateArticlePaths(revalidateEnv, logger, updated.slug);
+      }
+      return updated;
     },
 
     async delete(id) {
       const existing = await repository.findById(id);
       if (!existing) throw notFoundError();
       await repository.delete(id);
-      if (existing.status === 'published') {
+      if (isPubliclyVisible(existing, new Date())) {
         await revalidateArticlePaths(revalidateEnv, logger, existing.slug);
       }
     },

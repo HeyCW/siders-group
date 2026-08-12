@@ -29,15 +29,25 @@ A request with no credentials, or with an invalid or expired session, SHALL cont
 - **THEN** the request completes normally with no identity attached
 
 ### Requirement: Session credentials are only ever delivered as protected cookies
-Access and refresh credentials SHALL be transmitted solely as cookies marked httpOnly and Secure, with SameSite protection, scoped to the shared application domain. They SHALL NOT appear in any response body, URL, query parameter, or header readable by client script.
+Access and refresh credentials SHALL be transmitted solely as cookies marked httpOnly, with SameSite protection, scoped to the shared application domain. They SHALL NOT appear in any response body, URL, query parameter, or header readable by client script.
+
+Both cookies SHALL additionally be marked Secure whenever the application origin is served over HTTPS, which is every deployed environment. The Secure decision SHALL be derived from the application origin's scheme, never from a build profile or environment name: those answer a different question, and keying on one would ship session cookies without Secure to any HTTPS deployment not labelled "production". The flag MAY be omitted only for a plaintext HTTP origin, which SHALL be confined to local development.
 
 #### Scenario: Credentials are absent from the response body
 - **WHEN** a sign-in or refresh succeeds
-- **THEN** the response body contains no access or refresh credential, and both are set only as httpOnly Secure cookies
+- **THEN** the response body contains no access or refresh credential, and both are set only as httpOnly cookies
 
 #### Scenario: Client script cannot read session credentials
 - **WHEN** client-side script enumerates the cookies available to it after sign-in
 - **THEN** neither session credential is visible to it
+
+#### Scenario: An HTTPS deployment marks credentials Secure regardless of environment name
+- **WHEN** a session is established in any environment whose application origin is HTTPS, including one not designated production
+- **THEN** both session credential cookies are marked Secure
+
+#### Scenario: A plaintext local origin is the only case that omits Secure
+- **WHEN** a session is established while the application origin is plaintext HTTP
+- **THEN** the cookies are still httpOnly and SameSite-protected, and Secure is omitted so the browser accepts them
 
 ### Requirement: State-changing requests require a CSRF token
 Every state-changing request (any method other than GET, HEAD, or OPTIONS) that is authenticated by session cookie SHALL be rejected unless it carries a CSRF token matching a separate, script-readable CSRF cookie issued when the session was established. The check SHALL fail closed: a missing, empty, or mismatched token is a rejection. Requests carrying no session credential SHALL be unaffected by this check.
@@ -54,9 +64,25 @@ Every state-changing request (any method other than GET, HEAD, or OPTIONS) that 
 - **WHEN** a state-changing request originates from a different origin that nonetheless shares the session cookie's domain, with cookies attached but no matching CSRF token
 - **THEN** the request is rejected
 
+The CSRF token SHALL be bound to the session that issued it, and that binding SHALL be verified on every state-changing request that presents an identifiable session — which is what retires the previous token on rotation, since rotation establishes a new session identity. The binding SHALL be carried in the token itself and verified against the session claim already present on the request, without a database read.
+
+Session refresh is the single exception, and it is a structural one: refresh exists to be called once the access credential has expired, so there is no session claim to bind against. At that endpoint the token's signature SHALL still be verified, the session binding SHALL NOT be relied upon, and the response SHALL issue a replacement token bound to the newly established session. An unexpired-but-superseded token therefore remains usable at refresh alone, where it authorizes nothing beyond rotating a refresh credential the caller already holds.
+
 #### Scenario: A new CSRF token is issued on session rotation
 - **WHEN** a session is established or its credentials are rotated
-- **THEN** a matching CSRF cookie is issued alongside, and the previously issued CSRF token is no longer accepted
+- **THEN** a matching CSRF cookie is issued alongside, bound to the newly established session
+
+#### Scenario: A token bound to a superseded session is rejected
+- **WHEN** a state-changing request presents an identifiable session together with a CSRF token bound to a different session
+- **THEN** the request is rejected
+
+#### Scenario: Refresh verifies the token's signature where no session can be identified
+- **WHEN** a refresh request arrives with an expired access credential, so no session claim is available, carrying a validly signed CSRF token
+- **THEN** the signature is verified, the request proceeds, and the response issues a replacement token bound to the new session
+
+#### Scenario: A forged CSRF token is rejected even where the binding cannot be checked
+- **WHEN** a refresh request arrives with a CSRF token that does not verify against the signing secret
+- **THEN** the request is rejected
 
 ### Requirement: Revoked sessions are rejected without waiting for expiry
 Every access credential SHALL reference the session that issued it. Wherever an authenticated identity is relied upon to grant access, the system SHALL reject a caller whose referenced session has been revoked or whose underlying account is no longer active, without waiting for the access credential's own expiry. This check SHALL fail closed: if session or account state cannot be determined, the caller is treated as unauthorized.

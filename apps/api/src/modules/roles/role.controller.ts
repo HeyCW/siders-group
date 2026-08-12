@@ -3,17 +3,12 @@ import { roleAssignmentRequestSchema, roleCreateRequestSchema, roleUpdateRequest
 import type { RoleService } from './role.service.js';
 import { toRoleResponse } from './role.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { requireUuidParam } from '../../lib/requireParam.js';
 
 function requireCaller(req: Request): { subjectId: string; isOwner: boolean } {
   const subjectId = req.auth?.subjectId;
   if (!subjectId) throw new AppError('Not authenticated', 401, 'unauthenticated');
   return { subjectId, isOwner: req.staffRole?.isOwner ?? false };
-}
-
-function requireParam(req: Request, name: string): string {
-  const value = req.params[name];
-  if (!value) throw new AppError(`Missing path parameter: ${name}`, 400, 'bad_request');
-  return value;
 }
 
 /** Parse, delegate, respond. No `if` about business meaning lives here. */
@@ -40,7 +35,7 @@ export function createRoleController(service: RoleService) {
 
     async update(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const body = roleUpdateRequestSchema.parse(req.body);
         const role = await service.update(id, body);
         res.json({ success: true, data: toRoleResponse(role) });
@@ -51,7 +46,7 @@ export function createRoleController(service: RoleService) {
 
     async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         await service.delete(id);
         res.status(204).end();
       } catch (err) {
@@ -61,7 +56,7 @@ export function createRoleController(service: RoleService) {
 
     async assign(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const targetStaffId = requireParam(req, 'staffId');
+        const targetStaffId = requireUuidParam(req, 'staffId');
         const body = roleAssignmentRequestSchema.parse(req.body);
         const caller = requireCaller(req);
         await service.assign(targetStaffId, body.roleId, caller);

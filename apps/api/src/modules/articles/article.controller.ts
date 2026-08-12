@@ -11,6 +11,7 @@ import type { ArticleService } from './article.service.js';
 import type { ArticleRepository } from './article.repository.js';
 import { toAdminResponse, toPreviewResponse, toPublicCard, toPublicDetail } from './article.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { requireParam, requireUuidParam } from '../../lib/requireParam.js';
 import type { Env } from '../../config/env.js';
 
 type MediaUrlEnv = Pick<Env, 'MEDIA_PUBLIC_BASE_URL'>;
@@ -19,12 +20,6 @@ function requireCaller(req: Request): { subjectId: string } {
   const subjectId = req.auth?.subjectId;
   if (!subjectId) throw new AppError('Not authenticated', 401, 'unauthenticated');
   return { subjectId };
-}
-
-function requireParam(req: Request, name: string): string {
-  const value = req.params[name];
-  if (!value) throw new AppError(`Missing path parameter: ${name}`, 400, 'bad_request');
-  return value;
 }
 
 /** Parse, delegate, respond. Admin (permission-gated) article endpoints. */
@@ -43,7 +38,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async get(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const article = await service.get(id);
         res.json({ success: true, data: toAdminResponse(env, article) });
       } catch (err) {
@@ -63,7 +58,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async update(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const body = articleUpdateRequestSchema.parse(req.body);
         const article = await service.update(id, body);
         res.json({ success: true, data: toAdminResponse(env, article) });
@@ -74,7 +69,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async autosave(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const body = articleAutosaveRequestSchema.parse(req.body);
         const article = await service.autosave(id, body);
         res.json({ success: true, data: toAdminResponse(env, article) });
@@ -85,7 +80,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         await service.delete(id);
         res.status(204).end();
       } catch (err) {
@@ -95,7 +90,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async publish(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const article = await service.publish(id);
         res.json({ success: true, data: toAdminResponse(env, article) });
       } catch (err) {
@@ -105,7 +100,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async unpublish(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const article = await service.unpublish(id);
         res.json({ success: true, data: toAdminResponse(env, article) });
       } catch (err) {
@@ -115,7 +110,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async schedule(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const body = articleScheduleRequestSchema.parse(req.body);
         const article = await service.schedule(id, new Date(body.publishedAt));
         res.json({ success: true, data: toAdminResponse(env, article) });
@@ -126,7 +121,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
 
     async preview(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const article = await service.preview(id);
         res.json({ success: true, data: toPreviewResponse(env, article) });
       } catch (err) {

@@ -12,6 +12,7 @@ const PUBLIC_READ_RATE_LIMIT = { windowMs: 60 * 1000, max: 120 };
 
 function publicReadRateLimiter() {
   return rateLimit({
+    name: 'public-article-read',
     ...PUBLIC_READ_RATE_LIMIT,
     keyGenerator: clientIp,
     onLimited: (_req, res) => {

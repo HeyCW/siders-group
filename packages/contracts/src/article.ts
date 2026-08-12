@@ -73,8 +73,9 @@ export const DEFAULT_PUBLIC_LIST_LIMIT = 20;
 export const MAX_PUBLIC_LIST_LIMIT = 100;
 
 /**
- * `excludeIds` arrives as a comma-separated query string and is split before validation, since
- * a repeated-key array isn't guaranteed across every HTTP client
+ * `excludeIds` arrives either as a comma-separated query string, or — since Express's default
+ * query parser turns a repeated key into an array — as an array already; both are normalized to
+ * an array before validation, since neither form is guaranteed across every HTTP client
  * (specs/public-news-api/spec.md - "Excluding specific articles from the list").
  */
 export const articlePublicListQuerySchema = z.object({
@@ -91,11 +92,20 @@ export const articlePublicListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   categorySlug: z.string().optional(),
   tagSlug: z.string().optional(),
-  excludeIds: z
-    .preprocess(
-      (value) => (typeof value === 'string' && value.length > 0 ? value.split(',') : undefined),
-      z.array(z.string().uuid()).optional(),
-    ),
+  excludeIds: z.preprocess((value) => {
+    // Both query encodings normalize to the same array, and the two are combinable: Express's
+    // `qs` turns a repeated key into an array whose elements may each still be a comma-separated
+    // list, so the array branch splits too rather than handing `"a,b"` to the uuid check as one
+    // element. Empty segments are dropped so a trailing comma or `?excludeIds=` is ignored
+    // rather than rejected (specs/public-news-api/spec.md - "Unknown identifiers are ignored").
+    const raw = typeof value === 'string' ? [value] : Array.isArray(value) ? value : undefined;
+    if (raw === undefined) return undefined;
+    const ids = raw
+      .filter((entry): entry is string => typeof entry === 'string')
+      .flatMap((entry) => entry.split(','))
+      .filter((entry) => entry.length > 0);
+    return ids.length > 0 ? ids : undefined;
+  }, z.array(z.string().uuid()).optional()),
 });
 export type ArticlePublicListQuery = z.infer<typeof articlePublicListQuerySchema>;
 

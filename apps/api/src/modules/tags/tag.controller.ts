@@ -2,13 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { tagCreateRequestSchema, tagUpdateRequestSchema } from '@siders/contracts';
 import type { TagService } from './tag.service.js';
 import { toTagResponse } from './tag.mapper.js';
-import { AppError } from '../../middleware/errorHandler.js';
-
-function requireParam(req: Request, name: string): string {
-  const value = req.params[name];
-  if (!value) throw new AppError(`Missing path parameter: ${name}`, 400, 'bad_request');
-  return value;
-}
+import { requireUuidParam } from '../../lib/requireParam.js';
 
 /** Parse, delegate, respond. No `if` about business meaning lives here. */
 export function createTagController(service: TagService) {
@@ -34,7 +28,7 @@ export function createTagController(service: TagService) {
 
     async update(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         const body = tagUpdateRequestSchema.parse(req.body);
         const row = await service.update(id, body.name);
         res.json({ success: true, data: toTagResponse(row) });
@@ -45,7 +39,7 @@ export function createTagController(service: TagService) {
 
     async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const id = requireParam(req, 'id');
+        const id = requireUuidParam(req, 'id');
         await service.delete(id);
         res.status(204).end();
       } catch (err) {
