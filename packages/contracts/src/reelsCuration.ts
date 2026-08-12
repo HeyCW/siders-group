@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { reelStatusSchema } from './reel.js';
+import { reelProviderSchema } from './reelProvider.js';
 
 /**
  * Mirrors `MAX_HOME_CURATION_ENTRIES` (specs/reels-curation/spec.md - "Ordering validation").
@@ -28,7 +29,7 @@ export type ReelsCurationReplaceRequest = z.infer<typeof reelsCurationReplaceReq
 
 export const reelsCurationReelSummarySchema = z.object({
   id: z.string().uuid(),
-  provider: z.string(),
+  provider: reelProviderSchema,
   externalId: z.string(),
   posterUrl: z.string(),
   caption: z.string().nullable(),

@@ -1,23 +1,22 @@
 import { useEffect, useState } from 'react';
-import type { ReelResponse, ReelsCurationEntryResponse } from '@siders/contracts';
+import type { ReelProvider, ReelResponse, ReelsCurationEntryResponse } from '@siders/contracts';
+import { MAX_REELS_CURATION_ENTRIES } from '@siders/contracts';
 import { ApiError } from '../lib/api.js';
 import { reelsApi, reelsCurationApi } from '../lib/reelsApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
 
-const MAX_ENTRIES = 10;
-
 interface PickedItem {
   id: string;
-  provider: string;
+  provider: ReelProvider;
   externalId: string;
   posterUrl: string;
   caption: string | null;
   status: ReelResponse['status'];
-  /** Known from the server for every entry loaded from `GET /admin/reels-curation`. An item
-   *  just added from the library (not yet saved) has no server answer yet, so this is left
-   *  `undefined` and the badge is simply omitted rather than guessed — mirrors
-   *  `HomeCurationPage`'s own `isPubliclyVisible?` handling. */
-  isPubliclyVisible?: boolean;
+  /** Authoritative for every entry loaded from `GET /admin/reels-curation`. For an item just
+   *  added from the library (not yet saved), `addReel` derives it from the reel's own `status`
+   *  — unlike `HomeCurationPage`'s equivalent field, a reel's status is already known client-side
+   *  at add time, so there's no need to leave this `undefined` and omit the badge until save. */
+  isPubliclyVisible: boolean;
 }
 
 function toPickedItem(entry: ReelsCurationEntryResponse): PickedItem {
@@ -66,10 +65,18 @@ export function ReelsCurationPage() {
   const pickableReels = library.filter((reel) => !pickedIds.has(reel.id));
 
   function addReel(reel: ReelResponse) {
-    if (picked.length >= MAX_ENTRIES) return;
+    if (picked.length >= MAX_REELS_CURATION_ENTRIES) return;
     setPicked((prev) => [
       ...prev,
-      { id: reel.id, provider: reel.provider, externalId: reel.externalId, posterUrl: reel.posterUrl, caption: reel.caption, status: reel.status },
+      {
+        id: reel.id,
+        provider: reel.provider,
+        externalId: reel.externalId,
+        posterUrl: reel.posterUrl,
+        caption: reel.caption,
+        status: reel.status,
+        isPubliclyVisible: reel.status === 'published',
+      },
     ]);
   }
 
@@ -184,8 +191,8 @@ export function ReelsCurationPage() {
             >
               Clear all
             </button>
-            {picked.length >= MAX_ENTRIES && (
-              <span className="text-xs text-gray-400">Maximum of {MAX_ENTRIES} reels reached</span>
+            {picked.length >= MAX_REELS_CURATION_ENTRIES && (
+              <span className="text-xs text-gray-400">Maximum of {MAX_REELS_CURATION_ENTRIES} reels reached</span>
             )}
           </div>
 
@@ -211,7 +218,7 @@ export function ReelsCurationPage() {
                   <button
                     type="button"
                     onClick={() => addReel(reel)}
-                    disabled={picked.length >= MAX_ENTRIES}
+                    disabled={picked.length >= MAX_REELS_CURATION_ENTRIES}
                     className="text-xs text-blue-600 disabled:opacity-50 dark:text-blue-400"
                   >
                     Add
