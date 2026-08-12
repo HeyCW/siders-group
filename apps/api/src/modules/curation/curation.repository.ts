@@ -55,16 +55,19 @@ export function createHomeCurationRepository(db: Database): HomeCurationReposito
     async replace(articleIds) {
       try {
         return await db.transaction(async (tx) => {
-          // Lock the referenced article rows *before* the home_curation table. A hard delete of
-          // an article takes its row lock first and only then needs a lock on home_curation (to
-          // run the ON DELETE CASCADE); taking the table lock here first — as an earlier version
-          // of this method did — let a concurrent delete's cascade block on our EXCLUSIVE table
-          // lock while we blocked on the delete's row lock, an unavoidable 40P01 deadlock that
-          // reached the caller as a 500 for a save that, from the editor's side, looked
-          // identical to a normal one. Matching the delete path's lock order removes the cycle.
-          // Reproduced and verified against a live Postgres 16: without this, a concurrent
-          // replace and an unrelated article delete reliably deadlocked; with it, the loser of
-          // the row lock simply waits for the winner to commit.
+          // Lock the referenced article rows *before* the home_curation table. The cycle only
+          // arises when the concurrent delete targets an article that is itself in this
+          // replace's submitted list: a hard delete takes that article's row lock first and only
+          // then needs a lock on home_curation (to run the ON DELETE CASCADE), while the old
+          // ordering here took the table lock first and only then needed the same article's row
+          // lock (via the INSERT's foreign-key check) — an unavoidable 40P01 deadlock that
+          // reached the caller as a 500 for a save that, from the editor's side, looked identical
+          // to a normal one. Deleting an article that is *not* in the submitted list never hits
+          // this cycle, since nothing here takes a lock on it. Matching the delete path's lock
+          // order removes the cycle for the case that does collide. Reproduced and verified
+          // against a live Postgres 16: without this, a concurrent replace and a delete of one of
+          // its own submitted articles reliably deadlocked; with it, the loser of the row lock
+          // simply waits for the winner to commit.
           if (articleIds.length > 0) {
             const rows = await tx.execute(sql`
               select id from app.articles
