@@ -53,9 +53,6 @@ function createFakeReelRepository(initial: ReelRow[] = []) {
     async delete(id) {
       stored = stored.filter((r) => r.id !== id);
     },
-    async findManyByIds(ids) {
-      return stored.filter((r) => ids.includes(r.id));
-    },
   };
   return { repository, setStored: (rows: ReelRow[]) => (stored = rows) };
 }
@@ -100,7 +97,7 @@ describe('ReelService revalidation', () => {
     expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
   });
 
-  it('does not revalidate when an update does not cross the visibility boundary', async () => {
+  it('does not revalidate when a draft reel is edited and stays a draft', async () => {
     revalidateHomePathMock.mockClear();
     const { repository } = createFakeReelRepository([row({ id: 'a', status: 'draft' })]);
     const service = createReelService(repository, revalidateEnv, logger);
@@ -108,6 +105,16 @@ describe('ReelService revalidation', () => {
     await service.update('a', { caption: 'new caption' });
 
     expect(revalidateHomePathMock).not.toHaveBeenCalled();
+  });
+
+  it('revalidates "/" when an already-published reel\'s caption is edited', async () => {
+    revalidateHomePathMock.mockClear();
+    const { repository } = createFakeReelRepository([row({ id: 'a', status: 'published' })]);
+    const service = createReelService(repository, revalidateEnv, logger);
+
+    await service.update('a', { caption: 'new caption' });
+
+    expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
   });
 
   it('revalidates "/" when a published reel is deleted', async () => {

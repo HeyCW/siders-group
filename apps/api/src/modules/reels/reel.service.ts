@@ -88,7 +88,12 @@ export function createReelService(
         if (isForeignKeyViolation(err)) throw invalidPosterMediaError();
         throw err;
       }
-      if (isReelPubliclyVisible(existing.status) !== isReelPubliclyVisible(updated.status)) {
+      // Gated on "was it already public *or* is it public now", not on the boundary changing —
+      // a caption or poster edit on an already-published reel is itself a change to public
+      // output (both fields are in `PublicReelItem`), so it must also revalidate even though
+      // visibility didn't cross. Mirrors `article.service.ts`'s `isPubliclyVisible(existing, ...)`
+      // gate for the identical case.
+      if (isReelPubliclyVisible(existing.status) || isReelPubliclyVisible(updated.status)) {
         await revalidateHomePath(revalidateEnv, logger);
       }
       return updated;

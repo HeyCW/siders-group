@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { media, reels, type Database } from '@siders/db';
 import type { ReelProvider, ReelStatus } from '@siders/contracts';
 import { stripUndefined } from '../../lib/stripUndefined.js';
@@ -54,10 +54,6 @@ export interface ReelRepository {
   list(): Promise<ReelRow[]>;
   update(id: string, input: UpdateReelInput): Promise<ReelRow>;
   delete(id: string): Promise<void>;
-  /** Used by the ordering write path's existence check (curation.repository.ts's `FOR KEY
-   *  SHARE` pattern) and by public visibility filtering; kept here since it is a plain read
-   *  against `reels`, not `reels_curation`. */
-  findManyByIds(ids: string[]): Promise<ReelRow[]>;
 }
 
 /**
@@ -116,15 +112,6 @@ export function createReelRepository(db: Database): ReelRepository {
 
     async delete(id) {
       await db.delete(reels).where(eq(reels.id, id));
-    },
-
-    async findManyByIds(ids) {
-      if (ids.length === 0) return [];
-      return db
-        .select(SELECT_COLUMNS)
-        .from(reels)
-        .innerJoin(media, eq(media.id, reels.posterMediaId))
-        .where(inArray(reels.id, ids));
     },
   };
 }
