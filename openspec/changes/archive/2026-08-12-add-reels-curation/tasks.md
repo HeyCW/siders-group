@@ -2,10 +2,10 @@
 
 `add-home-curation` and `add-news-management-system` are implemented and merged into `main`. The prerequisites below are satisfied; recorded here for traceability rather than as an open gate.
 
-- [ ] 0.1 `app.media` exists and the media upload endpoint accepts images — posters need no new storage work
-- [ ] 0.2 `apps/api/src/lib/revalidate.ts` exports `revalidateHomePath`, added by `add-home-curation`, which logs and swallows failures
-- [ ] 0.3 `authenticate` + `requirePermission` exist and `news.manage` is seeded by `0000_useful_red_shift.sql`
-- [ ] 0.4 Re-read `archive/2026-08-12-add-home-curation/design.md` — "Writes replace the whole list" before writing the replace transaction; its lock ordering is reused verbatim and its two failure modes were found empirically, not theoretically
+- [x] 0.1 `app.media` exists and the media upload endpoint accepts images — posters need no new storage work
+- [x] 0.2 `apps/api/src/lib/revalidate.ts` exports `revalidateHomePath`, added by `add-home-curation`, which logs and swallows failures
+- [x] 0.3 `authenticate` + `requirePermission` exist and `news.manage` is seeded by `0000_useful_red_shift.sql`
+- [x] 0.4 Re-read `archive/2026-08-12-add-home-curation/design.md` — "Writes replace the whole list" before writing the replace transaction; its lock ordering is reused verbatim and its two failure modes were found empirically, not theoretically
 
 ## 1. Data model
 
