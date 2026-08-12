@@ -27,6 +27,7 @@ import { createScheduledPublishJob } from './modules/articles/scheduledPublishWo
 import { categoryRoutes } from './modules/categories/category.routes.js';
 import { tagRoutes } from './modules/tags/tag.routes.js';
 import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
+import { reelRoutes, reelsCurationRoutes, publicReelsRoutes } from './modules/reels/reels.routes.js';
 
 export function createServer(): Express {
   const env = loadEnv();
@@ -61,6 +62,9 @@ export function createServer(): Express {
   app.use('/tags', tagRoutes(db));
   app.use('/admin/curation', curationRoutes(db, env));
   app.use('/home', publicHomeRoutes(db, env));
+  app.use('/admin/reels-curation', reelsCurationRoutes(db, env));
+  app.use('/admin/reels', reelRoutes(db, env));
+  app.use('/reels', publicReelsRoutes(db, env));
 
   app.use(createErrorHandler(logger));
 
