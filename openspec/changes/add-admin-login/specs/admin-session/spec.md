@@ -69,23 +69,46 @@ The sign-in screen SHALL present exactly one generic failure message for any rej
 - **THEN** the message does not identify email or password as the specific cause
 
 ### Requirement: Refresh is single-flight
-When a request to a feature route is rejected with a 403, other than the sign-in screen's own credential submission, the admin app SHALL attempt a session refresh before giving up on that request. Regardless of how many requests discover a 403 at approximately the same time, the app SHALL have at most one refresh request in flight per session at any time, and every request that discovers a 403 while a refresh is already in flight SHALL await that same attempt rather than starting its own. A request SHALL be retried at most once following a refresh.
+When a request to a feature route is rejected with a 403 coded `forbidden`, the admin app SHALL attempt a session refresh before giving up on that request, other than the sign-in screen's own credential submission. A 403 coded `csrf_failed` is a distinct condition and SHALL NOT trigger this refresh path — it is handled by the CSRF recovery described below, since a refresh cannot repair a CSRF mismatch. Regardless of how many requests discover a `forbidden` 403 at approximately the same time, the app SHALL have at most one refresh request in flight per session at any time, and every request that discovers one while a refresh is already in flight SHALL await that same attempt rather than starting its own. A request SHALL be retried at most once following a refresh.
 
 #### Scenario: A single 403 triggers exactly one refresh and one retry
-- **WHEN** one request to a feature route is rejected with a 403
+- **WHEN** one request to a feature route is rejected with a 403 coded `forbidden`
 - **THEN** the app issues one refresh request and, if it succeeds, retries the original request exactly once
 
 #### Scenario: Concurrent 403s share one refresh attempt
-- **WHEN** multiple requests to feature routes are rejected with a 403 at approximately the same time
+- **WHEN** multiple requests to feature routes are rejected with a 403 coded `forbidden` at approximately the same time
 - **THEN** the app issues exactly one refresh request for that session, and every rejected request retries only after that one attempt resolves
 
 #### Scenario: A request is not retried a second time
 - **WHEN** a request has already been retried once following a refresh and is rejected again
 - **THEN** the app does not attempt another refresh or retry for that request
 
+#### Scenario: A CSRF failure does not trigger a refresh
+- **WHEN** a request is rejected with a 403 coded `csrf_failed`
+- **THEN** the app does not attempt a session refresh for it, and instead follows the CSRF recovery path described below
+
 #### Scenario: The sign-in screen's own submission never triggers a refresh
-- **WHEN** the sign-in screen's credential submission is rejected, including with a 403
-- **THEN** the app does not attempt a session refresh, since no session yet exists to refresh
+- **WHEN** the sign-in screen's credential submission is rejected, for any reason including a 403
+- **THEN** the app does not attempt a session refresh for it — a stale CSRF cookie on that same request is instead recovered via the bootstrap path below, not by refreshing
+
+### Requirement: A CSRF failure is recovered by bootstrapping, not by refreshing
+When a request, including the sign-in screen's own credential submission, is rejected with a 403 coded `csrf_failed`, the admin app SHALL recover by calling the CSRF cookie re-pairing endpoint and then retrying the original request once. Regardless of how many requests discover a `csrf_failed` 403 at approximately the same time, the app SHALL have at most one such recovery call in flight at a time, and every request that discovers one while a recovery call is already in flight SHALL await that same attempt rather than starting its own. A request SHALL be retried at most once following this recovery, and this recovery path SHALL NOT chain with the refresh path above for the same rejection — a request already retried once, by either path, is not retried again.
+
+#### Scenario: A CSRF failure recovers via bootstrap and one retry
+- **WHEN** a request to a feature route is rejected with a 403 coded `csrf_failed`
+- **THEN** the app calls the CSRF cookie re-pairing endpoint and, having done so, retries the original request exactly once
+
+#### Scenario: Sign-in recovers from a stale CSRF cookie the same way
+- **WHEN** the sign-in screen's own credential submission is rejected with a 403 coded `csrf_failed`
+- **THEN** the app calls the CSRF cookie re-pairing endpoint and retries the sign-in submission once — unlike a `forbidden` rejection, which the sign-in submission never attempts to recover from by refreshing
+
+#### Scenario: Concurrent CSRF failures share one recovery call
+- **WHEN** multiple requests are rejected with a 403 coded `csrf_failed` at approximately the same time
+- **THEN** the app calls the CSRF cookie re-pairing endpoint exactly once, and every rejected request retries only after that one call resolves
+
+#### Scenario: Recovery paths do not chain into an unbounded retry
+- **WHEN** a request has already been retried once, whether following CSRF recovery or following a refresh
+- **THEN** a further rejection of that same request does not trigger the other recovery path or any additional retry
 
 ### Requirement: A 403 after refresh is resolved by re-probing, never assumed
 Because a 403 from a permission-gated route and a 403 from having no session are indistinguishable by status code alone, the admin app SHALL NOT assume which occurred. If the refresh attempt itself does not succeed, the app SHALL treat the session as gone and route the caller to sign-in without retrying the original request. If the refresh succeeds but the retried request is rejected with a 403 again, the app SHALL re-probe the caller's own account before deciding what happened: a successful re-probe SHALL be treated as a permission denial, and a failed re-probe SHALL be treated as the session being gone.

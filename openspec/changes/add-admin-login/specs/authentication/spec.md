@@ -63,3 +63,49 @@ The system SHALL allow a caller holding a valid, unrevoked, unexpired refresh cr
 #### Scenario: A second presentation is treated as reuse regardless of intent
 - **WHEN** a refresh credential already treated as used is presented again, whether by an attacker or by the credential's own holder racing a second request against the first
 - **THEN** the system revokes the lineage exactly as specified above, without attempting to determine which case occurred
+
+### Requirement: Authentication attempts are rate limited
+Rate limiting SHALL be enforced, not merely declared. The system SHALL limit failed sign-in attempts per source-and-email pair, SHALL additionally cap failed sign-in attempts per source address across all email addresses, and SHALL limit attempts against the password-change endpoint, session refresh, the sign-in callback, and the CSRF cookie re-pairing endpoint. Throttled responses SHALL be indistinguishable from ordinary failure responses for the same endpoint.
+
+#### Scenario: Repeated failures for one account are throttled
+- **WHEN** sign-in attempts for the same email address from the same source fail repeatedly within a short window
+- **THEN** further attempts are rejected regardless of whether the submitted credentials would otherwise be correct
+
+#### Scenario: Password spraying across many accounts is throttled
+- **WHEN** a single source makes failed sign-in attempts against many different email addresses, none of which individually exceeds the per-account limit
+- **THEN** further attempts from that source are rejected
+
+#### Scenario: Brute-forcing a current password at the change endpoint is throttled
+- **WHEN** repeated password-change attempts carrying an incorrect current password are submitted from the same source within a short window
+- **THEN** further attempts are rejected
+
+#### Scenario: Throttling does not leak account existence
+- **WHEN** a caller is throttled after repeated failures
+- **THEN** the response is indistinguishable from an ordinary failure response for that endpoint
+
+#### Scenario: Repeated CSRF re-pairing calls are throttled
+- **WHEN** a source makes repeated requests to the CSRF cookie re-pairing endpoint within a short window
+- **THEN** further attempts from that source are rejected, and the rejection is indistinguishable from the endpoint's ordinary uniform response
+
+## ADDED Requirements
+
+### Requirement: A CSRF cookie can be re-paired with an existing session
+The system SHALL provide a safe-method endpoint that issues a new CSRF cookie bound to whichever session the caller's own session cookies identify, without itself requiring a CSRF token. Binding SHALL be derived only from the caller's own session cookies — never from a query parameter, header, or request body — in this order: a valid access credential's session takes precedence; otherwise a valid, unrevoked, unexpired refresh credential's session; otherwise no token is issued. The response SHALL be uniform regardless of which case applied, so the endpoint cannot be used to determine whether a caller holds any session. The issued token SHALL be delivered only as the same script-readable cookie every other CSRF token is delivered as, and SHALL NOT appear in any response body.
+
+This mechanism SHALL NOT rotate any credential, create a session, extend any session's expiry, or lift a revocation. It only re-pairs a CSRF token with a session that already validly exists; a session that is revoked or expired gains nothing from it.
+
+#### Scenario: Recovery using only a refresh credential
+- **WHEN** a caller presents a valid, unrevoked, unexpired refresh credential and no valid access credential
+- **THEN** a new CSRF cookie is issued, bound to the session the refresh credential identifies
+
+#### Scenario: Recovery using a valid access credential binds to its session
+- **WHEN** a caller presents a valid access credential
+- **THEN** the new CSRF cookie is bound to the session identified by that access credential, so a subsequent state-changing request using it passes the binding check
+
+#### Scenario: No token is issued when no session is identifiable
+- **WHEN** a caller presents no valid access credential and no valid, unrevoked, unexpired refresh credential — including a caller presenting a revoked or expired refresh credential, or no session cookies at all
+- **THEN** no CSRF cookie is issued, and the response is indistinguishable from the response given when a token is issued
+
+#### Scenario: The mechanism does not rotate credentials or revive a revoked session
+- **WHEN** the mechanism is used, in any case
+- **THEN** no refresh credential is rotated, no session is created or has its expiry extended, and a session that was revoked or expired beforehand remains so, rejected by every other check exactly as it would have been without this mechanism
