@@ -8,20 +8,7 @@ import { createHomeFeedService } from './homeFeed.service.js';
 import { createHomeCurationController, createHomeFeedController } from './curation.controller.js';
 import { createArticleRepository } from '../articles/article.repository.js';
 import { requirePermission, requirePublic } from '../../middleware/authorize.js';
-import { rateLimit, clientIp } from '../../middleware/rateLimit.js';
-
-const PUBLIC_READ_RATE_LIMIT = { windowMs: 60 * 1000, max: 120 };
-
-function publicReadRateLimiter() {
-  return rateLimit({
-    name: 'public-home-feed',
-    ...PUBLIC_READ_RATE_LIMIT,
-    keyGenerator: clientIp,
-    onLimited: (_req, res) => {
-      res.status(429).json({ success: false, error: { code: 'rate_limited', message: 'Too many requests' } });
-    },
-  });
-}
+import { publicReadRateLimiter } from '../../middleware/rateLimit.js';
 
 /**
  * Admin curation endpoints, mounted at `/admin/curation`. Both routes are gated by
@@ -54,7 +41,7 @@ export function publicHomeRoutes(db: Database, env: Pick<Env, 'MEDIA_PUBLIC_BASE
   const service = createHomeFeedService(curationRepository, articleRepository, env);
   const controller = createHomeFeedController(service);
 
-  router.get('/', requirePublic(), publicReadRateLimiter(), controller.getFeed);
+  router.get('/', requirePublic(), publicReadRateLimiter('public-home-feed'), controller.getFeed);
 
   return router;
 }

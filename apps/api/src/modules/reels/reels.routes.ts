@@ -10,20 +10,7 @@ import { createReelsCurationService } from './reelsCuration.service.js';
 import { createPublicReelsService } from './publicReels.service.js';
 import { createReelsCurationController, createPublicReelsController } from './reelsCuration.controller.js';
 import { requirePermission, requirePublic } from '../../middleware/authorize.js';
-import { rateLimit, clientIp } from '../../middleware/rateLimit.js';
-
-const PUBLIC_READ_RATE_LIMIT = { windowMs: 60 * 1000, max: 120 };
-
-function publicReadRateLimiter(name: string) {
-  return rateLimit({
-    name,
-    ...PUBLIC_READ_RATE_LIMIT,
-    keyGenerator: clientIp,
-    onLimited: (_req, res) => {
-      res.status(429).json({ success: false, error: { code: 'rate_limited', message: 'Too many requests' } });
-    },
-  });
-}
+import { publicReadRateLimiter } from '../../middleware/rateLimit.js';
 
 /**
  * Admin reel-library endpoints, mounted at `/admin/reels` — create, read, update, delete the
