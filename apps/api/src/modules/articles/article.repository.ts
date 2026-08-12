@@ -92,6 +92,14 @@ export interface ArticleRepository {
   slugExists(slug: string, excludeId?: string): Promise<boolean>;
   listPublished(filter: PublicListFilter): Promise<ArticleWithRelations[]>;
   findPublishedBySlug(slug: string, now: Date): Promise<ArticleWithRelations | null>;
+  /**
+   * A specific set of articles, filtered through the same canonical visibility predicate as
+   * every other public read. Used by `home-curation` to build public cards for curated picks
+   * without re-deriving visibility itself (specs/public-news-api/spec.md - "One canonical public
+   * visibility rule"; specs/home-curation/spec.md - "Public visibility is not re-derived").
+   * Returns matches in no particular order — callers that need curated order re-sort by id.
+   */
+  findManyPubliclyVisible(ids: string[], now: Date): Promise<ArticleWithRelations[]>;
   /** `scheduled` articles whose `published_at` has passed — the scheduled-publish worker's input. */
   findDueScheduled(now: Date): Promise<{ id: string; slug: string; publishedAt: Date }[]>;
   /**
@@ -411,6 +419,15 @@ export function createArticleRepository(db: Database): ArticleRepository {
         .limit(filter.limit)
         .offset(filter.offset);
 
+      return attachRelations(db, rows);
+    },
+
+    async findManyPubliclyVisible(ids, now) {
+      if (ids.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(articles)
+        .where(and(inArray(articles.id, ids), publiclyVisible(now)));
       return attachRelations(db, rows);
     },
 

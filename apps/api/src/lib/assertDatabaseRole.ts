@@ -2,8 +2,11 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@siders/db';
 import type { Logger } from './logger.js';
 
-/** The six tables `add-news-management-system` created with RLS enabled and no policies. */
-const GUARDED_TABLES = ['media', 'articles', 'categories', 'tags', 'article_categories', 'article_tags'];
+/**
+ * The tables `add-news-management-system` and `add-home-curation` created with RLS enabled and
+ * no policies.
+ */
+const GUARDED_TABLES = ['media', 'articles', 'categories', 'tags', 'article_categories', 'article_tags', 'home_curation'];
 
 interface TableRlsRow {
   relname: string;

@@ -26,6 +26,7 @@ import { createArticleRepository } from './modules/articles/article.repository.j
 import { createScheduledPublishJob } from './modules/articles/scheduledPublishWorker.js';
 import { categoryRoutes } from './modules/categories/category.routes.js';
 import { tagRoutes } from './modules/tags/tag.routes.js';
+import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
 
 export function createServer(): Express {
   const env = loadEnv();
@@ -58,6 +59,8 @@ export function createServer(): Express {
   app.use('/articles', publicArticleRoutes(db, env));
   app.use('/categories', categoryRoutes(db));
   app.use('/tags', tagRoutes(db));
+  app.use('/admin/curation', curationRoutes(db, env));
+  app.use('/home', publicHomeRoutes(db, env));
 
   app.use(createErrorHandler(logger));
 

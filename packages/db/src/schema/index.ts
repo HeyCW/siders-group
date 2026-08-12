@@ -6,3 +6,4 @@ export * from './sessions';
 export * from './media';
 export * from './articles';
 export * from './taxonomy';
+export * from './homeCuration';

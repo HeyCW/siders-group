@@ -102,6 +102,9 @@ function createFakeArticleRepository() {
     async listPublished() {
       return [];
     },
+    async findManyPubliclyVisible() {
+      return [];
+    },
     async findPublishedBySlug() {
       return null;
     },
