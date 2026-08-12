@@ -42,3 +42,12 @@ export async function revalidateArticlePaths(
     [...detailPaths, '/news', '/'].map((path) => revalidatePath(env, logger, path)),
   );
 }
+
+/**
+ * A curation write changes only the homepage — no article's own page changed, and `/news` does
+ * not show curation — so it revalidates `/` alone, never the three-path bundle above
+ * (specs/home-curation/spec.md - "Curation writes revalidate the homepage").
+ */
+export async function revalidateHomePath(env: RevalidateEnv, logger: Logger): Promise<void> {
+  await revalidatePath(env, logger, '/');
+}

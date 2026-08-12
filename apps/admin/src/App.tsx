@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { ArticleListPage } from './pages/ArticleListPage.js';
 import { NewArticlePage } from './pages/NewArticlePage.js';
 import { TaxonomyManagementPage } from './pages/TaxonomyManagementPage.js';
+import { HomeCurationPage } from './pages/HomeCurationPage.js';
 import { categoriesApi, tagsApi } from './lib/taxonomyApi.js';
 
 // The editor page pulls in the entire Tiptap toolchain (~450KB); the list and taxonomy screens
@@ -38,6 +39,7 @@ export default function App() {
         element={<TaxonomyManagementPage title="Categories" singularLabel="category" api={categoriesApi} />}
       />
       <Route path="/tags" element={<TaxonomyManagementPage title="Tags" singularLabel="tag" api={tagsApi} />} />
+      <Route path="/curation" element={<HomeCurationPage />} />
     </Routes>
   );
 }

@@ -2,8 +2,11 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@siders/db';
 import type { Logger } from './logger.js';
 
-/** The six tables `add-news-management-system` created with RLS enabled and no policies. */
-const GUARDED_TABLES = ['media', 'articles', 'categories', 'tags', 'article_categories', 'article_tags'];
+/**
+ * The tables `add-news-management-system` and `add-home-curation` created with RLS enabled and
+ * no policies.
+ */
+const GUARDED_TABLES = ['media', 'articles', 'categories', 'tags', 'article_categories', 'article_tags', 'home_curation'];
 
 interface TableRlsRow {
   relname: string;
@@ -31,6 +34,11 @@ interface TableRlsRow {
  * configuration, not the vacuous default-deny this guards against.
  */
 export async function assertDatabaseRoleCanReadNewsTables(db: Database, logger: Logger): Promise<void> {
+  // `in (...)` with one bound parameter per name, not `= any(${GUARDED_TABLES})`. Drizzle's `sql`
+  // template does not bind a JS array as a Postgres array here, so the `any()` form made Postgres
+  // reject the whole statement with 42809 ("op ANY/ALL (array) requires array on right side") —
+  // and because this runs at boot, before `createServer()`, it took the entire API down on every
+  // start against a real database rather than reporting anything about RLS.
   const result = await db.execute(sql`
     select c.relname,
            row_security_active(c.oid) as rls_active,
@@ -38,7 +46,10 @@ export async function assertDatabaseRoleCanReadNewsTables(db: Database, logger: 
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'app'
-      and c.relname = any(${GUARDED_TABLES})
+      and c.relname in (${sql.join(
+        GUARDED_TABLES.map((table) => sql`${table}`),
+        sql`, `,
+      )})
   `);
 
   const rows = result.rows as unknown as TableRlsRow[];
