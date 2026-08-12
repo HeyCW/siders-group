@@ -1,9 +1,9 @@
 ---
 name: openspec-propose
 description: Propose a new change with all artifacts generated in one step. Use when the user wants to quickly describe what they want to build and get a complete proposal with design, specs, and tasks ready for implementation.
-allowed-tools: Bash(openspec:*)
+allowed-tools: Bash(openspec:*), Bash(ls:*), Bash(find:*), Bash(mkdir:*), Bash(mv:*), Bash(test:*), Bash(diff:*), Bash(grep:*), Bash(command:*), Read, Write, Edit, Glob, Grep
 license: MIT
-compatibility: Requires openspec CLI.
+compatibility: Works with the openspec CLI; falls back to reading openspec/ directly when it is absent.
 metadata:
   author: openspec
   version: "1.0"
@@ -11,6 +11,9 @@ metadata:
 ---
 
 Propose a new change - create the change and generate all artifacts in one step.
+
+**If the `openspec` CLI is not installed**, read `.claude/skills/openspec-shared/cli-fallback.md` and derive the same state from `openspec/` directly. Probe once with `command -v openspec` before the first CLI call. A missing binary is a fallback, not an error; a binary that exists and then fails is a real error worth stopping on.
+
 
 I'll create a change with the artifacts your schema defines. With the default spec-driven schema that is:
 - proposal.md (what & why)

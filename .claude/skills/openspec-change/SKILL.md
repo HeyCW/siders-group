@@ -9,6 +9,12 @@ OpenSpec splits work into three stages: **create a change** → implement it →
 
 The core discipline: **no implementation code until the change is written, validated, and approved.** If you find yourself editing source files during this skill, stop — you've skipped a stage.
 
+**If the `openspec` CLI is not installed**, read `.claude/skills/openspec-shared/cli-fallback.md`
+and derive the same state from `openspec/` directly. Probe once with `command -v openspec`
+before the first CLI call. This skill leans hardest on `openspec validate --strict`, which
+has no offline equivalent — the fallback gives you a structural hand check instead. Report
+it as a hand check, never as a passing `--strict` run.
+
 ## Step 0: Orient before writing anything
 
 Three reads, in this order. Do not skip them — guessing at repo conventions is the most common way these proposals go wrong.

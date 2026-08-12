@@ -1,9 +1,9 @@
 ---
 name: openspec-sync-specs
 description: Sync delta specs from a change to main specs. Use when the user wants to update main specs with changes from a delta spec, without archiving the change.
-allowed-tools: Bash(openspec:*)
+allowed-tools: Bash(openspec:*), Bash(ls:*), Bash(find:*), Bash(mkdir:*), Bash(mv:*), Bash(test:*), Bash(diff:*), Bash(grep:*), Bash(command:*), Read, Write, Edit, Glob, Grep
 license: MIT
-compatibility: Requires openspec CLI.
+compatibility: Works with the openspec CLI; falls back to reading openspec/ directly when it is absent.
 metadata:
   author: openspec
   version: "1.0"
@@ -11,6 +11,9 @@ metadata:
 ---
 
 Sync delta specs from a change to main specs.
+
+**If the `openspec` CLI is not installed**, read `.claude/skills/openspec-shared/cli-fallback.md` and derive the same state from `openspec/` directly. Probe once with `command -v openspec` before the first CLI call. A missing binary is a fallback, not an error; a binary that exists and then fails is a real error worth stopping on.
+
 
 This is an **agent-driven** operation - you will read delta specs and directly edit main specs to apply the changes. This allows intelligent merging (e.g., adding a scenario without copying the entire requirement).
 
