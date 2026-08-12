@@ -4,6 +4,8 @@ import { ArticleListPage } from './pages/ArticleListPage.js';
 import { NewArticlePage } from './pages/NewArticlePage.js';
 import { TaxonomyManagementPage } from './pages/TaxonomyManagementPage.js';
 import { HomeCurationPage } from './pages/HomeCurationPage.js';
+import { ReelLibraryPage } from './pages/ReelLibraryPage.js';
+import { ReelsCurationPage } from './pages/ReelsCurationPage.js';
 import { categoriesApi, tagsApi } from './lib/taxonomyApi.js';
 
 // The editor page pulls in the entire Tiptap toolchain (~450KB); the list and taxonomy screens
@@ -40,6 +42,8 @@ export default function App() {
       />
       <Route path="/tags" element={<TaxonomyManagementPage title="Tags" singularLabel="tag" api={tagsApi} />} />
       <Route path="/curation" element={<HomeCurationPage />} />
+      <Route path="/reels" element={<ReelLibraryPage />} />
+      <Route path="/reels-curation" element={<ReelsCurationPage />} />
     </Routes>
   );
 }

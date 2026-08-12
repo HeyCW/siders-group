@@ -1,9 +1,9 @@
 ---
 name: openspec-archive-change
 description: Archive a completed change in the experimental workflow. Use when the user wants to finalize and archive a change after implementation is complete.
-allowed-tools: Bash(openspec:*)
+allowed-tools: Bash(openspec:*), Bash(ls:*), Bash(find:*), Bash(mkdir:*), Bash(mv:*), Bash(test:*), Bash(diff:*), Bash(grep:*), Bash(command:*), Read, Write, Edit, Glob, Grep
 license: MIT
-compatibility: Requires openspec CLI.
+compatibility: Works with the openspec CLI; falls back to reading openspec/ directly when it is absent.
 metadata:
   author: openspec
   version: "1.0"
@@ -11,6 +11,12 @@ metadata:
 ---
 
 Archive a completed change in the experimental workflow.
+
+**If the `openspec` CLI is not installed**, read `.claude/skills/openspec-shared/cli-fallback.md`
+and derive every value below from `openspec/` directly. Probe once with
+`command -v openspec` before the first CLI call. A missing binary is a fallback, not an
+error — including at step 4, whose stop-on-failure rule applies only when the CLI is
+present and its command actually failed.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `view`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
@@ -111,7 +117,13 @@ Archive a completed change in the experimental workflow.
    selected-root flags. Require a zero exit status and valid artifact-instruction
    JSON. If the lookup fails or returns invalid JSON, report the error and stop
    before writing any main spec or moving the change. A valid response with omitted
-   `rules` is the no-rules case. Apply returned `rules` only to the content and
+   `rules` is the no-rules case.
+
+   **When the CLI is absent this lookup does not apply and does not block.** There is
+   no command to fail, so treat it as the no-rules case, read any `rules:` from
+   `openspec/config.yaml` instead, and proceed — noting in the summary that no
+   artifact rules were available. Stopping here would make a missing binary
+   indistinguishable from a corrupt change. Apply returned `rules` only to the content and
    form of main specs produced by this merge; do not use them as archive guidance,
    change CLI behavior, or copy the rule text into any output file.
 
@@ -166,7 +178,9 @@ Archive a completed change in the experimental workflow.
 
 **Guardrails**
 - Announce the selected change; prompt for selection when it is ambiguous
-- Use artifact graph (openspec status --json) for completion checking
+- Use artifact graph (openspec status --json) for completion checking, or the filesystem
+  derivation in `cli-fallback.md` when the CLI is absent — say which was used
+- Never report a CLI check as having passed when no CLI was available to run it
 - Don't block archive on warnings - just inform and confirm
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened

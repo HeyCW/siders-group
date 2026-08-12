@@ -7,3 +7,5 @@ export * from './media';
 export * from './articles';
 export * from './taxonomy';
 export * from './homeCuration';
+export * from './reels';
+export * from './reelsCuration';

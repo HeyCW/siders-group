@@ -1,9 +1,9 @@
 ---
 name: openspec-apply-change
 description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.
-allowed-tools: Bash(openspec:*)
+allowed-tools: Bash(openspec:*), Bash(ls:*), Bash(find:*), Bash(mkdir:*), Bash(mv:*), Bash(test:*), Bash(diff:*), Bash(grep:*), Bash(command:*), Read, Write, Edit, Glob, Grep
 license: MIT
-compatibility: Requires openspec CLI.
+compatibility: Works with the openspec CLI; falls back to reading openspec/ directly when it is absent.
 metadata:
   author: openspec
   version: "1.0"
@@ -11,6 +11,9 @@ metadata:
 ---
 
 Implement tasks from an OpenSpec change.
+
+**If the `openspec` CLI is not installed**, read `.claude/skills/openspec-shared/cli-fallback.md` and derive the same state from `openspec/` directly. Probe once with `command -v openspec` before the first CLI call. A missing binary is a fallback, not an error; a binary that exists and then fails is a real error worth stopping on.
+
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `view`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
