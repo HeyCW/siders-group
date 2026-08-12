@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 
 /** `.env` files can't hold real newlines cleanly, so PEM keys travel as one line with literal `\n`. */
@@ -51,6 +52,18 @@ const envSchema = z.object({
   R2_ACCESS_KEY_ID: z.string().min(1),
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_BUCKET: z.string().min(1),
+
+  // Local-filesystem media storage for add-news-management-system (design.md - "Media storage:
+  // the local filesystem, not R2"). Deliberately separate from the R2 variables above, which
+  // remain unused by this change. MEDIA_STORAGE_PATH must be absolute so the storage root is
+  // unambiguous regardless of the process's working directory.
+  // `isAbsolute` (not `.startsWith('/')`) so this accepts a Windows-style root (`C:\data\media`)
+  // as well as a POSIX one — local dev on Windows was otherwise rejected at boot.
+  MEDIA_STORAGE_PATH: z.string().min(1).refine((v) => isAbsolute(v), {
+    message: 'must be an absolute path',
+  }),
+  MEDIA_PUBLIC_BASE_URL: z.string().url().transform(stripTrailingSlash),
+  MEDIA_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
 
   // Trailing slashes are stripped so these compare equal to a parsed `URL.origin`, which never
   // carries one. `redirect.ts` matches the post-sign-in target's origin against this set; with

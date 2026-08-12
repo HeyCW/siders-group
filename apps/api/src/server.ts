@@ -8,6 +8,8 @@ import { createLogger } from './lib/logger.js';
 import { startScheduler } from './lib/scheduler.js';
 import { createCsrfMiddleware } from './lib/csrf.js';
 import { getDatabase } from './lib/db.js';
+import { ensureMediaStorageDir } from './lib/mediaStorage.js';
+import { assertDatabaseRoleCanReadNewsTables } from './lib/assertDatabaseRole.js';
 import { requestId } from './middleware/requestId.js';
 import { createAuthenticate } from './middleware/authenticate.js';
 import { auditAuthorizationDeclarations } from './middleware/authorize.js';
@@ -18,6 +20,12 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { googleAuthRoutes } from './modules/auth/google.routes.js';
 import { staffRoutes } from './modules/staff/staff.routes.js';
 import { roleRoutes } from './modules/roles/role.routes.js';
+import { mediaFileRoutes, mediaRoutes } from './modules/media/media.routes.js';
+import { articleRoutes, publicArticleRoutes } from './modules/articles/article.routes.js';
+import { createArticleRepository } from './modules/articles/article.repository.js';
+import { createScheduledPublishJob } from './modules/articles/scheduledPublishWorker.js';
+import { categoryRoutes } from './modules/categories/category.routes.js';
+import { tagRoutes } from './modules/tags/tag.routes.js';
 
 export function createServer(): Express {
   const env = loadEnv();
@@ -44,6 +52,12 @@ export function createServer(): Express {
   app.use('/auth', googleAuthRoutes(db, env));
   app.use('/staff', staffRoutes(db, env));
   app.use('/roles', roleRoutes(db));
+  app.use('/media', mediaRoutes(db, env));
+  app.use('/media-files', mediaFileRoutes(env));
+  app.use('/admin/articles', articleRoutes(db, env));
+  app.use('/articles', publicArticleRoutes(db, env));
+  app.use('/categories', categoryRoutes(db));
+  app.use('/tags', tagRoutes(db));
 
   app.use(createErrorHandler(logger));
 
@@ -60,8 +74,23 @@ const isMainModule =
 if (isMainModule) {
   const env = loadEnv();
   const logger = createLogger(env);
+  // Best-effort: `storeUpload` also creates its dated subdirectory recursively on every write,
+  // so a missing root self-heals on first upload regardless. This is the boot-time guarantee
+  // for operational visibility (add-news-management-system/tasks.md - 4.3), not a correctness
+  // dependency of the upload path itself.
+  await ensureMediaStorageDir(env);
+  // RLS is enabled with no policies on the news-management tables (tasks.md - 2.7), so this
+  // connection must be exempt from it or every read silently returns nothing (tasks.md - 2.9).
+  await assertDatabaseRoleCanReadNewsTables(getDatabase(env), logger);
   const app = createServer();
-  startScheduler(logger);
+  const scheduler = startScheduler(logger);
+  // Every minute, matching design.md - "Scheduling: status flag plus a lazy read-time
+  // fallback" - "A cron worker runs every minute". Correctness never depends on this job; see
+  // scheduledPublishWorker.ts.
+  scheduler.registerJob(
+    '* * * * *',
+    createScheduledPublishJob(createArticleRepository(getDatabase(env)), env, logger),
+  );
   app.listen(env.PORT, () => {
     logger.info({ port: env.PORT }, 'api listening');
   });

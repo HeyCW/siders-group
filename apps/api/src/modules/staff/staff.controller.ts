@@ -3,6 +3,7 @@ import { staffCreateRequestSchema, staffPasswordChangeRequestSchema } from '@sid
 import type { StaffService } from './staff.service.js';
 import { toStaffCreateResponse, toStaffResetResponse } from './staff.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { requireUuidParam } from '../../lib/requireParam.js';
 
 function requireCaller(req: Request): { subjectId: string; isOwner: boolean } {
   const subjectId = req.auth?.subjectId;
@@ -13,12 +14,6 @@ function requireCaller(req: Request): { subjectId: string; isOwner: boolean } {
 function requireSession(req: Request): { subjectId: string; sessionId: string } {
   if (!req.auth?.subjectId || !req.auth.sessionId) throw new AppError('Not authenticated', 401, 'unauthenticated');
   return { subjectId: req.auth.subjectId, sessionId: req.auth.sessionId };
-}
-
-function requireParam(req: Request, name: string): string {
-  const value = req.params[name];
-  if (!value) throw new AppError(`Missing path parameter: ${name}`, 400, 'bad_request');
-  return value;
 }
 
 /** Parse, delegate, respond. No `if` about business meaning lives here. */
@@ -38,7 +33,7 @@ export function createStaffController(service: StaffService) {
     async disable(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const caller = requireCaller(req);
-        const targetId = requireParam(req, 'id');
+        const targetId = requireUuidParam(req, 'id');
         await service.disable(targetId, caller);
         res.status(204).end();
       } catch (err) {
@@ -49,7 +44,7 @@ export function createStaffController(service: StaffService) {
     async triggerReset(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const caller = requireCaller(req);
-        const targetId = requireParam(req, 'id');
+        const targetId = requireUuidParam(req, 'id');
         const { temporaryPassword } = await service.triggerReset(targetId, caller);
         res.status(200).json({ success: true, data: toStaffResetResponse(temporaryPassword) });
       } catch (err) {

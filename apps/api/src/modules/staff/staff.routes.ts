@@ -37,6 +37,7 @@ function respondWithPasswordChangeFailure(_req: Request, _res: Response, next: N
  */
 export function passwordChangeRateLimiter() {
   return rateLimit({
+    name: 'staff-password-change',
     ...PASSWORD_CHANGE_RATE_LIMIT,
     keyGenerator: callerSubjectKey,
     onLimited: respondWithPasswordChangeFailure,
