@@ -2,13 +2,15 @@
 
 Per `docs/ARCHITECTURE.md` §4 and §8.1: the API is module-per-feature, Drizzle over Supabase Postgres in the `app` schema, and `/` is rendered by `apps/web` with ISR (60s) plus on-demand revalidation, explicitly so that "editors publish curation and see it within seconds". The curation that sentence assumes has never been specified.
 
-This change builds directly on `add-news-management-system`, which is **specified but not implemented** (0 of 90 tasks). It relies on three things that change delivers:
+This change builds directly on `add-news-management-system`, which is **implemented and archived** (`archive/2026-08-11-add-news-management-system/`). It relies on three things that change delivers, all present in `main` today:
 
 ```
 app.articles                    the FK target and the thing being curated
 public visibility rule          "scheduled && published_at <= now()  ⇒  published",
                                  expressed ONCE in the public read query layer
+                                 (apps/api/src/modules/articles/article.repository.ts)
 revalidate.ts                   the REVALIDATE_SECRET-protected webhook caller
+                                 (apps/api/src/lib/revalidate.ts)
 ```
 
 It also relies on `add-auth-foundation` (implemented and archived) for `authenticate` + `requirePermission`, and on the `news.manage` row already seeded by `0000_useful_red_shift.sql`.
@@ -136,15 +138,14 @@ As established there, a failed revalidation call is logged and does not fail the
 
 ## Risks / Trade-offs
 
-- **[Stacked behind an unimplemented change]** → Nothing here can be built until `app.articles` and the public read query layer exist. Mitigation: none needed, but the task list must not be started before `add-news-management-system` is complete, and the build order below assumes it.
 - **[Last-write-wins on a shared list]** → Two editors curating simultaneously silently overwrite each other, and unlike an article draft the front page is shared. Accepted; a version/etag precondition on `PUT` is a cheap follow-up if editors ever collide in practice.
 - **[Curated list drifts out of sync with what readers see]** → An editor curates five articles, three of them drafts, and wonders why the homepage shows two. Mitigated by the admin endpoint reporting per-pick visibility and the admin screen badging not-yet-live picks; it cannot be eliminated without giving up pre-scheduling.
 - **[Silent shrinkage]** → If a curated article is unpublished, the head silently gets shorter and backfill quietly covers it. This is the intended behaviour and is strictly better than a hole, but it means an editor is never *told* their pick fell off the front page. No notification system is in scope; the admin screen showing live status is the only signal.
-- **[`excludeIds` rationale now inaccurate]** → `add-news-management-system/design.md` documents a consumer that this change replaces with server-side composition. Flagged in `proposal.md` — Impact for reconciliation rather than edited from here, so the two changes do not disagree about ownership.
+- **[`excludeIds` rationale inaccurate in the archived record]** → `archive/2026-08-11-add-news-management-system/design.md` documents a client-side consumer that this change replaces with server-side composition. Archived changes are not edited after archiving, so the inaccuracy is left there; flagged in `proposal.md` — Impact, with this `design.md` as the authoritative description going forward.
 
 ## Build Order
 
-Assumes `add-news-management-system` is complete. Do not start before it is.
+`add-news-management-system` is implemented and merged into `main`; nothing here is blocked.
 
 1. **Data model + contracts** — the table, RLS, the migration, and the Zod schemas. Everything queries against this.
 2. **Admin read + write** — the module, whole-list replacement in a transaction, validation, and the `/` revalidation call. This is the whole editorial capability and is testable without any public surface.

@@ -1,10 +1,10 @@
 ## 0. Prerequisite
 
-`add-home-curation` is stacked behind `add-news-management-system`. Do not start section 1 until that change is implemented and archived.
+`add-news-management-system` is implemented and merged into `main` (`archive/2026-08-11-add-news-management-system/`). The prerequisites below are satisfied; recorded here for traceability rather than as an open gate.
 
-- [ ] 0.1 Confirm `app.articles` exists and the articles migration has been applied
-- [ ] 0.2 Confirm the public read query layer exposes the canonical visibility rule (`scheduled && published_at <= now()` ⇒ published) as a reusable predicate rather than an inline condition, and reuse it — do not copy it
-- [ ] 0.3 Confirm `apps/api/src/lib/revalidate.ts` exists and accepts a single path per call
+- [x] 0.1 `app.articles` exists and the articles migration has been applied
+- [x] 0.2 The public read query layer exposes the canonical visibility rule as a reusable predicate: `publiclyVisible(now)` (SQL-side, `apps/api/src/modules/articles/article.repository.ts:143`) for query conditions, and the exported `isPubliclyVisible(row, now)` (same file, line 163) for filtering an already-loaded row in application code — use the latter to filter curated picks
+- [x] 0.3 `apps/api/src/lib/revalidate.ts` exists and accepts a single path per call
 
 ## 1. Data model
 
@@ -84,4 +84,4 @@
 - [ ] 7.1 Run build, lint, and the full test suite with no TypeScript errors
 - [ ] 7.2 Confirm `auditAuthorizationDeclarations` passes at boot — every new route declares a permission or `requirePublic()`
 - [ ] 7.3 Confirm no new rows exist in `app.permissions` after migrating
-- [ ] 7.4 Reconcile `add-news-management-system/design.md`'s `excludeIds` rationale, which describes consumer-side composition that this change replaced with server-side composition (see `proposal.md` — Impact)
+- [x] 7.4 ~~Reconcile `add-news-management-system/design.md`'s `excludeIds` rationale~~ — moot: that file is now part of an archived, immutable historical record (`archive/2026-08-11-add-news-management-system/design.md`) and is not edited after archiving. This change's own `design.md` is the authoritative description of how `excludeIds` is actually used (see `proposal.md` — Impact)
