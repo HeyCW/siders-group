@@ -37,7 +37,12 @@ function respondWithCallbackFailure(_req: Request, _res: Response, next: NextFun
 
 /** Exported for the same reason the sign-in chain is: the tests assert the shipped config. */
 export function googleCallbackRateLimiter() {
-  return rateLimit({ ...CALLBACK_RATE_LIMIT, keyGenerator: clientIp, onLimited: respondWithCallbackFailure });
+  return rateLimit({
+    name: 'google-callback',
+    ...CALLBACK_RATE_LIMIT,
+    keyGenerator: clientIp,
+    onLimited: respondWithCallbackFailure,
+  });
 }
 
 export function googleAuthRoutes(db: Database, env: Env) {

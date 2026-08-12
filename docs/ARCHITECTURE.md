@@ -471,6 +471,12 @@ Drizzle schema in TypeScript is the source of truth. `drizzle-kit generate` emit
 
 ## 7. Storage
 
+**Current state (`add-news-management-system`): article media is stored on the API's own local filesystem, not R2.** `app.media` records a storage-root-relative path (`MEDIA_STORAGE_PATH`, date-sharded as `YYYY/MM/<uuid>.<ext>`); the public URL is derived at map time as `MEDIA_PUBLIC_BASE_URL + '/' + storage_path`, never stored. Uploads are validated server-side against an image-type allowlist and a size cap, with the real type determined by sniffing the file's leading bytes rather than trusting the client's declared `Content-Type` — the same discipline the R2 design below describes, just applied to a local write instead of a presigned PUT. This is a deliberate, scoped decision (see `openspec/changes/add-news-management-system/design.md` - "Media storage"), not a partial implementation of the section below: local storage is not replica-safe, so a deployment running this must either mount `MEDIA_STORAGE_PATH` on shared durable storage or run a single API instance. Because the URL is always derived rather than stored, migrating to R2 later touches the media mapper and configuration, not the `app.media` rows or any article that references them.
+
+The R2 design below remains the intended eventual target and is unchanged as a plan; it is simply not what this repository currently runs.
+
+---
+
 With Supabase scoped to the database, media goes to an S3-compatible store. **Cloudflare R2** is the recommendation — S3 API compatible, zero egress fees, and an image resizing service in front of it. Backblaze B2 or plain S3 work identically; the SDK code does not change.
 
 | Bucket / prefix | Access | Contents |

@@ -28,6 +28,7 @@ describe('rateLimit', () => {
 
   it('allows requests under the limit', () => {
     const middleware = rateLimit({
+      name: 'test',
       windowMs: 1000,
       max: 3,
       keyGenerator: () => 'fixed-key',
@@ -43,6 +44,7 @@ describe('rateLimit', () => {
 
   it('rejects once the limit is exceeded', () => {
     const middleware = rateLimit({
+      name: 'test',
       windowMs: 1000,
       max: 2,
       keyGenerator: () => 'fixed-key',
@@ -57,6 +59,7 @@ describe('rateLimit', () => {
 
   it('tracks separate keys independently', () => {
     const middleware = rateLimit({
+      name: 'test',
       windowMs: 1000,
       max: 1,
       keyGenerator: (req) => (req as unknown as { key: string }).key,
@@ -72,7 +75,7 @@ describe('rateLimit', () => {
 
   it('calls a custom onLimited handler instead of the default 429', () => {
     const onLimited = vi.fn();
-    const middleware = rateLimit({ windowMs: 1000, max: 1, keyGenerator: () => 'fixed-key', onLimited });
+    const middleware = rateLimit({ name: 'test', windowMs: 1000, max: 1, keyGenerator: () => 'fixed-key', onLimited });
     const next = vi.fn();
     middleware(makeReq(), {} as Response, next as NextFunction);
     middleware(makeReq(), {} as Response, next as NextFunction);
@@ -80,10 +83,57 @@ describe('rateLimit', () => {
     expect(next).not.toHaveBeenCalledWith(expect.objectContaining({ status: 429 }));
   });
 
+  /**
+   * Every limiter shares one process-wide bucket map. Before the key was namespaced by
+   * `name`, two limiters whose key generators returned the same string shared a counter — the
+   * media-upload limiter and the password-change limiter both keyed on a bare `subjectId`, so
+   * uploading images spent the password-change budget and the next *correct* password was
+   * answered "Current password is incorrect". Four `clientIp`-keyed limiters collided the same
+   * way, letting anonymous public reads exhaust the refresh budget and sign an admin out.
+   */
+  it('keeps two limiters independent when their key generators return the same string', () => {
+    const uploadLimited = vi.fn();
+    const passwordLimited = vi.fn();
+    const sameKey = () => 'subject-1';
+
+    const uploads = rateLimit({
+      name: 'media-upload',
+      windowMs: 1000,
+      max: 30,
+      keyGenerator: sameKey,
+      onLimited: uploadLimited,
+    });
+    const passwordChanges = rateLimit({
+      name: 'staff-password-change',
+      windowMs: 1000,
+      max: 10,
+      keyGenerator: sameKey,
+      onLimited: passwordLimited,
+    });
+
+    // Spend the *upload* budget well past the password limiter's smaller ceiling.
+    for (let i = 0; i < 20; i += 1) {
+      uploads(makeReq(), {} as Response, vi.fn() as NextFunction);
+    }
+
+    // The password limiter must still have its full, untouched budget.
+    for (let i = 0; i < 10; i += 1) {
+      passwordChanges(makeReq(), {} as Response, vi.fn() as NextFunction);
+    }
+
+    expect(uploadLimited).not.toHaveBeenCalled();
+    expect(passwordLimited).not.toHaveBeenCalled();
+
+    // ...and enforce its own ceiling on the 11th.
+    passwordChanges(makeReq(), {} as Response, vi.fn() as NextFunction);
+    expect(passwordLimited).toHaveBeenCalledTimes(1);
+  });
+
   describe('failuresOnly', () => {
     it('refunds a successful attempt so it does not spend the budget', () => {
       const onLimited = vi.fn();
       const middleware = rateLimit({
+        name: 'test',
         windowMs: 1000,
         max: 2,
         keyGenerator: () => 'fixed-key',
@@ -103,6 +153,7 @@ describe('rateLimit', () => {
     it('charges a failed attempt', () => {
       const onLimited = vi.fn();
       const middleware = rateLimit({
+        name: 'test',
         windowMs: 1000,
         max: 2,
         keyGenerator: () => 'fixed-key',
@@ -129,6 +180,7 @@ describe('rateLimit', () => {
     it('holds the ceiling when attempts are made concurrently, not just sequentially', () => {
       const onLimited = vi.fn();
       const middleware = rateLimit({
+        name: 'test',
         windowMs: 1000,
         max: 5,
         keyGenerator: () => 'fixed-key',
@@ -155,6 +207,7 @@ describe('rateLimit', () => {
     it('drops a refund whose window rolled over rather than crediting an orphaned bucket', () => {
       const onLimited = vi.fn();
       const middleware = rateLimit({
+        name: 'test',
         windowMs: 20,
         max: 1,
         keyGenerator: () => 'fixed-key',

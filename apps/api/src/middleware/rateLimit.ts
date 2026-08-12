@@ -2,6 +2,18 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppError } from './errorHandler.js';
 
 export interface RateLimitOptions {
+  /**
+   * Namespace for this limiter's buckets. Required, not optional: every limiter shares the one
+   * process-wide `buckets` map, so without a namespace two limiters whose key generators return
+   * the same string share a counter and silently enforce each other's ceilings. That was not
+   * hypothetical — the media-upload limiter and the password-change limiter both keyed on a bare
+   * `subjectId`, so 10 image uploads exhausted the password-change budget and the next *correct*
+   * password came back as "Current password is incorrect"; and four `clientIp`-keyed limiters
+   * (public reads, staff login, refresh, Google callback) all shared one bucket per IP, letting
+   * anonymous reads sign an admin out by exhausting the refresh budget. A required field makes
+   * that class of collision impossible to reintroduce by omission.
+   */
+  name: string;
   windowMs: number;
   max: number;
   /** Derives the bucket key from the request — e.g. `${ip}:${email}`, or `ip` alone. */
@@ -64,7 +76,8 @@ export function rateLimit(options: RateLimitOptions) {
     const now = Date.now();
     if (buckets.size > MAX_TRACKED_BUCKETS) sweepExpired(now);
 
-    const key = options.keyGenerator(req);
+    // Namespaced so each limiter counts only its own traffic — see `name` above.
+    const key = `${options.name}:${options.keyGenerator(req)}`;
     const bucket = currentBucket(key, now, options.windowMs);
 
     // Reserve the slot *before* the handler runs, and hand it back afterward if the attempt

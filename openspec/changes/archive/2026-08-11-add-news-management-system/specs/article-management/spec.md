@@ -163,11 +163,11 @@ An article SHALL be assignable to any number of categories and any number of tag
 - **THEN** the assignment succeeds, because attaching existing taxonomy to an article is an article edit rather than a change to the category catalog
 
 ### Requirement: Author derived from session
-The system SHALL always set an article's `author_id` from the authenticated staff session, and SHALL ignore any `author_id` value present in the request body. Request schemas SHALL NOT declare an `author_id` field.
+The system SHALL always set an article's `author_id` from the authenticated staff session. Request schemas SHALL NOT declare an `author_id` field, and SHALL reject a request whose body includes one rather than silently discarding it.
 
-#### Scenario: Client-supplied author is ignored
+#### Scenario: Client-supplied author is rejected
 - **WHEN** a request to create or update an article includes an `author_id` field in the body
-- **THEN** the stored article's `author_id` is the authenticated staff member, not the value from the body
+- **THEN** the request is rejected as invalid, and no article is created or updated with an author other than the authenticated staff member
 
 ### Requirement: Only sanitized HTML is served publicly
 The public read path SHALL return only the stored `body_html` and SHALL never expose the editor's `body_json`. Mappers and response contracts SHALL omit `body_json` from every public response.

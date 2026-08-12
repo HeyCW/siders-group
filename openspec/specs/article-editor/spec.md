@@ -1,8 +1,10 @@
+# article-editor Specification
+
 ## Purpose
 
 Defines the admin writing experience for long-form articles: a distraction-free canvas, contextual formatting controls, block insertion, and the keyboard-first workflow it must support.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Distraction-free writing canvas
 The editor SHALL present a large, centered writing canvas with generous whitespace, separated from a distinct title field, and SHALL keep formatting controls hidden until the user selects text or places the cursor in the content area.
@@ -38,15 +40,7 @@ Typing `/` at the start of an empty line SHALL open a searchable menu of inserta
 - **THEN** the menu closes and the `/` character remains as plain text
 
 ### Requirement: Supported content blocks
-The editor SHALL support creating and editing: paragraphs; headings H1-H3; bold, italic, underline, and strikethrough marks; links; block quotes; code blocks; ordered and unordered lists; checklists; tables; images with optional captions, resizing, and alignment (left, center, right); horizontal dividers; and optionally embedded videos by URL.
-
-#### Scenario: Insert and resize an image
-- **WHEN** the user inserts an image block and drags its resize handle
-- **THEN** the image's stored width updates and its aspect ratio is preserved
-
-#### Scenario: Add a caption to an image
-- **WHEN** the user types text into an image block's caption field
-- **THEN** the caption text is persisted as part of that image block
+The editor SHALL support creating and editing: paragraphs; headings H1-H3; bold, italic, underline, and strikethrough marks; links; block quotes; code blocks; ordered and unordered lists; checklists; tables; images; horizontal dividers; and optionally embedded videos by URL. The image node's underlying content model MAY carry width, alignment, and caption attributes for future use, but this requirement does not itself mandate any UI for setting them.
 
 #### Scenario: Build a checklist
 - **WHEN** the user inserts a checklist block and adds items, checking one of them

@@ -7,7 +7,7 @@
 ## What Changes
 
 - Add a distraction-free, Tiptap-based rich text editor to `apps/admin`: large centered canvas, floating contextual toolbar (Medium-style), `/` slash-command menu for block insertion, keyboard shortcuts, focus mode, and dark mode.
-- Support block types: paragraphs, headings (H1-H3), bold/italic/underline/strikethrough, links, quotes, code blocks, ordered/unordered lists, checklists, tables, images with captions (plus resize and alignment), horizontal dividers, and optional embedded videos.
+- Support block types: paragraphs, headings (H1-H3), bold/italic/underline/strikethrough, links, quotes, code blocks, ordered/unordered lists, checklists, tables, images, horizontal dividers, and optional embedded videos. The image node carries width/alignment/caption attributes in its content model and the sanitizer renders them, but authoring UI for setting those three (drag-to-resize handle, alignment picker, caption field) is deferred to a follow-up change.
 - Add debounced autosave for drafts with a visible save-status indicator. Autosave never changes an article's slug or status.
 - Add admin lifecycle actions for articles: create, edit, preview, publish, unpublish, schedule, delete. Delete is hard delete (no `deleted_at`).
 - Add draft / scheduled / published states, slug generation (auto from title on first save only, manually overridable, unique; on collision the API rejects the save), SEO metadata, featured image, categories, tags, author attribution (always derived from the session), and publication timestamps. Publishing sets `published_at` to the current time; unpublishing clears it.

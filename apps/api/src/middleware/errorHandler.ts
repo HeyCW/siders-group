@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 import type { Logger } from '../lib/logger.js';
 
 export class AppError extends Error {
@@ -37,6 +38,23 @@ export function createErrorHandler(logger: Logger) {
           details: err.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
         },
       });
+      return;
+    }
+
+    // Multer's own request-body-level size guard rejects before `mediaStorage.ts` ever sees a
+    // buffer (media.routes.ts - upload middleware). Mapped here rather than per-route, same as
+    // ZodError above, so no controller can forget it (specs/media-management/spec.md -
+    // "Maximum file size").
+    if (err instanceof MulterError) {
+      logger.warn({ err, requestId: req.requestId }, 'upload rejected by multer');
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(413).json({
+          success: false,
+          error: { code: 'file_too_large', message: 'File exceeds the maximum allowed size' },
+        });
+        return;
+      }
+      res.status(400).json({ success: false, error: { code: 'upload_error', message: err.message } });
       return;
     }
 
