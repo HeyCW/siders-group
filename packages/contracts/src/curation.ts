@@ -3,7 +3,8 @@ import { articleStatusSchema } from './article-status.js';
 import { DEFAULT_PUBLIC_LIST_LIMIT, MAX_PUBLIC_LIST_LIMIT } from './article.js';
 
 /**
- * The homepage curation list caps at 10 entries (design.md - "Curated list validation"). There
+ * The homepage curation list caps at 10 entries (specs/home-curation/spec.md - "Curated list
+ * validation"). There
  * is deliberately no minimum: an empty list is valid and the homepage falls back to a purely
  * chronological feed.
  */

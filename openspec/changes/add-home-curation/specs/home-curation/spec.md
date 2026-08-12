@@ -65,6 +65,10 @@ The write endpoint SHALL accept a complete ordered collection of article identif
 - **WHEN** two staff members submit different replacement collections at the same time
 - **THEN** both requests succeed, the curated list afterwards matches exactly one of the two submitted collections in full, and neither request is rejected because of the other
 
+#### Scenario: A concurrent article deletion does not deadlock a replacement
+- **WHEN** a staff member replaces the curated list at the same time as any article is hard-deleted
+- **THEN** each request completes with a normal success or a normal validation failure, and neither request fails with an internal error caused by the other
+
 ### Requirement: Curated list validation
 The system SHALL reject a submitted collection that contains more entries than the permitted maximum, that names the same article more than once, or that names an article that does not exist. The permitted maximum SHALL be ten entries. There SHALL be no minimum.
 
@@ -113,6 +117,17 @@ The admin read endpoint SHALL return every stored entry, including entries whose
 #### Scenario: Live status is reported per entry
 - **WHEN** a staff member reads the curated list
 - **THEN** each entry reports its article's status and whether that article is currently publicly visible
+
+### Requirement: Feed request limit
+The public homepage feed endpoint SHALL accept an optional result limit, SHALL apply a default limit when none is given, and SHALL cap the limit at the same maximum as the public article list endpoint.
+
+#### Scenario: Default limit applied
+- **WHEN** a client requests the homepage feed without specifying a limit
+- **THEN** the system returns at most the default number of articles
+
+#### Scenario: Limit is capped
+- **WHEN** a client requests a limit above the permitted maximum
+- **THEN** the system returns at most the maximum rather than the requested amount
 
 ### Requirement: Public homepage feed composes curated picks with chronological backfill
 The system SHALL expose a public endpoint that returns a single ordered collection for the homepage, consisting of the publicly visible curated articles in their stored order, followed by the most recently published articles not already present, up to a requested limit. The endpoint SHALL require no authentication.

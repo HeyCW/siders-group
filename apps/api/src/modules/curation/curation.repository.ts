@@ -55,13 +55,37 @@ export function createHomeCurationRepository(db: Database): HomeCurationReposito
     async replace(articleIds) {
       try {
         return await db.transaction(async (tx) => {
+          // Lock the referenced article rows *before* the home_curation table. A hard delete of
+          // an article takes its row lock first and only then needs a lock on home_curation (to
+          // run the ON DELETE CASCADE); taking the table lock here first — as an earlier version
+          // of this method did — let a concurrent delete's cascade block on our EXCLUSIVE table
+          // lock while we blocked on the delete's row lock, an unavoidable 40P01 deadlock that
+          // reached the caller as a 500 for a save that, from the editor's side, looked
+          // identical to a normal one. Matching the delete path's lock order removes the cycle.
+          // Reproduced and verified against a live Postgres 16: without this, a concurrent
+          // replace and an unrelated article delete reliably deadlocked; with it, the loser of
+          // the row lock simply waits for the winner to commit.
+          if (articleIds.length > 0) {
+            const rows = await tx.execute(sql`
+              select id from app.articles
+              where id in (${sql.join(
+                articleIds.map((id) => sql`${id}`),
+                sql`, `,
+              )})
+              for key share
+            `);
+            if (rows.rows.length !== articleIds.length) throw invalidArticleReferenceError();
+          }
           // Serializes concurrent replaces so the second writer's DELETE runs against a fresh
           // snapshot that already includes the first writer's committed INSERT, rather than
           // racing it. Without this, two overlapping PUTs can both pass their DELETE before
           // either INSERTs, and the second INSERT then collides with the first's rows on
           // `home_curation_pkey` or `home_curation_position_unique` — an unhandled 23505
           // surfacing as a 500, not the last-write-wins design.md promises ("two editors saving
-          // concurrently is last-write-wins on the entire list, not a per-item merge").
+          // concurrently is last-write-wins on the entire list, not a per-item merge"). Safe to
+          // take after the row locks above: FOR KEY SHARE is a shared lock, so two concurrent
+          // replaces never block each other there, only at this table lock, in whichever order
+          // they arrive.
           await tx.execute(sql`LOCK TABLE app.home_curation IN EXCLUSIVE MODE`);
           await tx.delete(homeCuration);
           if (articleIds.length > 0) {
@@ -70,6 +94,7 @@ export function createHomeCurationRepository(db: Database): HomeCurationReposito
           return selectJoined(tx);
         });
       } catch (err) {
+        if (err instanceof AppError) throw err;
         if (isForeignKeyViolation(err)) throw invalidArticleReferenceError();
         throw err;
       }
