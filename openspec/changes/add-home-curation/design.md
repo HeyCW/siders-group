@@ -51,6 +51,7 @@ PUT /admin/curation
 { "articleIds": ["…a", "…b", "…c"] }          ← the client never sends a position
 
   BEGIN
+    LOCK TABLE app.home_curation IN EXCLUSIVE MODE
     validate: ≤ 10 ids · no duplicates · every id exists
     DELETE FROM app.home_curation
     INSERT (article_id, position) VALUES (a,0), (b,1), (c,2)
@@ -61,7 +62,8 @@ PUT /admin/curation
 
 This is the central simplification. A `UNIQUE(position)` column with per-item "move up / move down" operations cannot swap two rows in two statements without transiently colliding, so every such API grows either a deferrable constraint or a shuffle through temporary positions. Whole-list replacement makes the constraint free instead of painful, makes the write idempotent, and matches what a drag-and-drop UI already has in hand — the complete resulting order.
 - Alternative considered: `POST /admin/curation/:articleId` + `PATCH .../position` + `DELETE .../:articleId`. Rejected for the collision problem above, and because it turns one editorial act ("this is the front page now") into a sequence of requests that can half-apply.
-- Accepted trade-off: two editors saving concurrently is last-write-wins on the entire list, not a per-item merge. Consistent with the last-write-wins autosave already accepted for articles, and a shared front page is a place where a silent partial merge would be worse than a clean overwrite.
+- **The table lock is load-bearing, not defensive filler.** Without it, two overlapping `PUT`s can both execute their `DELETE` before either `INSERT`s — under READ COMMITTED, a `DELETE` only removes rows visible as of its own statement snapshot, so the second `DELETE` does not see the first transaction's not-yet-committed rows. The second `INSERT` then collides with the first's on `home_curation_pkey` or `home_curation_position_unique`, and an unhandled `23505` reaches the caller as a 500 for a request that, from the editor's side, looked identical to a normal save. `LOCK TABLE ... IN EXCLUSIVE MODE` as the transaction's first statement forces the second writer to wait for the first to commit, so its `DELETE` runs against a fresh snapshot that already includes the first writer's rows — the second write then cleanly and fully overwrites the first. Verified empirically against a live Postgres instance: without the lock, two concurrent replaces reliably produced a `23505`; with it, the second write always completed cleanly.
+- Accepted trade-off: two editors saving concurrently is last-write-wins on the entire list, not a per-item merge — now genuinely delivered as a clean overwrite rather than as a 50/50 chance of a 500. Consistent with the last-write-wins autosave already accepted for articles, and a shared front page is a place where a silent partial merge would be worse than a clean overwrite.
 
 **Curation may reference articles that are not publicly visible.** A draft or a future-scheduled article can be curated. It contributes nothing to public output until the canonical visibility rule says it is visible, at which point it appears in its curated position.
 
@@ -80,7 +82,7 @@ This makes "pre-build Monday's front page" work with no scheduling machinery of 
 **Composition happens in the API, not in the consumer.** One public endpoint returns the assembled homepage feed:
 
 ```
-GET /public/home?limit=12
+GET /home?limit=12
    │
    ├─ curated picks, in stored order, filtered by the canonical visibility rule   → [A, B, C]
    │
@@ -119,7 +121,9 @@ app.home_curation
 |---|---|
 | `GET /admin/curation` | `news.manage` |
 | `PUT /admin/curation` | `news.manage` |
-| `GET /public/home` | `requirePublic()` |
+| `GET /home` | `requirePublic()` |
+
+Mounted bare, not under a `/public` prefix — matching every other public read in this API (`/articles`, `/categories`, `/tags`), none of which carry one either.
 
 Reusing `news.manage` treats "decide the front page" as part of the news-editing job. The permission catalog is fixed and seeded by migration only, so a dedicated `curation.manage` would require this change to be the first to seed a new catalog row — and every existing non-Owner role would then need an explicit grant to keep working.
 - Alternative considered: a new `curation.manage`. It is the more correct newsroom model (the front-page editor is often not every author) and remains a clean follow-up: one migration inserting the row, one `requirePermission` argument changed, plus granting it to whichever roles should keep the ability. Deferred until there are staff for whom the distinction is real.

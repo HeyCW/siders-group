@@ -61,6 +61,10 @@ The write endpoint SHALL accept a complete ordered collection of article identif
 - **WHEN** a staff member submits an empty collection
 - **THEN** the curated list becomes empty and the request succeeds
 
+#### Scenario: Concurrent replacements do not fail
+- **WHEN** two staff members submit different replacement collections at the same time
+- **THEN** both requests succeed, the curated list afterwards matches exactly one of the two submitted collections in full, and neither request is rejected because of the other
+
 ### Requirement: Curated list validation
 The system SHALL reject a submitted collection that contains more entries than the permitted maximum, that names the same article more than once, or that names an article that does not exist. The permitted maximum SHALL be ten entries. There SHALL be no minimum.
 
@@ -132,6 +136,10 @@ The system SHALL expose a public endpoint that returns a single ordered collecti
 #### Scenario: Feed is filled to the limit
 - **WHEN** a client requests a limit of N, the curated list contributes fewer than N visible articles, and enough other published articles exist
 - **THEN** the response contains N articles rather than fewer
+
+#### Scenario: More curated articles than the limit truncates rather than overflows
+- **WHEN** the number of visible curated articles is at or above the requested limit N
+- **THEN** the response contains exactly N articles, all of them curated, in their stored order, and the response is not larger than N
 
 #### Scenario: Anonymous and staff callers receive identical output
 - **WHEN** a staff member holding `news.manage` requests the public homepage feed

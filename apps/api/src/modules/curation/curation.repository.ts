@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { articles, homeCuration, type Database } from '@siders/db';
 import type { ArticleStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
@@ -55,6 +55,14 @@ export function createHomeCurationRepository(db: Database): HomeCurationReposito
     async replace(articleIds) {
       try {
         return await db.transaction(async (tx) => {
+          // Serializes concurrent replaces so the second writer's DELETE runs against a fresh
+          // snapshot that already includes the first writer's committed INSERT, rather than
+          // racing it. Without this, two overlapping PUTs can both pass their DELETE before
+          // either INSERTs, and the second INSERT then collides with the first's rows on
+          // `home_curation_pkey` or `home_curation_position_unique` — an unhandled 23505
+          // surfacing as a 500, not the last-write-wins design.md promises ("two editors saving
+          // concurrently is last-write-wins on the entire list, not a per-item merge").
+          await tx.execute(sql`LOCK TABLE app.home_curation IN EXCLUSIVE MODE`);
           await tx.delete(homeCuration);
           if (articleIds.length > 0) {
             await tx.insert(homeCuration).values(articleIds.map((articleId, position) => ({ articleId, position })));
