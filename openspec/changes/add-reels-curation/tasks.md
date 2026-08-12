@@ -111,6 +111,6 @@
 
 - [x] 9.1 `pnpm build` — web, admin, api all build clean
 - [x] 9.2 `pnpm lint` — clean (one `react/no-unescaped-entities` fixed in `ReelLibraryPage.tsx`)
-- [x] 9.3 `pnpm test` — 48 files, 397 tests, all passing, zero regressions (49 new: 30 contracts + 17 api)
+- [x] 9.3 `pnpm test` — 48 files, 398 tests, all passing, zero regressions (48 new: 30 contracts + 18 api)
 - [x] 9.4 `pnpm typecheck` — clean across all 6 packages/apps, no TypeScript errors, no `any`
 - [x] 9.5 Confirm `apps/web` and `apps/api/src/lib/sanitizeHtml.ts` are untouched by this change — verified via `git status`, both empty

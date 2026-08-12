@@ -140,6 +140,10 @@ export function ReelLibraryPage() {
       setEditPosterMediaId(media.id);
     } catch (err) {
       setEditPosterUploadError(err instanceof ApiError ? err.message : 'Poster upload failed');
+      // Fall back to the reel's current poster rather than leaving a stale replacement selected
+      // — mirrors handlePosterSelected's failure handling on the create form.
+      setEditPosterPreviewUrl(editingId ? (reels.find((reel) => reel.id === editingId)?.posterUrl ?? null) : null);
+      setEditPosterMediaId(null);
     } finally {
       setEditUploadingPoster(false);
     }
@@ -184,6 +188,15 @@ export function ReelLibraryPage() {
         <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
           You don&apos;t have permission to manage the reel library.
         </p>
+      )}
+      {/* Page-level rather than scoped to the edit form: the status <select> and Delete button
+          that trigger updateState/removeState both live in the row's non-editing branch, so an
+          error from either would otherwise have nowhere to render. */}
+      {updateState.errorMessage && !updateState.forbidden && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{updateState.errorMessage}</p>
+      )}
+      {removeState.errorMessage && !removeState.forbidden && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{removeState.errorMessage}</p>
       )}
 
       <div className="mb-6 space-y-3 rounded-md border border-gray-200 p-4 dark:border-gray-700">
@@ -259,8 +272,8 @@ export function ReelLibraryPage() {
           editingId === reel.id ? (
             <li key={reel.id} className="space-y-2 px-3 py-3">
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Editing {reel.provider} · {reel.externalId} — the video reference itself can&apos;t change; only the
-                caption, poster, and status can.
+                Editing {reel.provider} · {reel.externalId} — the video reference itself can&apos;t change. Status is
+                set from the dropdown on the list row; this form is caption and poster only.
               </p>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Caption</label>
@@ -305,9 +318,6 @@ export function ReelLibraryPage() {
                   Cancel
                 </button>
               </div>
-              {updateState.errorMessage && !updateState.forbidden && (
-                <p className="text-sm text-red-600 dark:text-red-400">{updateState.errorMessage}</p>
-              )}
             </li>
           ) : (
             <li key={reel.id} className="flex items-center justify-between gap-3 px-3 py-2">

@@ -161,7 +161,7 @@ export function ReelsCurationPage() {
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs capitalize text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                     {item.status}
                   </span>
-                  {item.isPubliclyVisible === false && (
+                  {!item.isPubliclyVisible && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                       not live
                     </span>
