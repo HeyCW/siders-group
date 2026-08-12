@@ -261,6 +261,8 @@ The public reels endpoint SHALL return only the reels present in the stored orde
 ### Requirement: Third-party embeds load only on user activation
 Public rendering of a reel SHALL present the locally stored poster image on initial render and SHALL NOT create a third-party frame, script, or network request for the provider until the visitor activates that reel. Activating one reel SHALL NOT load the embed for any other reel.
 
+This requirement constrains the follow-up change that renders the rail on `/` — see `proposal.md` ("Rendering the rail" - Non-Goals) and `design.md` ("Facade rendering: poster first, frame only on user activation"). `add-reels-curation` itself ships no consumer of `buildReelEmbedUrl` outside its own unit test; the rule is recorded here so that follow-up inherits it rather than reaching for a provider's copy-paste embed snippet.
+
 #### Scenario: Initial render contacts no provider
 - **WHEN** a visitor loads a page carrying the reels rail and does not interact with it
 - **THEN** no frame, script, or request to any provider is created for any reel

@@ -101,8 +101,10 @@ Whole-list replacement deletes and reinserts every ordering row on each save. If
 **Writes replace the whole ordering, and reuse the lock ordering `add-home-curation` paid for.**
 
 ```
-PUT /admin/reels/curation
+PUT /admin/reels-curation
 { "reelIds": ["…a", "…b", "…c"] }        ← the client never sends a position
+                                          ← a sibling of /admin/reels, not nested under it
+                                            (see reels.routes.ts and tasks.md - 5.1)
 
   BEGIN
     SELECT id FROM app.reels WHERE id IN (a,b,c) FOR KEY SHARE   ← 1. row locks FIRST
