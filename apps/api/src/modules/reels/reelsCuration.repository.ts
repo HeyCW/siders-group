@@ -1,8 +1,8 @@
-import { asc, eq, sql } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { media, reels, reelsCuration, type Database } from '@siders/db';
 import type { ReelProvider, ReelStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
-import { isForeignKeyViolation } from '../../lib/pgErrors.js';
+import { replaceOrdering, type OrderingExecutor } from '../../lib/replaceOrdering.js';
 
 export interface ReelsCurationEntryRow {
   reelId: string;
@@ -31,9 +31,7 @@ function invalidReelReferenceError(): AppError {
   return new AppError('One or more reel ids do not exist', 400, 'invalid_reel_reference');
 }
 
-type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
-
-async function selectJoined(executor: Executor): Promise<ReelsCurationEntryRow[]> {
+async function selectJoined(executor: OrderingExecutor): Promise<ReelsCurationEntryRow[]> {
   return executor
     .select({
       reelId: reelsCuration.reelId,
@@ -51,14 +49,13 @@ async function selectJoined(executor: Executor): Promise<ReelsCurationEntryRow[]
 }
 
 /**
- * Reuses, verbatim, the lock ordering `add-home-curation` discovered empirically against live
- * Postgres 16 for the structurally identical `home_curation` table: row locks on the referenced
- * entities first (`FOR KEY SHARE`), then the table lock, then delete-and-reinsert
- * (openspec/changes/add-reels-curation/design.md - "Writes replace the whole ordering, and
- * reuse the lock ordering `add-home-curation` paid for"). See `curation.repository.ts`'s
- * `replace` for the full account of both failure modes this ordering avoids — a `40P01`
- * deadlock against a concurrent delete of a submitted reel if the table lock is taken first,
- * and a `23505` from two overlapping replaces if the table lock is omitted entirely.
+ * Reuses, via the shared `replaceOrdering` helper, the lock ordering `add-home-curation`
+ * discovered empirically against live Postgres 16 for the structurally identical `home_curation`
+ * table (openspec/changes/add-reels-curation/design.md - "Writes replace the whole ordering, and
+ * reuse the lock ordering `add-home-curation` paid for"). See `replaceOrdering`'s doc comment for
+ * the full account of both failure modes this ordering avoids — a `40P01` deadlock against a
+ * concurrent delete of a submitted reel if the table lock is taken first, and a `23505` from two
+ * overlapping replaces if the table lock is omitted entirely.
  */
 export function createReelsCurationRepository(db: Database): ReelsCurationRepository {
   return {
@@ -66,32 +63,17 @@ export function createReelsCurationRepository(db: Database): ReelsCurationReposi
       return selectJoined(db);
     },
 
-    async replace(reelIds) {
-      try {
-        return await db.transaction(async (tx) => {
-          if (reelIds.length > 0) {
-            const rows = await tx.execute(sql`
-              select id from app.reels
-              where id in (${sql.join(
-                reelIds.map((id) => sql`${id}`),
-                sql`, `,
-              )})
-              for key share
-            `);
-            if (rows.rows.length !== reelIds.length) throw invalidReelReferenceError();
-          }
-          await tx.execute(sql`LOCK TABLE app.reels_curation IN EXCLUSIVE MODE`);
-          await tx.delete(reelsCuration);
-          if (reelIds.length > 0) {
-            await tx.insert(reelsCuration).values(reelIds.map((reelId, position) => ({ reelId, position })));
-          }
-          return selectJoined(tx);
-        });
-      } catch (err) {
-        if (err instanceof AppError) throw err;
-        if (isForeignKeyViolation(err)) throw invalidReelReferenceError();
-        throw err;
-      }
+    replace(reelIds) {
+      return replaceOrdering({
+        db,
+        ids: reelIds,
+        referencedTable: 'app.reels',
+        orderingTable: 'app.reels_curation',
+        deleteAll: (tx) => tx.delete(reelsCuration),
+        insertOrdered: (tx, ids) => tx.insert(reelsCuration).values(ids.map((reelId, position) => ({ reelId, position }))),
+        selectJoined,
+        onInvalidReference: invalidReelReferenceError,
+      });
     },
   };
 }
