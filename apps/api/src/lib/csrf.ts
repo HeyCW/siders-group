@@ -61,13 +61,14 @@ export function verifyCsrfToken(token: string, env: CsrfEnv): CsrfTokenPayload |
 export function setCsrfCookie(
   res: Response,
   token: string,
-  options: Pick<CookieOptions, 'secure' | 'domain'>,
+  options: Pick<CookieOptions, 'secure' | 'domain' | 'maxAge'>,
 ): void {
   res.cookie(CSRF_COOKIE, token, {
     httpOnly: false, // must be script-readable — the client echoes it back as a header
     secure: options.secure,
     sameSite: 'lax',
     domain: options.domain,
+    maxAge: options.maxAge,
     path: '/',
   });
 }

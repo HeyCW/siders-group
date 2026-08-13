@@ -527,6 +527,8 @@ Data fetching uses TanStack Query on the client for comments and likes, with `cr
 
 No SEO requirement, so no SSR complexity. React Router, TanStack Query for server state, react-hook-form with the shared Zod resolvers.
 
+Unlike the reader-facing 401 → refresh → retry cycle above, the admin fetch wrapper's cycle is 403-keyed: `requireStaff`/`requirePermission` answer 403, not 401, for "no session" (see §5.5), so recovery branches on the response's error `code` — `forbidden` triggers refresh-then-retry, `csrf_failed` triggers CSRF-cookie recovery, `password_change_required` routes to the forced password-change screen — rather than on status code alone (`openspec/specs/admin-session`).
+
 The editor is the centrepiece: Tiptap with a slash-command extension, bubble menu, drag handles, markdown input rules, and an upload extension wired to the presigned-URL flow. Autosave is a debounced mutation with optimistic status display.
 
 The moderation queue polls every 30 seconds. Without Supabase Realtime, a websocket layer would be the only alternative, and it is not worth building for a queue two people look at.
