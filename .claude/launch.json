@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@siders/admin", "dev"],
+      "port": 5173
+    }
+  ]
+}

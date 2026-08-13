@@ -28,6 +28,7 @@ import { categoryRoutes } from './modules/categories/category.routes.js';
 import { tagRoutes } from './modules/tags/tag.routes.js';
 import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
 import { reelRoutes, reelsCurationRoutes, publicReelsRoutes } from './modules/reels/reels.routes.js';
+import { analyticsRoutes } from './modules/analytics/analytics.routes.js';
 
 export function createServer(): Express {
   const env = loadEnv();
@@ -65,6 +66,7 @@ export function createServer(): Express {
   app.use('/admin/reels-curation', reelsCurationRoutes(db, env));
   app.use('/admin/reels', reelRoutes(db, env));
   app.use('/reels', publicReelsRoutes(db, env));
+  app.use('/admin/dashboard', analyticsRoutes(db));
 
   app.use(createErrorHandler(logger));
 

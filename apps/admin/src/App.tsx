@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { DashboardPage } from './pages/DashboardPage.js';
 import { ArticleListPage } from './pages/ArticleListPage.js';
 import { NewArticlePage } from './pages/NewArticlePage.js';
 import { TaxonomyManagementPage } from './pages/TaxonomyManagementPage.js';
@@ -24,8 +25,9 @@ function EditorLoadingFallback() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/articles" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/articles" element={<ArticleListPage />} />
       <Route path="/articles/new" element={<NewArticlePage />} />
       <Route
