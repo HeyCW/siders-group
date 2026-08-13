@@ -71,6 +71,8 @@ The sign-in screen SHALL present exactly one generic failure message for any rej
 ### Requirement: Refresh is single-flight
 When a request to a feature route is rejected with a 403 coded `forbidden`, the admin app SHALL attempt a session refresh before giving up on that request, other than the sign-in screen's own credential submission. A 403 coded `csrf_failed` is a distinct condition and SHALL NOT trigger this refresh path — it is handled by the CSRF recovery described below, since a refresh cannot repair a CSRF mismatch. Regardless of how many requests discover a `forbidden` 403 at approximately the same time, the app SHALL have at most one refresh request in flight per session at any time, and every request that discovers one while a refresh is already in flight SHALL await that same attempt rather than starting its own. A request SHALL be retried at most once following a refresh.
 
+A "feature route" is any request the interceptor wraps. It SHALL wrap every request the admin app makes except three: `POST /auth/refresh` itself, `GET /auth/csrf` itself, and the re-probe issued by the disambiguation algorithm below — these three are issued directly, outside the interceptor, so that a 403 from any of them is resolved by the caller that issued it rather than re-entering refresh or bootstrap recovery. The boot-time session probe (`GET /users/me`, described above) is a feature route and SHALL be wrapped; the re-probe following a still-failing retry is a distinct call made once disambiguation is already underway and SHALL NOT be.
+
 #### Scenario: A single 403 triggers exactly one refresh and one retry
 - **WHEN** one request to a feature route is rejected with a 403 coded `forbidden`
 - **THEN** the app issues one refresh request and, if it succeeds, retries the original request exactly once
@@ -129,6 +131,10 @@ Because a 403 from a permission-gated route and a 403 from having no session are
 - **WHEN** the re-probe following a still-failing retry itself fails
 - **THEN** the app routes the caller to sign-in
 
+#### Scenario: The re-probe itself never triggers further recovery
+- **WHEN** the re-probe request, issued outside the interceptor, is rejected with any status
+- **THEN** the app does not attempt a refresh or a CSRF bootstrap for the re-probe itself, and resolves directly to a permission denial or session-gone outcome as specified above
+
 ### Requirement: A pending password change confines the app to the change screen
 Once a session is established, if the caller's account requires a password change, the admin app SHALL render only the forced password-change screen and SHALL NOT render any other route until the change succeeds. This determination SHALL be made from the caller's own account state, not assumed from the outcome of sign-in alone. A successful change SHALL release the restriction for the remainder of that session without requiring the caller to sign in again.
 
@@ -143,6 +149,10 @@ Once a session is established, if the caller's account requires a password chang
 #### Scenario: The restriction is detected from the caller's own account
 - **WHEN** the app decides whether to show the change screen
 - **THEN** it does so from the password-change flag on the caller's own account rather than from a client-side assumption made at sign-in time
+
+#### Scenario: A mid-session 403 coded password_change_required routes to the change screen, not to a recovery path
+- **WHEN** a request to a feature route is rejected with a 403 coded `password_change_required`
+- **THEN** the app re-resolves session state and shows the forced password-change screen, attempting neither a session refresh nor CSRF bootstrap recovery for that rejection
 
 ### Requirement: Sign-out ends the local session
 The admin app SHALL provide a sign-out affordance reachable from within the app. Activating it SHALL call the session's sign-out endpoint, SHALL discard any locally held account state, and SHALL return the caller to the sign-in route whether or not the sign-out call itself succeeded.

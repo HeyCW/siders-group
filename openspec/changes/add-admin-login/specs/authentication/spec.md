@@ -65,7 +65,7 @@ The system SHALL allow a caller holding a valid, unrevoked, unexpired refresh cr
 - **THEN** the system revokes the lineage exactly as specified above, without attempting to determine which case occurred
 
 ### Requirement: Authentication attempts are rate limited
-Rate limiting SHALL be enforced, not merely declared. The system SHALL limit failed sign-in attempts per source-and-email pair, SHALL additionally cap failed sign-in attempts per source address across all email addresses, and SHALL limit attempts against the password-change endpoint, session refresh, the sign-in callback, and the CSRF cookie re-pairing endpoint. Throttled responses SHALL be indistinguishable from ordinary failure responses for the same endpoint.
+Rate limiting SHALL be enforced, not merely declared. The system SHALL limit failed sign-in attempts per source-and-email pair, SHALL additionally cap failed sign-in attempts per source address across all email addresses, and SHALL limit attempts against the password-change endpoint, session refresh, the sign-in callback, and the CSRF cookie re-pairing endpoint. Throttled responses SHALL be indistinguishable from ordinary failure responses for the same endpoint. Because the CSRF cookie re-pairing endpoint's ordinary response is a uniform 204 with no body regardless of outcome, its throttled response SHALL also be 204 with no cookie set — the same response a caller with no identifiable session already receives — rather than a distinct status such as 429.
 
 #### Scenario: Repeated failures for one account are throttled
 - **WHEN** sign-in attempts for the same email address from the same source fail repeatedly within a short window
@@ -85,14 +85,18 @@ Rate limiting SHALL be enforced, not merely declared. The system SHALL limit fai
 
 #### Scenario: Repeated CSRF re-pairing calls are throttled
 - **WHEN** a source makes repeated requests to the CSRF cookie re-pairing endpoint within a short window
-- **THEN** further attempts from that source are rejected, and the rejection is indistinguishable from the endpoint's ordinary uniform response
+- **THEN** further attempts from that source receive a 204 with no cookie set, the same response given when no session is identifiable, and no CSRF cookie is issued to a caller who would otherwise have received one
+
+#### Scenario: A throttled re-pairing call is not silently indistinguishable from success to the client
+- **WHEN** a caller's retry, following a `csrf_failed` recovery attempt, still 403s because that attempt was throttled rather than because no session existed
+- **THEN** the admin app's bootstrap recovery (`specs/admin-session`) treats it exactly as an unresolved `csrf_failed` — the retry-once bound still applies, and the caller lands on the generic failure or sign-in path rather than a distinct "throttled" state, since the server gives the client nothing to distinguish it by
 
 ## ADDED Requirements
 
 ### Requirement: A CSRF cookie can be re-paired with an existing session
-The system SHALL provide a safe-method endpoint that issues a new CSRF cookie bound to whichever session the caller's own session cookies identify, without itself requiring a CSRF token. Binding SHALL be derived only from the caller's own session cookies — never from a query parameter, header, or request body — in this order: a valid access credential's session takes precedence; otherwise a valid, unrevoked, unexpired refresh credential's session; otherwise no token is issued. The response SHALL be uniform regardless of which case applied, so the endpoint cannot be used to determine whether a caller holds any session. The issued token SHALL be delivered only as the same script-readable cookie every other CSRF token is delivered as, and SHALL NOT appear in any response body.
+The system SHALL provide a safe-method endpoint that issues a new CSRF cookie bound to whichever session the caller's own session cookies identify, without itself requiring a CSRF token. Binding SHALL be derived only from the caller's own session cookies — never from a query parameter, header, or request body — in this order: a cryptographically valid access credential's session takes precedence, checked by signature alone with no database read, exactly as identification elsewhere in this spec never rejects on session state; otherwise a valid, unrevoked, unexpired refresh credential's session, checked against `app.sessions`; otherwise no token is issued. The response SHALL be uniform regardless of which case applied, so the endpoint cannot be used to determine whether a caller holds any session. The issued token SHALL be delivered only as the same script-readable cookie every other CSRF token is delivered as, and SHALL NOT appear in any response body.
 
-This mechanism SHALL NOT rotate any credential, create a session, extend any session's expiry, or lift a revocation. It only re-pairs a CSRF token with a session that already validly exists; a session that is revoked or expired gains nothing from it.
+This mechanism SHALL NOT rotate any credential, create a session, extend any session's expiry, or lift a revocation. Because the access-credential branch checks signature validity only, it MAY re-pair a token with a session that has since been revoked; this grants that session nothing, since every other check on it — the CSRF binding check included — evaluates that session's actual state independently on the very next request. The refresh-credential branch does check `app.sessions`, so a session that is revoked or expired at that point gains nothing from either branch.
 
 #### Scenario: Recovery using only a refresh credential
 - **WHEN** a caller presents a valid, unrevoked, unexpired refresh credential and no valid access credential
@@ -109,3 +113,7 @@ This mechanism SHALL NOT rotate any credential, create a session, extend any ses
 #### Scenario: The mechanism does not rotate credentials or revive a revoked session
 - **WHEN** the mechanism is used, in any case
 - **THEN** no refresh credential is rotated, no session is created or has its expiry extended, and a session that was revoked or expired beforehand remains so, rejected by every other check exactly as it would have been without this mechanism
+
+#### Scenario: A token may be issued for a session revoked since the access credential was signed
+- **WHEN** a caller presents a cryptographically valid access credential whose session has since been revoked, and the access-credential branch binds to it without a database read
+- **THEN** a CSRF cookie may be issued bound to that session, and the revocation is unaffected — every subsequent request against that session, including one carrying this new token, is still rejected exactly as it would have been had this mechanism never run

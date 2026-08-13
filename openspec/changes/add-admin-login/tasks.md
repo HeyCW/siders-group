@@ -7,14 +7,14 @@
 
 ## 2. Backend — CSRF bootstrap/recovery endpoint
 
-- [ ] 2.1 Add `GET /auth/csrf` in `apps/api/src/modules/auth/auth.routes.ts`, declared `requirePublic()` and rate-limited (mirror `refreshRateLimiter()`'s shape and export pattern so tests can exercise the real configuration)
+- [ ] 2.1 Add `GET /auth/csrf` in `apps/api/src/modules/auth/auth.routes.ts`, declared `requirePublic()` and rate-limited: mirror `refreshRateLimiter()`'s exported-factory pattern so tests can exercise the real configuration, but give it its own key generator and its own `onLimited` (see 2.8) rather than reusing `refreshRateLimiter`'s IP-only key or its 401 `onLimited` — both are wrong for this endpoint (design.md - "That forced GET is nonetheless chargeable")
 - [ ] 2.2 Resolve binding in order: if `req.auth` is set (a cryptographically valid `sid_at`), bind to `req.auth.sessionId`; otherwise resolve `sid_rt` the same way `auth.service.ts`'s `refresh()` looks up a refresh credential (hash match, unrevoked, unexpired) and bind to that session; otherwise issue nothing
 - [ ] 2.3 Derive the binding only from the caller's own cookies — never from a query parameter, header, or request body
 - [ ] 2.4 Issue the new token via `setCsrfCookie` exactly as every other issuance point does; never include it in the response body
 - [ ] 2.5 Respond identically (204, no body) regardless of which binding branch fired or whether one fired at all, so the endpoint is not an oracle for session state
 - [ ] 2.6 Confirm the endpoint never rotates a refresh credential, never creates or extends a session, and never lifts a revocation — it only calls `setCsrfCookie`, nothing that touches `app.sessions`
-- [ ] 2.7 Add/extend tests: recovery with only `sid_rt` held; recovery with a valid `sid_at` held, and that the resulting cookie's binding then passes `createCsrfMiddleware`'s check on a subsequent state-changing request (the window a `sid_rt`-only fix would miss); no token issued with neither credential, and no token issued for a revoked or expired `sid_rt`; the response is identical across all of the above; no session row is created, rotated, or unrevoked by calling it
-- [ ] 2.8 Add a rate-limit test for the endpoint, consistent with the extended `specs/authentication` - "Authentication attempts are rate limited" requirement
+- [ ] 2.7 Add/extend tests: recovery with only `sid_rt` held; recovery with a valid `sid_at` held, and that the resulting cookie's binding then passes `createCsrfMiddleware`'s check on a subsequent state-changing request (the window a `sid_rt`-only fix would miss); no token issued with neither credential, and no token issued for a revoked or expired `sid_rt`; a token may still be issued for a cryptographically valid `sid_at` whose session has since been revoked, and a subsequent state-changing request against that session is still rejected despite carrying the new token; the response is identical across all of the above; no session row is created, rotated, or unrevoked by calling it
+- [ ] 2.8 Key the limiter on the presented refresh credential (a hash of `sid_rt`, matching how `2.2` already resolves it) when one is present, falling back to `clientIp` only when the caller presents no credential at all — so a hostile page forcing credential-less requests, or many staff members recovering behind one NAT, cannot spend a caller's own recovery budget for them. Give the limiter its own `onLimited` returning 204 with no cookie set, matching this endpoint's own uniform response (`2.5`) rather than `refreshRateLimiter`'s 401 — `apps/api/src/middleware/rateLimit.ts`'s `onLimited` is a required field for exactly this reason, since the response shape is per endpoint. Add a rate-limit test for the endpoint, consistent with the extended `specs/authentication` - "Authentication attempts are rate limited" requirement
 
 ## 3. Backend — expose effective permissions on GET /users/me
 
@@ -31,7 +31,7 @@
 
 ## 5. Frontend — interceptor: refresh recovery and CSRF bootstrap recovery
 
-- [ ] 5.1 In `apps/admin/src/lib/api.ts`, wrap `apiFetch`/`apiUpload` so a 403 response is inspected by its `code` before choosing a recovery path — `forbidden` triggers refresh-then-retry, `csrf_failed` triggers bootstrap-then-retry, and a single rejection is never routed down both
+- [ ] 5.1 In `apps/admin/src/lib/api.ts`, wrap `apiFetch`/`apiUpload` so a 403 response is inspected by its `code` before choosing a recovery path — `forbidden` triggers refresh-then-retry, `csrf_failed` triggers bootstrap-then-retry, `password_change_required` re-resolves session state into the forced password-change screen and attempts neither, and a single rejection is never routed down more than one path. The wrapper excludes `POST /auth/refresh`, `GET /auth/csrf`, and the disambiguation re-probe in 5.7 from itself, per `specs/admin-session` - "Refresh is single-flight"
 - [ ] 5.2 Refresh path: share one in-flight refresh promise across concurrent `forbidden` rejections instead of each issuing its own
 - [ ] 5.3 Bootstrap path: call `GET /auth/csrf` then retry, sharing one in-flight bootstrap promise across concurrent `csrf_failed` rejections instead of each issuing its own
 - [ ] 5.4 Cap retries at one per originating request across both paths combined — a request already retried once, by either path, is not retried again by the other
