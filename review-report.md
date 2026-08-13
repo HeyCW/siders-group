@@ -10,6 +10,8 @@
 
 Commits: `dfb6750` spec(admin-session), `3f9faf8` fix(admin-session).
 
+This is the diff of **PR #8** (`add-admin-login` → `main`): head `3f9faf8`, base `e94d2b0`, 7 files, +558, 2 commits — identical on every axis to the range reviewed here.
+
 ## Summary
 
 This change is **spec-only**: all 558 lines are the `openspec/changes/add-admin-login/` artifacts — proposal, design, three spec deltas, tasks. No application code is touched, and all 49 tasks are unchecked, so there is no implementation to review yet. What follows reviews the specification as the deliverable.
@@ -28,6 +30,7 @@ The verdict is driven by three Major findings, all narrow and all fixable in the
 | 4 | Minor | correctness | `openspec/changes/add-admin-login/specs/admin-session/spec.md:113` | A third 403 code, `password_change_required`, has no branch in the interceptor |
 | 5 | Minor | correctness | `openspec/changes/add-admin-login/specs/authentication/spec.md:93` | The `sid_at` binding branch contradicts the requirement's own "validly exists" guarantee |
 | 6 | Nit | hygiene | `openspec/changes/add-admin-login/proposal.md:39` | "Docs: none required" checks only ARCHITECTURE.md §5.3/§5.5, not §8.1's fetch-wrapper description |
+| 7 | Minor | conventions, correctness | `openspec/changes/add-admin-login/proposal.md:3` | Base drift: `App.tsx:14-16` is stale on current `main`, and two routes landed since that the change never counted |
 
 ## Details
 
@@ -84,6 +87,17 @@ The claim at `proposal.md:39` is accurate for the two sections it names — neit
 
 **Fix.** One line in §8.2 noting the admin wrapper's cycle is 403-keyed with code-based branching, because staff rejections answer 403 where reader rejections answer 401.
 
+### 7. Base drift: two routes landed since this change was written — Minor
+
+Every citation in this change is accurate against its own merge-base (`ef42d4b`), which is what the PR diff is computed against. But `main` has advanced 13 commits since, and two of those changes land in files this change describes:
+
+- **`apps/admin/src/App.tsx`** — PR #7 added `/reels` and `/reels-curation`. `LoginPage` is now at **`App.tsx:16-18`**, not the `14-16` cited in `proposal.md:3` and `design.md:3`, and the file now has **8 unguarded routes, not 6**. Task 6.2 is written by reference ("routes other than `/login`") so it still covers them, but the change's own narrative, Impact list, and QA plan were sized against six screens. Anyone verifying against the change's description will be two screens short.
+- **`apps/api/src/middleware/rateLimit.ts`** — PR #7 added `publicReadRateLimiter`. Checked: it is a pure addition that does not touch `rateLimit()`, `RateLimitOptions`, the charge-before-handler behavior, or the `onLimited` doc comment at `:21-31`. **Findings 1 and 2 stand unchanged**, and the new helper reinforces finding 2's rule — it declares its own `onLimited` matching its own response shape rather than borrowing another endpoint's.
+
+No other file cited by this change differs between the merge-base and current `main`; GitHub reports `mergeable_state: clean`, so the drift is additive and non-conflicting.
+
+**Fix.** Rebase onto current `main`, then re-point the two `App.tsx:14-16` citations at `16-18` and note the two additional routes the guard must cover in the Impact section and in task 11.x's QA sweep.
+
 ## Rule check
 
 | Rule | Where | Complies |
@@ -105,6 +119,7 @@ The claim at `proposal.md:39` is accurate for the two sections it names — neit
 
 1. Fix findings 1–3 before implementation starts. All three are edits to `design.md`, `tasks.md`, and the two spec deltas; none reopens the architecture.
 2. Findings 4–5 are scenario/wording additions worth folding into the same pass.
-3. Re-run `/review-pr` after the spec edits, then start on the tasks — the Build Order in `design.md:113-118` is sound and the backend-first sequencing is correct.
+3. Rebase onto current `main` and apply finding 7 — the drift is additive and conflict-free, but it changes two citations and adds two routes to guard.
+4. Re-run `/review-pr` after the spec edits, then start on the tasks — the Build Order in `design.md:113-118` is sound and the backend-first sequencing is correct.
 
 *Local review only — nothing was committed, pushed, or posted to GitHub.*
