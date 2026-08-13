@@ -1,11 +1,13 @@
 # Review report
 
-**Verdict:** Approve with changes
+**Verdict:** Approve with changes → **Approved** (all 28 findings fixed, see Disposition below)
 
 ## Reviewed at
 | Range | Files | +/- | Date |
 |---|---|---|---|
 | `origin/main...HEAD` (PR #9, `claude/admin-dashboard-analytics-3lxi20`, head `f30ea0b`) | 5 | +338 / -0 | 2026-08-13 |
+
+Round 2 (`73b382b`): all 28 findings fixed — 27 posted as inline GitHub review comments and resolved as threads; #26 was merged into #8's comment since both anchor `proposal.md:17`. Directory renamed `add-dashboard-admin` → `add-admin-dashboard` (#25), so file paths below are pre-rename; the same content now lives under the new path.
 
 ## Summary
 
@@ -63,36 +65,38 @@ any Minor).
 
 ## Findings
 
-| # | Severity | Aspect(s) | File:line | Title |
-|---|---|---|---|---|
-| 1 | Major | correctness | [design.md:59](openspec/changes/add-dashboard-admin/design.md:59) | `IS NULL` is the wrong emptiness test — content-debt reads ~0 forever |
-| 2 | Major | security | [tasks.md:14](openspec/changes/add-dashboard-admin/tasks.md:14) | `upNext` discloses pre-publication titles and slugs the spec never records |
-| 3 | Minor | correctness | [tasks.md:23](openspec/changes/add-dashboard-admin/tasks.md:23) | Cadence week boundary unspecified: start day, and the partial current week |
-| 4 | Minor | correctness | [design.md:93](openspec/changes/add-dashboard-admin/design.md:93) | Overdue count has no grace period against a one-minute cron |
-| 5 | Minor | correctness | [spec.md:94](openspec/changes/add-dashboard-admin/specs/admin-dashboard/spec.md:94) | Overdue scenario's wording contradicts its own predicate |
-| 6 | Minor | correctness | [design.md:65](openspec/changes/add-dashboard-admin/design.md:65) | `mediaMissingAlt` is unactionable — nothing in the product sets `media.alt` |
-| 7 | Minor | conventions | [proposal.md:29](openspec/changes/add-dashboard-admin/proposal.md:29) | Missing the `## Capabilities` section the archived proposals carry |
-| 8 | Minor | correctness, conventions | [proposal.md:17](openspec/changes/add-dashboard-admin/proposal.md:17) | Declared BREAKING behaviour has no spec coverage |
-| 9 | Minor | correctness | [design.md:73](openspec/changes/add-dashboard-admin/design.md:73) | Pipeline/cadence/debt re-derive published-ness, against this design's own rule |
-| 10 | Minor | correctness | [spec.md:45](openspec/changes/add-dashboard-admin/specs/admin-dashboard/spec.md:45) | Three of six content-debt counts have no covering scenario |
-| 11 | Minor | security | [spec.md:20](openspec/changes/add-dashboard-admin/specs/admin-dashboard/spec.md:20) | Anonymous scenario mandates a 401 the declared guard never returns |
-| 12 | Minor | performance | [design.md:113](openspec/changes/add-dashboard-admin/design.md:113) | "No purpose-built index" premise is false, and it licenses a seq scan |
-| 13 | Minor | performance | [tasks.md:34](openspec/changes/add-dashboard-admin/tasks.md:34) | ~14 parallel round-trips against a pool whose default max is 10 |
-| 14 | Minor | performance | [tasks.md:28](openspec/changes/add-dashboard-admin/tasks.md:28) | `dueWithin48h` is the response's only uncapped output |
-| 15 | Minor | performance | [tasks.md:44](openspec/changes/add-dashboard-admin/tasks.md:44) | Charting dependency would land eagerly on the new landing route |
-| 16 | Minor | correctness | [tasks.md:35](openspec/changes/add-dashboard-admin/tasks.md:35) | `weekStart` timezone unspecified; bucket labels shift off a naive timestamp |
-| 17 | Minor | correctness | [tasks.md:47](openspec/changes/add-dashboard-admin/tasks.md:47) | "N sign-ins" mislabels a distinct-reader count |
-| 18 | Minor | correctness | [proposal.md:23](openspec/changes/add-dashboard-admin/proposal.md:23) | Non-Goals names tiles this change does not ship |
-| 19 | Minor | correctness, hygiene | [tasks.md:24](openspec/changes/add-dashboard-admin/tasks.md:24) | "five queries" for six content-debt counts |
-| 20 | Minor | hygiene | [design.md:84](openspec/changes/add-dashboard-admin/design.md:84) | Flat vs nested `curationIntegrity` field names across documents |
-| 21 | Minor | correctness | [design.md:5](openspec/changes/add-dashboard-admin/design.md:5) | Migration citation off by one line (`:119` is `role.manage`) |
-| 22 | Minor | conventions | [proposal.md:31](openspec/changes/add-dashboard-admin/proposal.md:31) | Impact drops the standard `Dependencies` and `Docs` bullets |
-| 23 | Minor | conventions | [design.md:11](openspec/changes/add-dashboard-admin/design.md:11) | Goals are stated nowhere; the deferral target has no Goals section |
-| 24 | Minor | conventions | [tasks.md:51](openspec/changes/add-dashboard-admin/tasks.md:51) | Task 4.9 hedges on a repo fact; both of its branches are false |
-| 25 | Nit | conventions | [.openspec.yaml:1](openspec/changes/add-dashboard-admin/.openspec.yaml:1) | Change directory name inverts the capability slug it introduces |
-| 26 | Nit | conventions | [proposal.md:17](openspec/changes/add-dashboard-admin/proposal.md:17) | BREAKING bullet deviates from the uniform label and terminal position |
-| 27 | Nit | correctness | [design.md:89](openspec/changes/add-dashboard-admin/design.md:89) | Worker header comment is misquoted |
-| 28 | Nit | hygiene | [design.md:115](openspec/changes/add-dashboard-admin/design.md:115) | Cross-reference to `tasks.md` without a section number |
+| # | Severity | Aspect(s) | File:line | Title | Disposition |
+|---|---|---|---|---|---|
+| 1 | Major | correctness | [design.md:59](openspec/changes/add-dashboard-admin/design.md:59) | `IS NULL` is the wrong emptiness test — content-debt reads ~0 forever | Fixed |
+| 2 | Major | security | [tasks.md:14](openspec/changes/add-dashboard-admin/tasks.md:14) | `upNext` discloses pre-publication titles and slugs the spec never records | Fixed (documented, kept fields) |
+| 3 | Minor | correctness | [tasks.md:23](openspec/changes/add-dashboard-admin/tasks.md:23) | Cadence week boundary unspecified: start day, and the partial current week | Fixed |
+| 4 | Minor | correctness | [design.md:93](openspec/changes/add-dashboard-admin/design.md:93) | Overdue count has no grace period against a one-minute cron | Fixed |
+| 5 | Minor | correctness | [spec.md:94](openspec/changes/add-dashboard-admin/specs/admin-dashboard/spec.md:94) | Overdue scenario's wording contradicts its own predicate | Fixed |
+| 6 | Minor | correctness | [design.md:65](openspec/changes/add-dashboard-admin/design.md:65) | `mediaMissingAlt` is unactionable — nothing in the product sets `media.alt` | Fixed (dropped the tile) |
+| 7 | Minor | conventions | [proposal.md:29](openspec/changes/add-dashboard-admin/proposal.md:29) | Missing the `## Capabilities` section the archived proposals carry | Fixed |
+| 8 | Minor | correctness, conventions | [proposal.md:17](openspec/changes/add-dashboard-admin/proposal.md:17) | Declared BREAKING behaviour has no spec coverage | Fixed |
+| 9 | Minor | correctness | [design.md:73](openspec/changes/add-dashboard-admin/design.md:73) | Pipeline/cadence/debt re-derive published-ness, against this design's own rule | Fixed (documented as intentional) |
+| 10 | Minor | correctness | [spec.md:45](openspec/changes/add-dashboard-admin/specs/admin-dashboard/spec.md:45) | Three of six content-debt counts have no covering scenario | Fixed |
+| 11 | Minor | security | [spec.md:20](openspec/changes/add-dashboard-admin/specs/admin-dashboard/spec.md:20) | Anonymous scenario mandates a 401 the declared guard never returns | Fixed |
+| 12 | Minor | performance | [design.md:113](openspec/changes/add-dashboard-admin/design.md:113) | "No purpose-built index" premise is false, and it licenses a seq scan | Fixed |
+| 13 | Minor | performance | [tasks.md:34](openspec/changes/add-dashboard-admin/tasks.md:34) | ~14 parallel round-trips against a pool whose default max is 10 | Fixed (9 queries) |
+| 14 | Minor | performance | [tasks.md:28](openspec/changes/add-dashboard-admin/tasks.md:28) | `dueWithin48h` is the response's only uncapped output | Fixed |
+| 15 | Minor | performance | [tasks.md:44](openspec/changes/add-dashboard-admin/tasks.md:44) | Charting dependency would land eagerly on the new landing route | Fixed |
+| 16 | Minor | correctness | [tasks.md:35](openspec/changes/add-dashboard-admin/tasks.md:35) | `weekStart` timezone unspecified; bucket labels shift off a naive timestamp | Fixed |
+| 17 | Minor | correctness | [tasks.md:47](openspec/changes/add-dashboard-admin/tasks.md:47) | "N sign-ins" mislabels a distinct-reader count | Fixed |
+| 18 | Minor | correctness | [proposal.md:23](openspec/changes/add-dashboard-admin/proposal.md:23) | Non-Goals names tiles this change does not ship | Fixed |
+| 19 | Minor | correctness, hygiene | [tasks.md:24](openspec/changes/add-dashboard-admin/tasks.md:24) | "five queries" for six content-debt counts | Fixed |
+| 20 | Minor | hygiene | [design.md:84](openspec/changes/add-dashboard-admin/design.md:84) | Flat vs nested `curationIntegrity` field names across documents | Fixed |
+| 21 | Minor | correctness | [design.md:5](openspec/changes/add-dashboard-admin/design.md:5) | Migration citation off by one line (`:119` is `role.manage`) | Fixed |
+| 22 | Minor | conventions | [proposal.md:31](openspec/changes/add-dashboard-admin/proposal.md:31) | Impact drops the standard `Dependencies` and `Docs` bullets | Fixed |
+| 23 | Minor | conventions | [design.md:11](openspec/changes/add-dashboard-admin/design.md:11) | Goals are stated nowhere; the deferral target has no Goals section | Fixed |
+| 24 | Minor | conventions | [tasks.md:51](openspec/changes/add-dashboard-admin/tasks.md:51) | Task 4.9 hedges on a repo fact; both of its branches are false | Fixed |
+| 25 | Nit | conventions | [.openspec.yaml:1](openspec/changes/add-dashboard-admin/.openspec.yaml:1) | Change directory name inverts the capability slug it introduces | Fixed |
+| 26 | Nit | conventions | [proposal.md:17](openspec/changes/add-dashboard-admin/proposal.md:17) | BREAKING bullet deviates from the uniform label and terminal position | Fixed |
+| 27 | Nit | correctness | [design.md:89](openspec/changes/add-dashboard-admin/design.md:89) | Worker header comment is misquoted | Fixed |
+| 28 | Nit | hygiene | [design.md:115](openspec/changes/add-dashboard-admin/design.md:115) | Cross-reference to `tasks.md` without a section number | Fixed |
+
+All 28/28 fixed. Verified: `openspec/changes/add-admin-dashboard/` (post-rename) contains blank-aware content-debt predicates, the five-minute overdue grace period, Monday-pinned/partial-week-inclusive cadence bucketing with a sargable filter, `dueWithin48h` capped at 20 with `dueWithin48hTotal`, `mediaMissingAlt` fully removed from all four artifacts, 9 consolidated queries (was ~14), `## Capabilities` + `Dependencies`/`Docs` Impact bullets + explicit `Goals:` list added to match the archived-proposal shape, task 4.9's hedge resolved, and the directory renamed to `add-admin-dashboard`. `spec.md` grew from 8 requirements/22 scenarios to 9 requirements/33 scenarios to cover the gaps.
 
 ## Is it worth acting on?
 
