@@ -1,0 +1,66 @@
+## 0. Prerequisites
+
+- [ ] 0.1 Confirm `dashboard.view` is seeded in the permission catalog (`0000_useful_red_shift.sql:119`) and exported from `packages/contracts/src/permission.ts` — it is; no migration needed
+- [ ] 0.2 Confirm `requirePermission` (`apps/api/src/middleware/authorize.ts`) is usable unmodified for the new route
+- [ ] 0.3 Confirm `isPubliclyVisible` (`apps/api/src/modules/articles/article.repository.ts`) and `isReelPubliclyVisible` (`apps/api/src/modules/reels/reel.repository.ts`) are exported and importable from the new module without duplicating their logic
+
+## 1. Contracts
+
+- [ ] 1.1 Add `packages/contracts/src/dashboard.ts` with a `dashboardResponseSchema` covering all six sections: `pipeline`, `cadence`, `contentDebt`, `curationIntegrity`, `upNext`, `readers`
+- [ ] 1.2 `pipeline`: `{ draft: number, scheduled: number, published: number }`
+- [ ] 1.3 `cadence`: array of exactly 8 `{ weekStart: string (ISO date), count: number }`, ordered oldest to newest
+- [ ] 1.4 `contentDebt`: `{ missingSeoDescription, missingExcerpt, missingFeaturedImage, uncategorized, mediaMissingAlt, unusedTags }`, all `number`
+- [ ] 1.5 `curationIntegrity`: `{ home: { total: number, visible: number }, reels: { total: number, visible: number } }`
+- [ ] 1.6 `upNext`: `{ dueWithin48h: Array<{ id: string, title: string, slug: string, publishedAt: string }>, overdueUnpromotedCount: number }`
+- [ ] 1.7 `readers`: `{ newLast7d: number, activeLast30d: number }`
+- [ ] 1.8 Export `DashboardResponse` type inferred from the schema
+- [ ] 1.9 Unit-test the schema shape in `packages/contracts/src/dashboard.test.ts`
+
+## 2. Analytics module — repository
+
+- [ ] 2.1 Scaffold `apps/api/src/modules/analytics/` (routes, controller, service, repository, mapper) matching the module-per-feature layout every other module already uses
+- [ ] 2.2 `analytics.repository.ts`: `getPipelineCounts()` — `GROUP BY status` over `app.articles`
+- [ ] 2.3 `getCadence()` — `GROUP BY date_trunc('week', published_at AT TIME ZONE 'Asia/Jakarta')` over published articles in the trailing 8 weeks; fill any missing week with a zero count in application code rather than relying on the query to produce empty buckets
+- [ ] 2.4 `getContentDebt()` — five queries (or one query with conditional aggregates) implementing the exact predicates from `design.md` — Decisions: `missingSeoDescription`/`missingExcerpt`/`missingFeaturedImage`/`uncategorized` scoped to `status = 'published'`; `mediaMissingAlt` and `unusedTags` scoped platform-wide
+- [ ] 2.5 `uncategorized` uses `NOT EXISTS` against `article_categories`, not a `LEFT JOIN … IS NULL`, to avoid row multiplication from the join
+- [ ] 2.6 `unusedTags` uses `NOT EXISTS` against `article_tags`
+- [ ] 2.7 `getCurationIntegrity()` — load `home_curation` joined to `articles` (status, publishedAt) and `reels_curation` joined to `reels` (status); compute total/visible in application code using the imported `isPubliclyVisible`/`isReelPubliclyVisible` predicates, not a re-derived SQL condition
+- [ ] 2.8 `getUpNext()` — `dueWithin48h`: `status = 'scheduled' AND published_at BETWEEN now() AND now() + interval '48 hours'`, ordered by `published_at` ascending; `overdueUnpromotedCount`: `status = 'scheduled' AND published_at <= now()`
+- [ ] 2.9 `getReaderActivity()` — `newLast7d`: `created_at >= now() - interval '7 days'`; `activeLast30d`: `last_login_at >= now() - interval '30 days'`
+- [ ] 2.10 Confirm every query is read-only — no repository method in this module performs an `INSERT`, `UPDATE`, or `DELETE`
+
+## 3. Analytics module — service, controller, routes
+
+- [ ] 3.1 `analytics.service.ts`: `getDashboard()` composes all six repository calls (in parallel where independent) into one `DashboardResponse`
+- [ ] 3.2 `analytics.mapper.ts`: map raw rows to the contract shape, formatting `weekStart` and `publishedAt` as ISO strings
+- [ ] 3.3 `analytics.controller.ts`: `getDashboard` handler returning `{ success: true, data }`, matching the envelope used by `curation.controller.ts`
+- [ ] 3.4 `analytics.routes.ts`: `router.get('/', requirePermission('dashboard.view'), controller.getDashboard)`
+- [ ] 3.5 Mount in `apps/api/src/server.ts` as `app.use('/admin/dashboard', analyticsRoutes(db))`, alongside the other `/admin/*` mounts
+- [ ] 3.6 Confirm `auditAuthorizationDeclarations` (invoked at server boot) accepts the new route — it declares `requirePermission`, matching every other admin route's shape
+
+## 4. Admin UI
+
+- [ ] 4.1 Add `apps/admin/src/lib/dashboardApi.ts`: `dashboardApi.get()` calling `GET /admin/dashboard`, unwrapping the envelope, matching `curationApi.ts`'s pattern
+- [ ] 4.2 Add `apps/admin/src/pages/DashboardPage.tsx` rendering the six tiles: Pipeline, Cadence (sparkline or bar chart), Content debt (single rolled-up count plus the six-line breakdown), Homepage/reels integrity (`visible / total` for each), Up next (due-soon list + overdue count), Readers
+- [ ] 4.3 Content-debt tile shows counts only — no links to filtered article lists in this change (see `proposal.md` — Non-Goals)
+- [ ] 4.4 Up-next tile's overdue-count copy explicitly frames it as a scheduling-worker signal (e.g. "N scheduled articles are past due — check the publish worker"), never as "N articles failed to publish" — per `design.md`'s warning that `isPubliclyVisible` already serves an overdue-but-unflipped article as published
+- [ ] 4.5 Readers tile is labeled with sign-in language ("N sign-ins in the last 30 days" or equivalent) — never "visitors" or "traffic"
+- [ ] 4.6 Cadence and readers tiles show a plain empty/low-data state rather than implying a trend when history is short
+- [ ] 4.7 Register `/dashboard` in `apps/admin/src/App.tsx`
+- [ ] 4.8 Change the `/` route's `Navigate` target from `/articles` to `/dashboard`
+- [ ] 4.9 Add a "Dashboard" nav entry consistent with the existing admin navigation, if a shared nav component exists; otherwise add the link inline matching current per-page navigation conventions
+
+## 5. Tests
+
+- [ ] 5.1 Repository tests: each aggregate against seeded fixtures — pipeline counts, cadence bucketing (including a zero week and a published_at near the Asia/Jakarta day boundary), each content-debt predicate (published vs. draft scoping), curation integrity (visible vs. total, including an unavailable reel and an unpublished curated article), up-next due-soon window boundaries, overdue count, reader windows
+- [ ] 5.2 Permission test: confirm the route is covered by the existing generic `requirePermission` test in `middleware/authorize.test.ts`, matching the established convention (no new per-route permission test file)
+- [ ] 5.3 Contract test: `dashboardResponseSchema` accepts a well-formed payload and rejects a malformed one (e.g. wrong `cadence` length)
+- [ ] 5.4 Regression test: `health.routes.test.ts`'s full `createServer()` boot test still passes with the new route mounted, confirming `auditAuthorizationDeclarations` accepts it
+
+## 6. Completion
+
+- [ ] 6.1 `pnpm build` — clean across all apps/packages
+- [ ] 6.2 `pnpm lint` — clean
+- [ ] 6.3 `pnpm test` — all passing, including the new analytics tests
+- [ ] 6.4 `pnpm typecheck` — clean, no `any`
+- [ ] 6.5 Confirm `apps/web` is untouched by this change — the traffic pipeline stays deferred to `add-web-news-pages`
