@@ -160,7 +160,64 @@ describe('requireStaff', () => {
     const next = vi.fn();
     await requireStaff()(req, {} as Response, next as NextFunction);
     expect(next).toHaveBeenCalledWith();
-    expect(req.staffRole).toEqual({ roleId: 'author-role-id', isOwner: false });
+    expect(req.staffRole).toEqual({ roleId: 'author-role-id', isOwner: false, permissionKeys: [] });
+  });
+
+  /**
+   * `GET /users/me` sources `permissionKeys` from `req.staffRole` rather than a second query
+   * (specs/authorization/spec.md - "Effective permissions are reported") — this asserts the
+   * value it reads actually matches the caller's role, not just that a field exists.
+   */
+  it('carries the caller\'s exact resolved permission keys on req.staffRole', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: 'news.manage' },
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: 'article.publish' },
+      ]) as never,
+    );
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const next = vi.fn();
+    await requireStaff()(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+    expect(req.staffRole?.permissionKeys).toEqual(['news.manage', 'article.publish']);
+  });
+
+  /** specs/authorization/spec.md - "Owner status is reported independent of explicit permission
+   *  rows": the Owner role satisfies every check regardless of what's actually assigned to it. */
+  it('reports isOwner true for the Owner role even with zero explicit permission rows', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'owner-role-id', permissionKey: null },
+      ]) as never,
+    );
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const next = vi.fn();
+    await requireStaff()(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+    expect(req.staffRole).toEqual({ roleId: 'owner-role-id', isOwner: true, permissionKeys: [] });
+  });
+
+  /** specs/authorization/spec.md - "A role or permission change is reflected on the next
+   *  read": nothing here is cached — each request re-resolves from the database. */
+  it('reflects a permission change on the very next request, with no caching in between', async () => {
+    vi.mocked(getDatabase).mockReturnValueOnce(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: 'news.manage' },
+      ]) as never,
+    );
+    const firstReq = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    await requireStaff()(firstReq, {} as Response, vi.fn() as NextFunction);
+    expect(firstReq.staffRole?.permissionKeys).toEqual(['news.manage']);
+
+    vi.mocked(getDatabase).mockReturnValueOnce(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: 'news.manage' },
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: 'article.publish' },
+      ]) as never,
+    );
+    const secondReq = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    await requireStaff()(secondReq, {} as Response, vi.fn() as NextFunction);
+    expect(secondReq.staffRole?.permissionKeys).toEqual(['news.manage', 'article.publish']);
   });
 
   /**
@@ -310,7 +367,34 @@ describe('requirePermission', () => {
     const next = vi.fn();
     await requirePermission('settings.manage')(req, {} as Response, next as NextFunction);
     expect(next).toHaveBeenCalledWith();
-    expect(req.staffRole).toEqual({ roleId: 'owner-role-id', isOwner: true });
+    expect(req.staffRole).toEqual({ roleId: 'owner-role-id', isOwner: true, permissionKeys: [] });
+  });
+
+  /** specs/authorization/spec.md - "Reported state does not change enforcement": a permission
+   *  removed after being reported must reject on the very next request that needs it, exactly
+   *  as if it had never been reported at all. */
+  it('a permission removed after being reported no longer passes enforcement on the next request', async () => {
+    vi.mocked(getDatabase).mockReturnValueOnce(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: 'news.manage' },
+      ]) as never,
+    );
+    const firstReq = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const firstNext = vi.fn();
+    await requirePermission('news.manage')(firstReq, {} as Response, firstNext as NextFunction);
+    expect(firstNext).toHaveBeenCalledWith();
+    expect(firstReq.staffRole?.permissionKeys).toEqual(['news.manage']);
+
+    // The permission is removed out of band between requests.
+    vi.mocked(getDatabase).mockReturnValueOnce(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: null },
+      ]) as never,
+    );
+    const secondReq = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const secondNext = vi.fn();
+    await requirePermission('news.manage')(secondReq, {} as Response, secondNext as NextFunction);
+    expect(secondNext).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'forbidden' }));
   });
 
   it('gives no bypass to a role that merely shares a similar name, only the seeded id', async () => {

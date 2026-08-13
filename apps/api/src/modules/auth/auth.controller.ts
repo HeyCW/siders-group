@@ -7,6 +7,7 @@ import {
   setSessionCookies,
   clearSessionCookies,
   sharedCookieOptions,
+  REFRESH_TOKEN_MAX_AGE_MS,
   type CookieEnv,
 } from '../../lib/cookies.js';
 import { REFRESH_TOKEN_COOKIE } from '../../lib/tokens.js';
@@ -23,7 +24,7 @@ export function createAuthController(service: AuthService, env: CookieEnv & Sess
         }
         const issued = await service.refresh(raw, sessionMetaFromRequest(req, env));
         setSessionCookies(res, issued, env);
-        setCsrfCookie(res, issued.csrfToken, sharedCookieOptions(env));
+        setCsrfCookie(res, issued.csrfToken, { ...sharedCookieOptions(env), maxAge: REFRESH_TOKEN_MAX_AGE_MS });
         res.status(204).end();
       } catch (err) {
         next(err);

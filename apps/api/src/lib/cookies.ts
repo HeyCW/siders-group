@@ -6,7 +6,7 @@ import { REFRESH_TOKEN_COOKIE } from './tokens.js';
 export type CookieEnv = Pick<Env, 'NODE_ENV' | 'COOKIE_DOMAIN' | 'APP_ORIGIN'>;
 
 const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
-const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+export const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * `Secure` is keyed on the deployment actually being HTTPS, not on `NODE_ENV === 'production'`.

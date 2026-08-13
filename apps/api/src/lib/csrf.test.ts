@@ -3,11 +3,14 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   CSRF_COOKIE,
   CSRF_HEADER,
+  clearCsrfCookie,
   createCsrfMiddleware,
   issueCsrfToken,
+  setCsrfCookie,
   verifyCsrfToken,
   type CsrfEnv,
 } from './csrf.js';
+import { REFRESH_TOKEN_MAX_AGE_MS } from './cookies.js';
 import { ACCESS_TOKEN_COOKIE } from '../middleware/authenticate.js';
 import type { AuthContext } from '../middleware/authenticate.js';
 
@@ -147,5 +150,41 @@ describe('csrf middleware', () => {
     const next = vi.fn();
     middleware(req, {} as Response, next as NextFunction);
     expect(next).toHaveBeenCalledWith();
+  });
+});
+
+/**
+ * `setCsrfCookie` previously set neither `maxAge` nor `expires`, so browsers treated it as a
+ * session cookie while `sid_rt` persisted 30 days — a restart left `sid_rt` with no
+ * `csrf_token`, 403ing sign-in, refresh, and logout alike
+ * (specs/authentication/spec.md - "CSRF cookie survives a browser restart").
+ */
+describe('setCsrfCookie / clearCsrfCookie', () => {
+  function makeRes() {
+    return { cookie: vi.fn(), clearCookie: vi.fn() } as unknown as Response & {
+      cookie: ReturnType<typeof vi.fn>;
+      clearCookie: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it('sets the maxAge it is given, so the cookie persists across a browser restart', () => {
+    const res = makeRes();
+    setCsrfCookie(res, 'token-value', { secure: true, domain: undefined, maxAge: REFRESH_TOKEN_MAX_AGE_MS });
+    expect(res.cookie).toHaveBeenCalledWith(
+      CSRF_COOKIE,
+      'token-value',
+      expect.objectContaining({ maxAge: REFRESH_TOKEN_MAX_AGE_MS, httpOnly: false }),
+    );
+  });
+
+  it('clearCsrfCookie is unaffected by the maxAge change — it still clears with no maxAge option', () => {
+    const res = makeRes();
+    clearCsrfCookie(res, { secure: true, domain: undefined });
+    expect(res.clearCookie).toHaveBeenCalledWith(
+      CSRF_COOKIE,
+      expect.objectContaining({ httpOnly: false, secure: true }),
+    );
+    const [, options] = res.clearCookie.mock.calls[0] as [string, Record<string, unknown>];
+    expect(options.maxAge).toBeUndefined();
   });
 });

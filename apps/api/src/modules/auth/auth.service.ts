@@ -35,6 +35,14 @@ export interface AuthService {
   revokeAllForSubjectExcept(subjectType: SubjectType, subjectId: string, exceptSessionId: string): Promise<void>;
   revokeAll(): Promise<void>;
   getReaderAccount(subjectId: string): Promise<ReaderAccountRow | null>;
+  /**
+   * Read-only lookup for the CSRF re-pairing endpoint (`GET /auth/csrf`) — answers "what
+   * session, if any, does this refresh credential identify?" without rotating the credential,
+   * creating or extending a session, or lifting a revocation. Deliberately not `refresh()`:
+   * that method mutates on every call, which this endpoint must never do
+   * (design.md - "This is explicitly not a refresh").
+   */
+  resolveSessionForCsrfBootstrap(rawRefreshToken: string): Promise<string | null>;
 }
 
 export function createAuthService(
@@ -146,6 +154,15 @@ export function createAuthService(
 
     async getReaderAccount(subjectId) {
       return repository.findReaderAccount(subjectId);
+    },
+
+    async resolveSessionForCsrfBootstrap(rawRefreshToken) {
+      const tokenHash = sha256Hex(rawRefreshToken);
+      const row = await repository.findByRefreshTokenHash(tokenHash);
+      if (!row || row.revokedAt) return null;
+      const now = Date.now();
+      if (row.expiresAt.getTime() < now || row.absoluteExpiresAt.getTime() < now) return null;
+      return row.id;
     },
   };
 }
