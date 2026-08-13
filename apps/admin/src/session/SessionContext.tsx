@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { onSessionExpired } from '../lib/api.js';
+import { onSessionExpired, onSessionShouldReresolve } from '../lib/api.js';
 import { sessionApi, type StaffMeResponse } from '../lib/sessionApi.js';
 
 export type SessionState =
@@ -50,6 +50,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // still-403 retry whose re-probe also failed) reaches here without any component having made
   // a request itself.
   useEffect(() => onSessionExpired(() => setSession({ status: 'unauthenticated' })), []);
+
+  // A mid-session `password_change_required` 403 — the session itself is still valid, so this
+  // re-reads the account rather than treating it as expired; RequireSession picks up the
+  // resulting `mustChangePassword` flag and confines the app to the change screen on its own.
+  useEffect(() => onSessionShouldReresolve(() => void resolve()), [resolve]);
 
   const refreshAccount = useCallback(async () => {
     await resolve();

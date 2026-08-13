@@ -13,8 +13,13 @@ export const DEFAULT_LANDING_ROUTE = '/articles';
  */
 export function resolveInAppTarget(candidate: unknown): string {
   if (typeof candidate !== 'string' || candidate.length === 0) return DEFAULT_LANDING_ROUTE;
-  // Absolute URLs don't start with '/'; protocol-relative ones ("//evil.com") double it.
-  // Both are rejected the same way as a bare cross-origin URL.
-  if (!candidate.startsWith('/') || candidate.startsWith('//')) return DEFAULT_LANDING_ROUTE;
+  // Absolute URLs don't start with '/'. Protocol-relative ones double the leading slash
+  // ("//evil.com"); the WHATWG URL parser normalizes a leading backslash the same way
+  // ("/\evil.com" resolves to https://evil.com/, confirmed against `new URL()` directly), so
+  // both forms of the second character are rejected identically. A backslash anywhere else in
+  // the path stays same-origin and is left alone.
+  if (!candidate.startsWith('/') || candidate.startsWith('//') || candidate.startsWith('/\\')) {
+    return DEFAULT_LANDING_ROUTE;
+  }
   return candidate;
 }

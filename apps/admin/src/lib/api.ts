@@ -131,6 +131,25 @@ function notifySessionExpired(): void {
   for (const listener of sessionExpiredListeners) listener();
 }
 
+type SessionShouldReresolveListener = () => void;
+const sessionShouldReresolveListeners = new Set<SessionShouldReresolveListener>();
+
+/**
+ * Lets the session context learn when a `password_change_required` 403 arrived mid-session, so
+ * it can re-read the caller's own account and pick up the flag — the session and CSRF pairing
+ * are both still valid, so this is distinct from `onSessionExpired` above: nothing is gone, the
+ * account's own state just changed (specs/admin-session/spec.md - "A mid-session 403 coded
+ * password_change_required routes to the change screen, not to a recovery path").
+ */
+export function onSessionShouldReresolve(listener: SessionShouldReresolveListener): () => void {
+  sessionShouldReresolveListeners.add(listener);
+  return () => sessionShouldReresolveListeners.delete(listener);
+}
+
+function notifySessionShouldReresolve(): void {
+  for (const listener of sessionShouldReresolveListeners) listener();
+}
+
 /**
  * At most one in-flight `/auth/refresh` call, ever, shared by every request that discovers a
  * `forbidden` 403 at roughly the same time. Single-flight here is load-bearing, not an
@@ -221,6 +240,14 @@ async function withRecovery<T>(perform: () => Promise<T>, opts: { isSignIn?: boo
         }
         throw retryErr;
       }
+    }
+
+    if (err.code === 'password_change_required') {
+      // Neither refresh nor bootstrap addresses this — the session is valid and the CSRF
+      // pairing is intact, only the account's own state changed. Re-resolving lets the route
+      // guard confine the app to the change screen; the originating call still rejects.
+      notifySessionShouldReresolve();
+      throw err;
     }
 
     throw err;

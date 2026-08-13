@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, apiFetch, apiUpload, onSessionExpired } from './api.js';
+import { ApiError, apiFetch, apiUpload, onSessionExpired, onSessionShouldReresolve } from './api.js';
 
 function setCsrfCookie(value: string | null): void {
   Object.defineProperty(document, 'cookie', {
@@ -27,6 +27,12 @@ function noContent(): QueuedResponse {
 }
 function unauthorized(): QueuedResponse {
   return { status: 401, body: { success: false, error: { code: 'invalid_refresh_token', message: 'Invalid refresh token' } } };
+}
+function passwordChangeRequired(): QueuedResponse {
+  return {
+    status: 403,
+    body: { success: false, error: { code: 'password_change_required', message: 'Password change required' } },
+  };
 }
 
 /** Routes the stubbed `fetch` by URL suffix, queuing responses per endpoint and counting calls
@@ -68,6 +74,12 @@ describe('apiFetch/apiUpload recovery interceptor', () => {
   function trackSessionExpired(): { count: () => number } {
     let count = 0;
     unsubscribers.push(onSessionExpired(() => (count += 1)));
+    return { count: () => count };
+  }
+
+  function trackSessionShouldReresolve(): { count: () => number } {
+    let count = 0;
+    unsubscribers.push(onSessionShouldReresolve(() => (count += 1)));
     return { count: () => count };
   }
 
@@ -172,6 +184,22 @@ describe('apiFetch/apiUpload recovery interceptor', () => {
     await expect(apiFetch('/feature')).rejects.toMatchObject({ status: 403 });
 
     expect(expired.count()).toBe(1);
+  });
+
+  it('a password_change_required 403 triggers neither refresh nor bootstrap, and notifies the session context to re-resolve', async () => {
+    const router = createFetchRouter();
+    router.on('/feature', passwordChangeRequired());
+    vi.stubGlobal('fetch', router.fetchMock);
+    const reresolve = trackSessionShouldReresolve();
+    const expired = trackSessionExpired();
+
+    await expect(apiFetch('/feature')).rejects.toMatchObject({ status: 403, code: 'password_change_required' });
+
+    expect(router.calls('/feature')).toBe(1); // never retried
+    expect(router.calls('/auth/refresh')).toBe(0);
+    expect(router.calls('/auth/csrf')).toBe(0);
+    expect(reresolve.count()).toBe(1);
+    expect(expired.count()).toBe(0); // the session is still valid — this is not "session gone"
   });
 
   it('bounded composition: a refresh-recovered retry that fails with csrf_failed does not then attempt a bootstrap', async () => {

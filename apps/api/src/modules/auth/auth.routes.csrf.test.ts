@@ -120,6 +120,28 @@ describe('GET /auth/csrf', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
+  /**
+   * specs/authentication/spec.md - "A token may be issued for a session revoked since the
+   * access credential was signed": the access-credential branch binds on signature alone
+   * (`authenticate.ts` — no database read), so it has no way to know, or care, whether the
+   * session it names has since been revoked. `resolveSessionForCsrfBootstrapMock` — the only
+   * DB-touching call this route makes — is asserted un-called, which is exactly why revocation
+   * cannot gate this branch. The revocation itself stays enforced downstream, independently, by
+   * `resolveStaffAccess` (`authorize.test.ts` — "rejects a revoked session"); this endpoint
+   * having run changes nothing about that check.
+   */
+  it('issues a token via a valid access credential even when its session has since been revoked, since this branch never checks', async () => {
+    const app = await appWithAuth({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-revoked' })();
+
+    const res = await request(app).get('/auth/csrf');
+
+    expect(res.status).toBe(204);
+    expect(resolveSessionForCsrfBootstrapMock).not.toHaveBeenCalled();
+    expect(setCsrfCookieMock).toHaveBeenCalledTimes(1);
+    const [, token] = setCsrfCookieMock.mock.calls[0] as [unknown, string, Record<string, unknown>];
+    expect(verifyCsrfToken(token, ENV)).toEqual({ sessionId: 'sess-revoked' });
+  });
+
   it('issues no token when no session is identifiable — no cookies at all', async () => {
     const app = await appWithAuth()();
 
@@ -185,6 +207,58 @@ describe('GET /auth/csrf', () => {
     expect(throttled.status).toBe(204);
     expect(throttled.body).toEqual({});
     // Throttled: even though the credential would otherwise have resolved, no cookie is set.
+    expect(setCsrfCookieMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * design.md - "That forced GET is nonetheless chargeable": the limiter is keyed on the
+   * presented refresh credential, not bare source IP, so a hostile page forcing credential-less
+   * requests — or many staff members recovering behind one shared NAT — cannot spend one
+   * caller's budget against another's. Two distinct `sid_rt` values from what `supertest`
+   * treats as the same client exhaust two separate budgets, not one shared one.
+   */
+  it('keys the rate limit on the presented refresh credential, not on source address, so one caller cannot exhaust another\'s budget', async () => {
+    resolveSessionForCsrfBootstrapMock.mockResolvedValue('sess-1');
+    const app = await appWithAuth()();
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await request(app).get('/auth/csrf').set('Cookie', `${REFRESH_TOKEN_COOKIE}=credential-a`);
+    }
+    setCsrfCookieMock.mockClear();
+
+    // credential-a is now throttled...
+    const throttledA = await request(app).get('/auth/csrf').set('Cookie', `${REFRESH_TOKEN_COOKIE}=credential-a`);
+    expect(throttledA.status).toBe(204);
+    expect(setCsrfCookieMock).not.toHaveBeenCalled();
+
+    // ...but credential-b, from the same request-issuing client, has its own untouched budget.
+    const stillWorksB = await request(app).get('/auth/csrf').set('Cookie', `${REFRESH_TOKEN_COOKIE}=credential-b`);
+    expect(stillWorksB.status).toBe(204);
+    expect(setCsrfCookieMock).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The fallback for a caller presenting no refresh credential at all — the only case bare
+   * `clientIp` keying is still correct for, since there is nothing else to key on. Uses the
+   * access-credential branch (no `sid_rt` cookie sent) so a throttled request is observably
+   * different from a healthy one: the key generator only inspects `sid_rt`, so it falls back to
+   * `clientIp` here even though `req.auth` is what actually resolves the binding.
+   */
+  it('falls back to source address, and still throttles, when no refresh credential is presented', async () => {
+    const app = await appWithAuth({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-ip-fallback' })();
+
+    let lastStatus = 0;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const res = await request(app).get('/auth/csrf');
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(204);
+    expect(setCsrfCookieMock).toHaveBeenCalledTimes(30);
+    setCsrfCookieMock.mockClear();
+
+    const throttled = await request(app).get('/auth/csrf');
+    expect(throttled.status).toBe(204);
+    expect(throttled.body).toEqual({});
     expect(setCsrfCookieMock).not.toHaveBeenCalled();
   });
 });

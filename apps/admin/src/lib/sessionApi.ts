@@ -26,9 +26,14 @@ interface Envelope<T> {
 }
 
 /**
- * Wraps the six endpoints the admin session lifecycle consumes, all through `apiFetch` so CSRF
+ * Wraps the four endpoints screens and components call directly, all through `apiFetch` so CSRF
  * header attachment and the refresh/bootstrap recovery interceptor stay in one place
- * (proposal.md - "Route every call through the existing apiFetch").
+ * (proposal.md - "Route every call through the existing apiFetch"). `POST /auth/refresh` and
+ * `GET /auth/csrf` are the other two endpoints this change consumes, but the interceptor
+ * (`api.ts`) is their only caller — it issues them directly via `rawFetch`, deliberately outside
+ * `apiFetch`, so they are not exposed here: a copy built on `apiFetch` would route back through
+ * the very interceptor these two calls exist to recover (specs/admin-session/spec.md - "Refresh
+ * is single-flight" — the interceptor's scope excludes both by name).
  */
 export const sessionApi = {
   /** The sign-in screen's own submission — excluded from refresh recovery, since a 403 here
@@ -47,17 +52,7 @@ export const sessionApi = {
     return apiFetch<void>('/staff/me/password', { method: 'POST', body: { currentPassword, newPassword } });
   },
 
-  refresh(): Promise<void> {
-    return apiFetch<void>('/auth/refresh', { method: 'POST' });
-  },
-
   logout(): Promise<void> {
     return apiFetch<void>('/auth/logout', { method: 'POST' });
-  },
-
-  /** The CSRF cookie re-pairing endpoint (`GET /auth/csrf`) — a safe method, so it carries no
-   *  CSRF header of its own and cannot itself 403 `csrf_failed`. */
-  bootstrapCsrf(): Promise<void> {
-    return apiFetch<void>('/auth/csrf');
   },
 };

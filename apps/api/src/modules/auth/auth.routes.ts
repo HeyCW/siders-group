@@ -12,6 +12,7 @@ import { AppError } from '../../middleware/errorHandler.js';
 import { issueCsrfToken, setCsrfCookie } from '../../lib/csrf.js';
 import { REFRESH_TOKEN_MAX_AGE_MS, setSessionCookies, sharedCookieOptions } from '../../lib/cookies.js';
 import { REFRESH_TOKEN_COOKIE } from '../../lib/tokens.js';
+import { sha256Hex } from '../../lib/hashCompare.js';
 import { sessionMetaFromRequest } from '../../lib/sessionMeta.js';
 import type { Env } from '../../config/env.js';
 
@@ -86,12 +87,29 @@ function respondWithCsrfBootstrapNoop(_req: Request, res: Response, _next: (err:
   res.status(204).end();
 }
 
+/**
+ * A forced, credential-less call to this endpoint still reserves a rate-limit slot even though
+ * it can never obtain a token — `rateLimit` charges before the handler runs. Keying on bare
+ * `clientIp` would let a hostile page spend a victim's own recovery budget on requests that
+ * accomplish nothing else, or let every staff member behind one office NAT collectively drain a
+ * shared IP bucket recovering from the same browser-restart lockout on the same morning — the
+ * exact population this endpoint exists to serve. Keying on the presented refresh credential
+ * instead means only the caller who actually holds `sid_rt` can spend against it; `clientIp` is
+ * the fallback only for a caller presenting no credential at all (design.md - "That forced GET
+ * is nonetheless chargeable").
+ */
+function csrfBootstrapKey(req: Request): string {
+  const raw = req.cookies?.[REFRESH_TOKEN_COOKIE];
+  if (typeof raw === 'string' && raw.length > 0) return `rt:${sha256Hex(raw)}`;
+  return `ip:${clientIp(req)}`;
+}
+
 /** Exported for the same reason the sign-in chain is: the tests assert the shipped config. */
 export function csrfBootstrapRateLimiter() {
   return rateLimit({
     name: 'auth-csrf-bootstrap',
     ...CSRF_BOOTSTRAP_RATE_LIMIT,
-    keyGenerator: clientIp,
+    keyGenerator: csrfBootstrapKey,
     onLimited: respondWithCsrfBootstrapNoop,
   });
 }

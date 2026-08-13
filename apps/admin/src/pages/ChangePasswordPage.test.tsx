@@ -68,4 +68,30 @@ describe('ChangePasswordPage', () => {
     expect(screen.getByText('Current password is incorrect')).toBeTruthy();
     expect(refreshAccount).not.toHaveBeenCalled();
   });
+
+  /** The change screen is the only route a confined caller can reach (session/RouteGuards.tsx),
+   *  so it carries its own way out rather than relying on AppShell's, which never renders here. */
+  it('offers a sign-out control, since this screen renders outside AppShell', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useSession).mockReturnValue({
+      session: { status: 'authenticated', account: { mustChangePassword: true } as never },
+      refreshAccount: vi.fn(),
+      signIn: vi.fn(),
+      signOut,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/change-password']}>
+        <Routes>
+          <Route path="/change-password" element={<ChangePasswordPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Sign out' }).click();
+    });
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
 });

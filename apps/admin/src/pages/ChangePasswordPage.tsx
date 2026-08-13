@@ -16,7 +16,7 @@ export function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { refreshAccount } = useSession();
+  const { refreshAccount, signOut } = useSession();
   const navigate = useNavigate();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -38,7 +38,18 @@ export function ChangePasswordPage() {
 
   return (
     <div className="mx-auto mt-24 max-w-sm p-6">
-      <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">Change your password</h1>
+      <div className="mb-2 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Change your password</h1>
+        {/* This screen has no other route to navigate to while mustChangePassword is set
+            (session/RouteGuards.tsx), so it needs its own way out. */}
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+        >
+          Sign out
+        </button>
+      </div>
       <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">You must set a new password before continuing.</p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

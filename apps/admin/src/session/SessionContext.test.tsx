@@ -2,13 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { SessionProvider, useSession } from './SessionContext.js';
 import { sessionApi } from '../lib/sessionApi.js';
-import { onSessionExpired } from '../lib/api.js';
+import { onSessionExpired, onSessionShouldReresolve } from '../lib/api.js';
 
 vi.mock('../lib/sessionApi.js', () => ({
   sessionApi: { me: vi.fn(), logout: vi.fn() },
 }));
 vi.mock('../lib/api.js', () => ({
   onSessionExpired: vi.fn(() => () => {}),
+  onSessionShouldReresolve: vi.fn(() => () => {}),
 }));
 
 afterEach(() => cleanup());
@@ -72,6 +73,48 @@ describe('SessionProvider reacting to onSessionExpired', () => {
     act(() => notify());
 
     expect(screen.getByText('status:unauthenticated')).toBeTruthy();
+  });
+});
+
+/**
+ * A `password_change_required` 403 mid-session — the session itself is still valid, so this
+ * re-reads the account (picking up `mustChangePassword`) rather than treating it as expired
+ * (specs/admin-session/spec.md - "A mid-session 403 coded password_change_required routes to
+ * the change screen, not to a recovery path").
+ */
+describe('SessionProvider reacting to onSessionShouldReresolve', () => {
+  it('re-resolves the account in place, staying authenticated, when the interceptor reports a pending password change', async () => {
+    vi.mocked(sessionApi.me).mockResolvedValueOnce({ id: 'staff-1', mustChangePassword: false } as never);
+    let notify: () => void = () => {};
+    vi.mocked(onSessionShouldReresolve).mockImplementation((listener) => {
+      notify = listener;
+      return () => {};
+    });
+
+    function AccountConsumer() {
+      const { session } = useSession();
+      const flag = session.status === 'authenticated' ? String(session.account.mustChangePassword) : 'n/a';
+      return (
+        <div>
+          <div>status:{session.status}</div>
+          <div>mustChangePassword:{flag}</div>
+        </div>
+      );
+    }
+
+    render(
+      <SessionProvider>
+        <AccountConsumer />
+      </SessionProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('status:authenticated')).toBeTruthy());
+    expect(screen.getByText('mustChangePassword:false')).toBeTruthy();
+
+    vi.mocked(sessionApi.me).mockResolvedValueOnce({ id: 'staff-1', mustChangePassword: true } as never);
+    await act(async () => notify());
+
+    expect(screen.getByText('status:authenticated')).toBeTruthy();
+    expect(screen.getByText('mustChangePassword:true')).toBeTruthy();
   });
 });
 
