@@ -13,6 +13,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/categories', label: 'Categories', permission: 'category.manage' },
   { to: '/tags', label: 'Tags', permission: 'tag.manage' },
   { to: '/curation', label: 'Curation', permission: 'news.manage' },
+  { to: '/reels', label: 'Reels', permission: 'news.manage' },
+  { to: '/reels-curation', label: 'Reels Curation', permission: 'news.manage' },
 ];
 
 /**

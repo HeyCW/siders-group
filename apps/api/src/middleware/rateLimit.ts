@@ -125,3 +125,23 @@ export function __resetRateLimitStoreForTests(): void {
 export function clientIp(req: Request): string {
   return req.ip ?? req.socket.remoteAddress ?? 'unknown';
 }
+
+const PUBLIC_READ_RATE_LIMIT = { windowMs: 60 * 1000, max: 120 };
+
+/**
+ * Shared config for every public, unauthenticated read endpoint (articles, curation/home feed,
+ * reels, …) — window and ceiling in common, namespaced per caller via `name` so each endpoint
+ * still counts only its own traffic (see `name` above). Previously redefined verbatim in
+ * `article.routes.ts`, `curation.routes.ts`, and `reels.routes.ts`; consolidated here so the
+ * window/max and the 429 response shape have one definition instead of three.
+ */
+export function publicReadRateLimiter(name: string) {
+  return rateLimit({
+    name,
+    ...PUBLIC_READ_RATE_LIMIT,
+    keyGenerator: clientIp,
+    onLimited: (_req, res) => {
+      res.status(429).json({ success: false, error: { code: 'rate_limited', message: 'Too many requests' } });
+    },
+  });
+}

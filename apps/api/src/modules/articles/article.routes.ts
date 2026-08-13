@@ -6,20 +6,7 @@ import { createArticleRepository } from './article.repository.js';
 import { createArticleService } from './article.service.js';
 import { createArticleController, createPublicArticleController } from './article.controller.js';
 import { requirePermission, requirePublic } from '../../middleware/authorize.js';
-import { rateLimit, clientIp } from '../../middleware/rateLimit.js';
-
-const PUBLIC_READ_RATE_LIMIT = { windowMs: 60 * 1000, max: 120 };
-
-function publicReadRateLimiter() {
-  return rateLimit({
-    name: 'public-article-read',
-    ...PUBLIC_READ_RATE_LIMIT,
-    keyGenerator: clientIp,
-    onLimited: (_req, res) => {
-      res.status(429).json({ success: false, error: { code: 'rate_limited', message: 'Too many requests' } });
-    },
-  });
-}
+import { publicReadRateLimiter } from '../../middleware/rateLimit.js';
 
 /**
  * Admin article endpoints, mounted at `/admin/articles`. Every route is gated by
@@ -57,8 +44,8 @@ export function publicArticleRoutes(db: Database, env: Pick<Env, 'MEDIA_PUBLIC_B
   const repository = createArticleRepository(db);
   const controller = createPublicArticleController(repository, env);
 
-  router.get('/', requirePublic(), publicReadRateLimiter(), controller.list);
-  router.get('/:slug', requirePublic(), publicReadRateLimiter(), controller.getBySlug);
+  router.get('/', requirePublic(), publicReadRateLimiter('public-article-read'), controller.list);
+  router.get('/:slug', requirePublic(), publicReadRateLimiter('public-article-read'), controller.getBySlug);
 
   return router;
 }

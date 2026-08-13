@@ -10,3 +10,6 @@ export * from './tag.js';
 export * from './media.js';
 export * from './article.js';
 export * from './curation.js';
+export * from './reelProvider.js';
+export * from './reel.js';
+export * from './reelsCuration.js';
