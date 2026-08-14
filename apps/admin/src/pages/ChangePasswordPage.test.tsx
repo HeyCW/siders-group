@@ -5,6 +5,7 @@ import { ChangePasswordPage } from './ChangePasswordPage.js';
 import { sessionApi } from '../lib/sessionApi.js';
 import { ApiError } from '../lib/api.js';
 import { useSession } from '../session/SessionContext.js';
+import { DEFAULT_LANDING_ROUTE } from '../session/redirectTarget.js';
 
 vi.mock('../lib/sessionApi.js', () => ({ sessionApi: { changePassword: vi.fn() } }));
 vi.mock('../session/SessionContext.js', () => ({ useSession: vi.fn() }));
@@ -33,7 +34,7 @@ describe('ChangePasswordPage', () => {
       <MemoryRouter initialEntries={['/change-password']}>
         <Routes>
           <Route path="/change-password" element={<ChangePasswordPage />} />
-          <Route path="/articles" element={<div>Articles</div>} />
+          <Route path={DEFAULT_LANDING_ROUTE} element={<div>Landing</div>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -42,7 +43,7 @@ describe('ChangePasswordPage', () => {
 
     expect(sessionApi.changePassword).toHaveBeenCalledWith('old-pass', 'new-password-1');
     expect(refreshAccount).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.getByText('Articles')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Landing')).toBeTruthy());
   });
 
   it('shows the server error message on failure and does not re-resolve session state', async () => {

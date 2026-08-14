@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { RedirectIfAuthenticated, RequireSession } from './RouteGuards.js';
 import { useSession, type SessionContextValue } from './SessionContext.js';
+import { DEFAULT_LANDING_ROUTE } from './redirectTarget.js';
 
 vi.mock('./SessionContext.js', () => ({ useSession: vi.fn() }));
 
@@ -184,11 +185,11 @@ describe('RedirectIfAuthenticated', () => {
               </RedirectIfAuthenticated>
             }
           />
-          <Route path="/articles" element={<div>Articles</div>} />
+          <Route path={DEFAULT_LANDING_ROUTE} element={<div>Landing</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Articles')).toBeTruthy();
+    expect(screen.getByText('Landing')).toBeTruthy();
     expect(screen.queryByText('Login Form')).toBeNull();
   });
 

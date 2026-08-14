@@ -1,6 +1,6 @@
 /** Where a signed-in caller with no preserved deep link lands (specs/admin-session/spec.md -
  *  "No preserved target defaults to the landing route"). */
-export const DEFAULT_LANDING_ROUTE = '/articles';
+export const DEFAULT_LANDING_ROUTE = '/dashboard';
 
 /**
  * Validates a preserved-or-supplied post-sign-in target against the same rule

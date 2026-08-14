@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './LoginPage.js';
 import { sessionApi } from '../lib/sessionApi.js';
 import { useSession } from '../session/SessionContext.js';
+import { DEFAULT_LANDING_ROUTE } from '../session/redirectTarget.js';
 
 vi.mock('../lib/sessionApi.js', () => ({ sessionApi: { login: vi.fn() } }));
 vi.mock('../session/SessionContext.js', () => ({ useSession: vi.fn() }));
@@ -16,8 +17,8 @@ function renderAt(path: string, state?: unknown) {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/change-password" element={<div>Change Password Screen</div>} />
-        <Route path="/articles" element={<div>Articles</div>} />
         <Route path="/articles/42" element={<div>Article 42</div>} />
+        <Route path={DEFAULT_LANDING_ROUTE} element={<div>Landing</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -63,7 +64,7 @@ describe('LoginPage', () => {
     renderAt('/login');
     await act(async () => fillAndSubmit());
 
-    await waitFor(() => expect(screen.getByText('Articles')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Landing')).toBeTruthy());
   });
 
   /** specs/admin-session/spec.md - "Sign-in for an account requiring a password change enters
