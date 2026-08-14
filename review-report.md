@@ -439,12 +439,15 @@ branch has been updated, matching the round-2 format used for PR #7.
 
 # Round 3 — implementation review
 
-**Verdict:** Approve with changes
+**Verdict:** Approve with changes → **Approved** (all 5 findings fixed, see Disposition below)
 
 ## Reviewed at
 | Range | Files | +/- | Date |
 |---|---|---|---|
 | `origin/main...HEAD` (PR #9, head `596e501`) | 22 | +1811 / -179 | 2026-08-14 |
+
+All 5 findings fixed in `c270a33`, posted as inline GitHub review comment replies and resolved as
+threads. See "Disposition" below.
 
 Rounds 1–2 above reviewed the `add-admin-dashboard` proposal while it was spec-only; commit
 `596e501` added the implementation, and that implementation is what this round reviews.
@@ -483,13 +486,13 @@ findings cite precedent rather than a named rule.
 
 ## Findings
 
-| # | Severity | Aspect(s) | File:line | Title |
-|---|---|---|---|---|
-| 1 | Minor | correctness, conventions | `apps/api/src/modules/analytics/analytics.repository.test.ts` | `tasks.md` 5.1's reason for skipping live-DB tests is not accurate |
-| 2 | Minor | correctness | `apps/admin/src/pages/DashboardPage.tsx:118` | Content-debt headline sums incommensurable units |
-| 3 | Minor | correctness | `apps/admin/src/pages/DashboardPage.tsx:57` | Due-soon times render in the viewer's timezone, not Jakarta |
-| 4 | Nit | performance | `apps/api/src/modules/analytics/analytics.repository.ts:144` | Cadence query has no upper bound |
-| 5 | Nit | hygiene | `.claude/launch.json` | Unrelated tooling file bundled into the change |
+| # | Severity | Aspect(s) | File:line | Title | Disposition |
+|---|---|---|---|---|---|
+| 1 | Minor | correctness, conventions | `apps/api/src/modules/analytics/analytics.repository.test.ts` | `tasks.md` 5.1's reason for skipping live-DB tests is not accurate | Fixed |
+| 2 | Minor | correctness | `apps/admin/src/pages/DashboardPage.tsx:118` | Content-debt headline sums incommensurable units | Fixed |
+| 3 | Minor | correctness | `apps/admin/src/pages/DashboardPage.tsx:57` | Due-soon times render in the viewer's timezone, not Jakarta | Fixed |
+| 4 | Nit | performance | `apps/api/src/modules/analytics/analytics.repository.ts:144` | Cadence query has no upper bound | Fixed |
+| 5 | Nit | hygiene | `.claude/launch.json` | Unrelated tooling file bundled into the change | Fixed |
 
 ## Details
 
@@ -629,3 +632,27 @@ Not inferred from the diff — executed:
   activeLast30d 2` (correctly excluding the null-login reader), cadence bucketed to
   `2026-08-03` / `2026-08-10` across the Sunday/Monday Jakarta boundary.
 - Due-soon cap re-run with 26 matching rows: 20 returned, `dueWithin48hTotal` 26.
+
+## Disposition
+
+All 5 findings fixed in `c270a33`, on top of the reviewed commit `596e501`.
+
+- **#1** — `tasks.md` 5.1 corrected to state the accurate reason (buildable, verified directly
+  against a live Postgres; not run because `.github/workflows/ci.yml` has no database service),
+  replacing the false "never actually buildable here" claim. The integration-test harness itself
+  was deliberately *not* added: confirmed first that nothing in the repo uses a `skipIf`-gated
+  test and CI has no `TEST_DATABASE_URL`, so building one now would be a pattern that's always
+  skipped as written — out of proportion for a Minor finding.
+- **#2** — `contentDebtTotal` and its headline `<p>` removed from `DashboardPage.tsx`; the five
+  itemized rows stand alone. The "articles needing attention" alternative was left for a follow-up
+  since it needs a new repository field.
+- **#3** — `formatDate` now passes `timeZone: 'Asia/Jakarta'`; the "Up next" tile is relabeled
+  "Up next (times in WIB)".
+- **#4** — `lt` added to the `analytics.repository.ts` `drizzle-orm` import; the cadence `WHERE`
+  is now bounded above by `nextWeekStart`. Re-verified against a live Postgres: a published
+  article dated three weeks out is now excluded by the query itself rather than fetched and
+  discarded downstream, and the other three buckets matched prior output exactly.
+- **#5** — `.claude/launch.json` deleted. Confirmed first that nothing references it
+  (`grep -rn "launch.json"` matched only this review) before removing.
+
+`pnpm typecheck`, `pnpm lint`, and `pnpm test` (418 tests) all re-run clean after the fixes.
