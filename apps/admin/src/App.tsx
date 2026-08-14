@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { DashboardPage } from './pages/DashboardPage.js';
 import { ArticleListPage } from './pages/ArticleListPage.js';
 import { NewArticlePage } from './pages/NewArticlePage.js';
 import { TaxonomyManagementPage } from './pages/TaxonomyManagementPage.js';
@@ -43,7 +44,8 @@ export default function App() {
         >
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route element={<AppShell />}>
-            <Route path="/" element={<Navigate to="/articles" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/articles" element={<ArticleListPage />} />
             <Route path="/articles/new" element={<NewArticlePage />} />
             <Route

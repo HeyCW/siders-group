@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './LoginPage.js';
 import { useSession } from '../session/SessionContext.js';
+import { DEFAULT_LANDING_ROUTE } from '../session/redirectTarget.js';
 
 // sessionApi and api.ts are deliberately NOT mocked here — this exercises the real
 // apiFetch interceptor (api.ts) so the recovery actually runs, not a stand-in for it.
@@ -59,7 +60,7 @@ describe('LoginPage recovering from a stale CSRF cookie on submission', () => {
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/articles" element={<div>Articles</div>} />
+          <Route path={DEFAULT_LANDING_ROUTE} element={<div>Landing</div>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -71,6 +72,6 @@ describe('LoginPage recovering from a stale CSRF cookie on submission', () => {
     });
 
     expect(screen.queryByText('Invalid email or password.')).toBeNull();
-    expect(screen.getByText('Articles')).toBeTruthy();
+    expect(screen.getByText('Landing')).toBeTruthy();
   });
 });
