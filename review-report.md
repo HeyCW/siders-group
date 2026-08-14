@@ -434,3 +434,198 @@ three genuinely unindexed predicates are cheap scans on small tables, so
 
 Round 1. No findings resolved yet — a Disposition column will be added on re-review once the
 branch has been updated, matching the round-2 format used for PR #7.
+
+---
+
+# Round 3 — implementation review
+
+**Verdict:** Approve with changes
+
+## Reviewed at
+| Range | Files | +/- | Date |
+|---|---|---|---|
+| `origin/main...HEAD` (PR #9, head `596e501`) | 22 | +1811 / -179 | 2026-08-14 |
+
+Rounds 1–2 above reviewed the `add-admin-dashboard` proposal while it was spec-only; commit
+`596e501` added the implementation, and that implementation is what this round reviews.
+
+## Summary
+
+Implements `GET /admin/dashboard` — six read-only aggregate tiles — across `packages/contracts`,
+a new `apps/api/src/modules/analytics` module, and a new `apps/admin` dashboard page that becomes
+the admin landing route.
+
+The backend is correct. Rather than reason about the SQL from the diff, I stood up PostgreSQL 16,
+applied all four migrations from `supabase/migrations/`, seeded fixtures targeting the spec's edge
+cases, and executed all six repository methods against it. Every query runs and returns
+spec-correct values — including the three constructs most likely to fail only at runtime: the
+correlated `NOT EXISTS` nested inside an aggregate `FILTER` clause, `count(*) OVER ()` paired with
+`LIMIT`, and the `date_trunc('week', … AT TIME ZONE 'Asia/Jakarta')` bucketing. Jakarta week
+boundaries were checked at the two instants that actually distinguish the implementations
+(`2026-08-09T17:00Z` = Monday 00:00 Jakarta, `2026-08-09T16:59Z` = Sunday 23:59 Jakarta); they
+landed in adjacent buckets, so the SQL bucketing and the JS `jakartaWeekStart`/`jakartaDateLabel`
+helpers agree. The 20-row due-soon cap was checked with 26 matching rows: 20 returned, total 26.
+
+`pnpm typecheck`, `pnpm lint`, and `pnpm test` (418 tests, 52 files) all pass. Module layering
+matches `article.repository.ts` and `curation.routes.ts`; the route is authorization-declared, so
+`auditAuthorizationDeclarations` accepts it at boot. No `any`, no dead code, no leftover debug
+output.
+
+No finding is Critical or Major — nothing here is a bug I could make fire. What drove
+"Approve with changes" is three Minor items: one factual claim in `tasks.md` that my own
+verification contradicts, and two UI defects that produce misleading output rather than wrong
+data.
+
+Standards used: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `openspec/changes/add-admin-dashboard/`
+(proposal, design, spec, tasks), and `file:line` precedent from the existing `articles`,
+`curation`, and `reels` modules. There is no `docs/adr/` and no `CONTRIBUTING.md`, so conventions
+findings cite precedent rather than a named rule.
+
+## Findings
+
+| # | Severity | Aspect(s) | File:line | Title |
+|---|---|---|---|---|
+| 1 | Minor | correctness, conventions | `apps/api/src/modules/analytics/analytics.repository.test.ts` | `tasks.md` 5.1's reason for skipping live-DB tests is not accurate |
+| 2 | Minor | correctness | `apps/admin/src/pages/DashboardPage.tsx:118` | Content-debt headline sums incommensurable units |
+| 3 | Minor | correctness | `apps/admin/src/pages/DashboardPage.tsx:57` | Due-soon times render in the viewer's timezone, not Jakarta |
+| 4 | Nit | performance | `apps/api/src/modules/analytics/analytics.repository.ts:144` | Cadence query has no upper bound |
+| 5 | Nit | hygiene | `.claude/launch.json` | Unrelated tooling file bundled into the change |
+
+## Details
+
+### 1 — `tasks.md` 5.1's reason for skipping live-DB tests is not accurate (Minor)
+
+The gap itself is disclosed, which is the right instinct. The justification is what does not hold.
+Task 5.1 states that seeded-fixture repository tests were *"never actually buildable here"*. That
+claim is false, and the disproof is cheap: `initdb` + the repo's own four migrations from
+`supabase/migrations/` + `getDb({ DATABASE_URL })` brought a working schema up in a few minutes,
+and all six repository methods ran against it unmodified.
+
+This matters because of what is currently unexercised. `analytics.repository.test.ts` covers the
+two pure date helpers only. Every `sql` fragment in the module — the four `count(*) filter (where …)`
+aggregates, the correlated `notExists`, `count(*) over ()`, and the Jakarta bucketing expression —
+executes for the first time in production. The service test's fake repository cannot catch a
+regression in any of them, because it replaces exactly the layer that holds the risk.
+
+The queries are correct **today** — I verified that directly. The finding is that nothing in CI
+would notice if they stopped being correct, and the recorded reason for accepting that risk does
+not survive contact with the evidence.
+
+Suggested fix: add `analytics.repository.integration.test.ts`, skipped unless a
+`TEST_DATABASE_URL` is set, so it is free locally and in CI until someone wires a Postgres service.
+Two cases carry most of the value: the Sunday-23:59-Jakarta vs Monday-00:00-Jakarta pair, and a
+26-row due-soon fixture asserting `dueWithin48h.length === 20 && dueWithin48hTotal === 26`.
+If the preference is to leave this to a follow-up change, correcting 5.1's wording is still worth
+doing — a future reader will otherwise take "not buildable" at face value.
+
+### 2 — Content-debt headline sums incommensurable units (Minor)
+
+```ts
+const contentDebtTotal =
+  data.contentDebt.missingSeoDescription +   // published articles
+  data.contentDebt.missingExcerpt +          // published articles
+  data.contentDebt.missingFeaturedImage +    // published articles
+  data.contentDebt.uncategorized +           // published articles
+  data.contentDebt.unusedTags;               // tags, all statuses
+```
+
+Two problems compound. The first four are per-article counts over the same population, so a single
+article missing all four fields contributes **4** to the headline. The fifth counts tags across
+articles of any status — a different table and a different scope, by design
+(`spec.md` — *"across all tags regardless of article status"*).
+
+The result is not a count of anything. On my fixture it rendered **8** against 3 published
+articles and 2 tags. The spec's "Content debt counts" requirement defines five separate counts and
+no total; this aggregate is a UI invention, and it is the largest number on the tile.
+
+Suggested fix: drop the headline and let the five itemized rows stand — they are already
+individually actionable, which the sum is not. If a single number is wanted for scanning, count
+distinct articles carrying at least one debt signal and label it "articles needing attention",
+leaving `unusedTags` out of it. That needs a new repository field, so it is a spec change, not a
+UI edit.
+
+### 3 — Due-soon times render in the viewer's timezone, not Jakarta (Minor)
+
+```ts
+return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+```
+
+`undefined` locale plus no `timeZone` resolves to the browser's zone. Every other time-bearing
+value on this board is pinned to Asia/Jakarta — the cadence bucket labels are Jakarta calendar
+dates produced in SQL, and `design.md`'s "Timezone: Asia/Jakarta, pinned now" decision is what
+`jakartaWeekStart` exists to honour. An editor outside UTC+7 therefore reads Jakarta-bucketed week
+labels directly above publish times in their own zone, with nothing on screen distinguishing them.
+For a tile whose entire job is "is this going out when I think it is", that is the wrong failure
+mode.
+
+This is the first date formatter in `apps/admin` — `grep` for `toLocaleString` across
+`apps/admin/src` and `apps/web/` returns only this line — so it sets the precedent rather than
+following one.
+
+Suggested fix:
+
+```ts
+return new Date(iso).toLocaleString(undefined, {
+  month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  timeZone: 'Asia/Jakarta',
+});
+```
+
+and label the tile or column "WIB" so the pinning is visible rather than merely correct.
+
+### 4 — Cadence query has no upper bound (Nit)
+
+```ts
+.where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff)))
+```
+
+Bounded below by `cutoff`, unbounded above. A `published` row dated beyond the current Jakarta week
+is scanned, bucketed by `to_char(...)`, and then silently discarded, because
+`countByWeek.get(label)` finds no matching bucket. I confirmed the behaviour by inserting a
+published article dated three weeks ahead: output stayed correct, the row was fetched for nothing.
+
+Output is right either way, so this is a Nit. Adding the upper bound turns
+`articles_status_published_at_idx` into a bounded range scan and makes "eight weeks, ending with
+the current one" legible in the query rather than only in the loop below it:
+
+```ts
+const nextWeekStart = new Date(currentWeekStart.getTime() + WEEK_MS);
+// … and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff), lt(articles.publishedAt, nextWeekStart))
+```
+
+### 5 — Unrelated tooling file bundled into the change (Nit)
+
+`.claude/launch.json` configures a `pnpm --filter @siders/admin dev` launch. It is not referenced
+by `proposal.md`, `design.md`, `tasks.md`, or the spec, and has nothing to do with the dashboard
+capability. Not harmful — just noise in the diff of a change whose artifacts otherwise account for
+every file they touch. Worth splitting out, or adding a line to `tasks.md` so it is accounted for.
+
+## Rule check
+
+| Rule | Source | Complies |
+|---|---|---|
+| TypeScript strict, no `any` | `CLAUDE.md` — Coding Standards | Yes — no `any` in the change; the one narrowing in `getUpNext` uses a documented type predicate |
+| Typed `AppError`, formatted once in `errorHandler` | `CLAUDE.md` — API | Yes — the controller delegates to `next(err)` and adds no local formatting |
+| Consistent JSON envelope | `CLAUDE.md` — API | Yes — `{ success: true, data }`, matching `articles`/`curation`/`reels` |
+| Composition over inheritance, small focused functions | `CLAUDE.md` — Coding Standards | Yes — factory functions throughout, matching the sibling modules |
+| No duplicated logic | `CLAUDE.md` — Coding Standards | Yes — `isPubliclyVisible` / `isReelPubliclyVisible` are imported, not re-derived in SQL, per `design.md` |
+| Controller → service → repository layering | precedent: `curation.routes.ts:19-29` | Yes — the mapper is the only added layer, matching `article.mapper.ts` |
+| UUID PKs, migrations | `CLAUDE.md` — Database | N/A — read-only change, no schema delta |
+| Lazy-load large features | `CLAUDE.md` — Frontend | Yes — `DashboardPage` is eager, but it is the landing route with no editor dependency; the rationale is recorded at `DashboardPage.tsx:24-28` |
+| Every route declares authorization | `specs/authorization/spec.md` | Yes — `requirePermission('dashboard.view')`; `health.routes.test.ts`'s boot test passes with the route mounted |
+| No new permission catalog entry | `specs/admin-dashboard/spec.md` | Yes — `dashboard.view` already exists at `packages/contracts/src/permission.ts:10` and `supabase/migrations/0000_useful_red_shift.sql:120` |
+| Build, lint, tests, no TS errors before completion | `CLAUDE.md` — Testing | Yes — `pnpm typecheck`, `pnpm lint`, `pnpm test` (418 passing) all clean |
+
+## Verification performed
+
+Not inferred from the diff — executed:
+
+- PostgreSQL 16 cluster, all four `supabase/migrations/*.sql` applied clean.
+- Fixtures covering: blank-vs-null `excerpt`/`seo_description`; a published article on each side of
+  the Jakarta week boundary; a draft-only tag association; a reader with `last_login_at IS NULL`;
+  a curated-but-not-visible article; an `unavailable` curated reel.
+- All six `AnalyticsRepository` methods executed against it. Results matched the spec on every
+  tile — content debt `{1,2,2,2,1}`, curation `home 1/2, reels 1/2`, readers `newLast7d 1,
+  activeLast30d 2` (correctly excluding the null-login reader), cadence bucketed to
+  `2026-08-03` / `2026-08-10` across the Sunday/Monday Jakarta boundary.
+- Due-soon cap re-run with 26 matching rows: 20 returned, `dueWithin48hTotal` 26.
