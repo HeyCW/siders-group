@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Siders Broadsheet global resets (Claude Design export, `Siders Broadsheet.dc.html`). */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #f7f6f2;
+  }
+
+  a {
+    color: #141414;
+    text-decoration: none;
+  }
+
+  a:hover {
+    background: #ffd100;
+  }
+
+  ::selection {
+    background: #ffd100;
+    color: #141414;
+  }
+
+  input,
+  textarea,
+  button {
+    font-family: var(--font-serif), Georgia, serif;
+  }
+}
+
+/* `::first-letter` only reaches a block-level descendant when applied directly to it, so this
+   targets the article body's first paragraph specifically — a Tailwind `first-letter:` utility
+   on the wrapping div would not reach inside a nested `<p>`. */
+.article-body > p:first-of-type::first-letter {
+  float: left;
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 0.82;
+  padding-right: 8px;
+}
+
+/* Hides the scrollbar on horizontally-scrolling rails (the Reels rail) while keeping the
+   element scrollable — the design treats the rail as swipeable, not as a visible scroll list. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
