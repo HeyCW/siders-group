@@ -183,4 +183,59 @@ describe('AuthService', () => {
     expect(fake.rows.get(spared.sessionId)?.revokedAt).toBeNull();
     expect(fake.rows.get(other.sessionId)?.revokedAt).not.toBeNull();
   });
+
+  /**
+   * Backs `GET /auth/csrf` (design.md - "This is explicitly not a refresh"): a read-only
+   * lookup that must never rotate the credential, create a session, or revive one that is
+   * gone — unlike `refresh()`, which mutates on every call.
+   */
+  describe('resolveSessionForCsrfBootstrap', () => {
+    it('resolves the session for a valid, unrevoked, unexpired refresh credential without mutating it', async () => {
+      const started = await service.startSession('staff-1', 'staff', {});
+
+      const sessionId = await service.resolveSessionForCsrfBootstrap(started.refreshToken);
+
+      expect(sessionId).toBe(started.sessionId);
+      const row = fake.rows.get(started.sessionId);
+      expect(row?.revokedAt).toBeNull();
+      expect(fake.rows.size).toBe(1); // no new row created
+    });
+
+    it('resolves nothing for an unknown refresh credential', async () => {
+      await expect(service.resolveSessionForCsrfBootstrap('unknown-token')).resolves.toBeNull();
+    });
+
+    it('resolves nothing for a revoked refresh credential', async () => {
+      const started = await service.startSession('staff-1', 'staff', {});
+      await service.logout(started.refreshToken);
+
+      await expect(service.resolveSessionForCsrfBootstrap(started.refreshToken)).resolves.toBeNull();
+    });
+
+    it('resolves nothing for an expired refresh credential', async () => {
+      const started = await service.startSession('staff-1', 'staff', {});
+      const row = fake.rows.get(started.sessionId);
+      if (row) row.expiresAt = new Date(Date.now() - 1000);
+
+      await expect(service.resolveSessionForCsrfBootstrap(started.refreshToken)).resolves.toBeNull();
+    });
+
+    it('resolves nothing once a credential is past its absolute lifetime', async () => {
+      const started = await service.startSession('staff-1', 'staff', {});
+      const row = fake.rows.get(started.sessionId);
+      if (row) row.absoluteExpiresAt = new Date(Date.now() - 1000);
+
+      await expect(service.resolveSessionForCsrfBootstrap(started.refreshToken)).resolves.toBeNull();
+    });
+
+    it('does not rotate the credential, unlike refresh() — the same raw token still resolves afterward', async () => {
+      const started = await service.startSession('staff-1', 'staff', {});
+
+      await service.resolveSessionForCsrfBootstrap(started.refreshToken);
+      const secondCall = await service.resolveSessionForCsrfBootstrap(started.refreshToken);
+
+      expect(secondCall).toBe(started.sessionId);
+      expect(fake.rows.size).toBe(1);
+    });
+  });
 });

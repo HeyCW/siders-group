@@ -10,6 +10,10 @@ import { getOwnerRoleId } from '../lib/ownerRole.js';
 export interface StaffRoleContext {
   roleId: string;
   isOwner: boolean;
+  /** The caller's currently effective permission keys — for `GET /users/me` to report back to
+   *  the client for rendering only (specs/authorization/spec.md - "A staff member's own
+   *  effective permissions and Owner status are readable"). Never itself a grant. */
+  permissionKeys: string[];
 }
 
 declare module 'express-serve-static-core' {
@@ -194,7 +198,7 @@ export function requireStaff(options: RequireStaffOptions = {}) {
         throw passwordChangeRequiredError();
       }
       const ownerRoleId = await getOwnerRoleId(db());
-      req.staffRole = { roleId: access.roleId, isOwner: access.roleId === ownerRoleId };
+      req.staffRole = { roleId: access.roleId, isOwner: access.roleId === ownerRoleId, permissionKeys: access.permissionKeys };
       next();
     } catch (err) {
       next(err);
@@ -230,7 +234,7 @@ export function requirePermission(key: PermissionKey) {
       if (!isOwner && !access.permissionKeys.includes(key)) {
         throw new AppError('Insufficient permission', 403, 'forbidden');
       }
-      req.staffRole = { roleId: access.roleId, isOwner };
+      req.staffRole = { roleId: access.roleId, isOwner, permissionKeys: access.permissionKeys };
       next();
     } catch (err) {
       next(err);

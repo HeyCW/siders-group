@@ -19,7 +19,7 @@ import {
 import { resolveRedirectTarget } from '../../lib/redirect.js';
 import { sessionMetaFromRequest } from '../../lib/sessionMeta.js';
 import { setCsrfCookie } from '../../lib/csrf.js';
-import { setSessionCookies, sharedCookieOptions } from '../../lib/cookies.js';
+import { REFRESH_TOKEN_MAX_AGE_MS, setSessionCookies, sharedCookieOptions } from '../../lib/cookies.js';
 import { createAuthService } from './auth.service.js';
 import { createSessionRepository } from './session.repository.js';
 import { createReaderRepository } from './reader.repository.js';
@@ -111,7 +111,7 @@ export function googleAuthRoutes(db: Database, env: Env) {
 
         const issued = await authService.startSession(reader.id, 'reader', sessionMetaFromRequest(req, env));
         setSessionCookies(res, issued, env);
-        setCsrfCookie(res, issued.csrfToken, sharedCookieOptions(env));
+        setCsrfCookie(res, issued.csrfToken, { ...sharedCookieOptions(env), maxAge: REFRESH_TOKEN_MAX_AGE_MS });
 
         res.redirect(resolveRedirectTarget(bound.next, env));
       } catch (err) {
