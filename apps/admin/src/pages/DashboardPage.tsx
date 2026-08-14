@@ -54,8 +54,16 @@ function CadenceChart({ buckets }: { buckets: DashboardCadenceBucket[] }) {
   );
 }
 
+/** Pinned to Asia/Jakarta, matching every other time-bearing value on this board — the caller's
+ *  local timezone would otherwise silently disagree with the Jakarta-bucketed cadence tile. */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  });
 }
 
 /**
@@ -115,13 +123,6 @@ export function DashboardPage() {
     );
   }
 
-  const contentDebtTotal =
-    data.contentDebt.missingSeoDescription +
-    data.contentDebt.missingExcerpt +
-    data.contentDebt.missingFeaturedImage +
-    data.contentDebt.uncategorized +
-    data.contentDebt.unusedTags;
-
   const readersHasHistory = data.readers.newLast7d > 0 || data.readers.activeLast30d > 0;
 
   return (
@@ -142,7 +143,6 @@ export function DashboardPage() {
         </Tile>
 
         <Tile title="Content debt">
-          <p className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">{contentDebtTotal}</p>
           <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
             <li className="flex justify-between">
               <span>Missing SEO description</span>
@@ -184,7 +184,7 @@ export function DashboardPage() {
           </div>
         </Tile>
 
-        <Tile title="Up next">
+        <Tile title="Up next (times in WIB)">
           {data.upNext.overdueUnpromotedCount > 0 && (
             <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
               {data.upNext.overdueUnpromotedCount} scheduled article

@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gte, isNull, lte, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, isNull, lt, lte, notExists, or, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
   articles,
@@ -131,6 +131,9 @@ export function createAnalyticsRepository(db: Database): AnalyticsRepository {
       // Oldest of the 8 buckets: the current week plus the 7 complete weeks before it
       // (spec.md - "Publishing cadence").
       const cutoff = new Date(currentWeekStart.getTime() - (DASHBOARD_CADENCE_WEEKS - 1) * WEEK_MS);
+      // End of the newest bucket: the current Jakarta week hasn't finished, but nothing published
+      // after it belongs in any of the 8 buckets, so the range is bounded on both sides.
+      const nextWeekStart = new Date(currentWeekStart.getTime() + WEEK_MS);
 
       // Filtered on the bare `published_at` column, not a wrapped expression, so
       // `articles_status_published_at_idx` stays usable (design.md - "Risks / Trade-offs";
@@ -141,7 +144,7 @@ export function createAnalyticsRepository(db: Database): AnalyticsRepository {
       const rows = await db
         .select({ weekStart: bucketExpr, count: count() })
         .from(articles)
-        .where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff)))
+        .where(and(eq(articles.status, 'published'), gte(articles.publishedAt, cutoff), lt(articles.publishedAt, nextWeekStart)))
         .groupBy(bucketExpr);
 
       const countByWeek = new Map(rows.map((row) => [row.weekStart, row.count]));
