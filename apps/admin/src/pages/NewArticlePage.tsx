@@ -33,12 +33,12 @@ export function NewArticlePage() {
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-center">
+      <div className="siders-scope flex h-full min-h-full items-center justify-center bg-[var(--paper)] p-8 text-center text-[var(--ink)]">
         <div>
           <p className="text-red-600 dark:text-red-400">{error}</p>
           <button
             type="button"
-            className="mt-4 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600"
+            className="mt-4 rounded-md border border-[var(--rule)] px-3 py-1.5 text-sm transition-colors hover:border-[var(--ink)]/30"
             onClick={() => navigate('/articles')}
           >
             Back to articles
@@ -48,5 +48,9 @@ export function NewArticlePage() {
     );
   }
 
-  return <div className="p-8 text-center text-gray-500 dark:text-gray-400">Creating draft…</div>;
+  return (
+    <div className="siders-scope flex h-full min-h-full items-center justify-center bg-[var(--paper)] p-8 text-center">
+      <p className="font-mono text-sm text-[var(--muted)]">Creating draft…</p>
+    </div>
+  );
 }

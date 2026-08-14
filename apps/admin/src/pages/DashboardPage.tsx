@@ -5,8 +5,8 @@ import { dashboardApi } from '../lib/dashboardApi.js';
 
 function Tile({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-md border border-gray-200 p-4 dark:border-gray-700">
-      <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200">{title}</h2>
+    <section className="rounded-lg border border-[var(--rule)] p-4">
+      <h2 className="mb-3 font-mono text-[10px] uppercase tracking-widest text-[var(--muted)]">{title}</h2>
       {children}
     </section>
   );
@@ -15,8 +15,8 @@ function Tile({ title, children }: { title: string; children: React.ReactNode })
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="font-display text-2xl">{value}</p>
+      <p className="font-mono text-xs text-[var(--muted)]">{label}</p>
     </div>
   );
 }
@@ -29,7 +29,7 @@ function Stat({ label, value }: { label: string; value: number }) {
 function CadenceChart({ buckets }: { buckets: DashboardCadenceBucket[] }) {
   const allZero = buckets.every((bucket) => bucket.count === 0);
   if (allZero) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">No articles published in this window yet.</p>;
+    return <p className="text-sm text-[var(--muted)]">No articles published in this window yet.</p>;
   }
 
   const max = Math.max(...buckets.map((bucket) => bucket.count), 1);
@@ -41,12 +41,12 @@ function CadenceChart({ buckets }: { buckets: DashboardCadenceBucket[] }) {
           <div key={bucket.weekStart} className="flex flex-1 flex-col items-center gap-1">
             <div className="flex h-full w-full items-end">
               <div
-                className={`w-full rounded-t ${isCurrentWeek ? 'bg-blue-300 dark:bg-blue-800' : 'bg-blue-600 dark:bg-blue-500'}`}
+                className={`w-full rounded-t ${isCurrentWeek ? 'bg-[var(--signal)]/40' : 'bg-[var(--signal)]'}`}
                 style={{ height: `${(bucket.count / max) * 100}%`, minHeight: bucket.count > 0 ? '2px' : '0' }}
                 title={`${bucket.weekStart}: ${bucket.count}${isCurrentWeek ? ' (partial week)' : ''}`}
               />
             </div>
-            <span className="text-[10px] text-gray-400">{bucket.weekStart.slice(5)}</span>
+            <span className="font-mono text-[10px] text-[var(--muted)]">{bucket.weekStart.slice(5)}</span>
           </div>
         );
       })}
@@ -95,8 +95,10 @@ export function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <p className="text-gray-500 dark:text-gray-400">Loading…</p>
+      <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
+        <div className="mx-auto max-w-5xl p-6">
+          <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>
+        </div>
       </div>
     );
   }
@@ -107,18 +109,24 @@ export function DashboardPage() {
   // exists. This message is the mitigation this change is scoped to provide.
   if (forbidden) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          You don&apos;t have permission to view the dashboard.
-        </p>
+      <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
+        <div className="mx-auto max-w-5xl p-6">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            You don&apos;t have permission to view the dashboard.
+          </p>
+        </div>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
-        <p className="text-red-600 dark:text-red-400">{error ?? 'Could not load the dashboard'}</p>
+      <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
+        <div className="mx-auto max-w-5xl p-6">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            {error ?? 'Could not load the dashboard'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -126,99 +134,104 @@ export function DashboardPage() {
   const readersHasHistory = data.readers.newLast7d > 0 || data.readers.activeLast30d > 0;
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+    <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
+      <div className="mx-auto max-w-5xl p-6">
+        <div className="mb-6">
+          <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Newsroom overview</p>
+          <h1 className="font-display text-3xl">Dashboard</h1>
+        </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Tile title="Pipeline">
-          <div className="flex gap-6">
-            <Stat label="Draft" value={data.pipeline.draft} />
-            <Stat label="Scheduled" value={data.pipeline.scheduled} />
-            <Stat label="Published" value={data.pipeline.published} />
-          </div>
-        </Tile>
-
-        <Tile title="Publishing cadence (last 8 weeks)">
-          <CadenceChart buckets={data.cadence} />
-        </Tile>
-
-        <Tile title="Content debt">
-          <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-            <li className="flex justify-between">
-              <span>Missing SEO description</span>
-              <span>{data.contentDebt.missingSeoDescription}</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Missing excerpt</span>
-              <span>{data.contentDebt.missingExcerpt}</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Missing featured image</span>
-              <span>{data.contentDebt.missingFeaturedImage}</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Uncategorized</span>
-              <span>{data.contentDebt.uncategorized}</span>
-            </li>
-            <li className="flex justify-between">
-              <span>Unused tags</span>
-              <span>{data.contentDebt.unusedTags}</span>
-            </li>
-          </ul>
-        </Tile>
-
-        <Tile title="Homepage & reels integrity">
-          <div className="flex gap-6">
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {data.curationIntegrity.home.visible} / {data.curationIntegrity.home.total}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Homepage curation visible</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {data.curationIntegrity.reels.visible} / {data.curationIntegrity.reels.total}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Reels curation visible</p>
-            </div>
-          </div>
-        </Tile>
-
-        <Tile title="Up next (times in WIB)">
-          {data.upNext.overdueUnpromotedCount > 0 && (
-            <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              {data.upNext.overdueUnpromotedCount} scheduled article
-              {data.upNext.overdueUnpromotedCount === 1 ? ' is' : 's are'} past due — check the publish worker.
-            </p>
-          )}
-          {data.upNext.dueWithin48h.length === 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Nothing scheduled in the next 48 hours.</p>
-          )}
-          <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-            {data.upNext.dueWithin48h.map((article) => (
-              <li key={article.id} className="py-2">
-                <p className="truncate text-sm text-gray-900 dark:text-white">{article.title}</p>
-                <p className="text-xs text-gray-400">{formatDate(article.publishedAt)}</p>
-              </li>
-            ))}
-          </ul>
-          {data.upNext.dueWithin48hTotal > data.upNext.dueWithin48h.length && (
-            <p className="mt-2 text-xs text-gray-400">
-              …and {data.upNext.dueWithin48hTotal - data.upNext.dueWithin48h.length} more
-            </p>
-          )}
-        </Tile>
-
-        <Tile title="Readers">
-          {readersHasHistory ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Tile title="Pipeline">
             <div className="flex gap-6">
-              <Stat label="New sign-ups (7d)" value={data.readers.newLast7d} />
-              <Stat label="Signed in (30d)" value={data.readers.activeLast30d} />
+              <Stat label="Draft" value={data.pipeline.draft} />
+              <Stat label="Scheduled" value={data.pipeline.scheduled} />
+              <Stat label="Published" value={data.pipeline.published} />
             </div>
-          ) : (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No reader sign-in activity yet.</p>
-          )}
-        </Tile>
+          </Tile>
+
+          <Tile title="Publishing cadence (last 8 weeks)">
+            <CadenceChart buckets={data.cadence} />
+          </Tile>
+
+          <Tile title="Content debt">
+            <ul className="space-y-1 text-sm text-[var(--ink)]">
+              <li className="flex justify-between">
+                <span>Missing SEO description</span>
+                <span className="font-mono text-[var(--muted)]">{data.contentDebt.missingSeoDescription}</span>
+              </li>
+              <li className="flex justify-between">
+                <span>Missing excerpt</span>
+                <span className="font-mono text-[var(--muted)]">{data.contentDebt.missingExcerpt}</span>
+              </li>
+              <li className="flex justify-between">
+                <span>Missing featured image</span>
+                <span className="font-mono text-[var(--muted)]">{data.contentDebt.missingFeaturedImage}</span>
+              </li>
+              <li className="flex justify-between">
+                <span>Uncategorized</span>
+                <span className="font-mono text-[var(--muted)]">{data.contentDebt.uncategorized}</span>
+              </li>
+              <li className="flex justify-between">
+                <span>Unused tags</span>
+                <span className="font-mono text-[var(--muted)]">{data.contentDebt.unusedTags}</span>
+              </li>
+            </ul>
+          </Tile>
+
+          <Tile title="Homepage & reels integrity">
+            <div className="flex gap-6">
+              <div>
+                <p className="font-display text-2xl">
+                  {data.curationIntegrity.home.visible} / {data.curationIntegrity.home.total}
+                </p>
+                <p className="font-mono text-xs text-[var(--muted)]">Homepage curation visible</p>
+              </div>
+              <div>
+                <p className="font-display text-2xl">
+                  {data.curationIntegrity.reels.visible} / {data.curationIntegrity.reels.total}
+                </p>
+                <p className="font-mono text-xs text-[var(--muted)]">Reels curation visible</p>
+              </div>
+            </div>
+          </Tile>
+
+          <Tile title="Up next (times in WIB)">
+            {data.upNext.overdueUnpromotedCount > 0 && (
+              <p className="mb-3 rounded-md bg-amber-500/15 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                {data.upNext.overdueUnpromotedCount} scheduled article
+                {data.upNext.overdueUnpromotedCount === 1 ? ' is' : 's are'} past due — check the publish worker.
+              </p>
+            )}
+            {data.upNext.dueWithin48h.length === 0 && (
+              <p className="text-sm text-[var(--muted)]">Nothing scheduled in the next 48 hours.</p>
+            )}
+            <ul className="divide-y divide-[var(--rule)]">
+              {data.upNext.dueWithin48h.map((article) => (
+                <li key={article.id} className="py-2">
+                  <p className="truncate text-sm text-[var(--ink)]">{article.title}</p>
+                  <p className="font-mono text-xs text-[var(--muted)]">{formatDate(article.publishedAt)}</p>
+                </li>
+              ))}
+            </ul>
+            {data.upNext.dueWithin48hTotal > data.upNext.dueWithin48h.length && (
+              <p className="mt-2 font-mono text-xs text-[var(--muted)]">
+                …and {data.upNext.dueWithin48hTotal - data.upNext.dueWithin48h.length} more
+              </p>
+            )}
+          </Tile>
+
+          <Tile title="Readers">
+            {readersHasHistory ? (
+              <div className="flex gap-6">
+                <Stat label="New sign-ups (7d)" value={data.readers.newLast7d} />
+                <Stat label="Signed in (30d)" value={data.readers.activeLast30d} />
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">No reader sign-in activity yet.</p>
+            )}
+          </Tile>
+        </div>
       </div>
     </div>
   );

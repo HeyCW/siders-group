@@ -9,19 +9,19 @@ import type { ArticlePublicDetail } from '@siders/contracts';
 export function PreviewModal({ article, onClose }: { article: ArticlePublicDetail; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12">
-      <div className="w-full max-w-3xl rounded-lg bg-white shadow-xl dark:bg-gray-900">
-        <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
-          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Preview</span>
+      <div className="siders-scope w-full max-w-3xl rounded-lg bg-[var(--paper)] text-[var(--ink)] shadow-xl">
+        <div className="flex items-center justify-between border-b border-[var(--rule)] p-4">
+          <span className="font-mono text-xs uppercase tracking-wide text-[var(--muted)]">Preview</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="rounded-md px-2 py-1 text-sm text-[var(--muted)] hover:bg-[var(--ink)]/5 hover:text-[var(--ink)]"
           >
             Close
           </button>
         </div>
         <article className="prose dark:prose-invert max-w-none p-8">
-          <h1>{article.title}</h1>
+          <h1 className="font-['Fraunces']">{article.title}</h1>
           {article.featuredImageUrl && (
             <img src={article.featuredImageUrl} alt={article.title} className="w-full rounded-lg" />
           )}
