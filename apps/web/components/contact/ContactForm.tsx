@@ -102,7 +102,7 @@ export function ContactForm() {
             Sending isn&rsquo;t wired up yet — email{' '}
             <a
               href={`mailto:${CONTACT_INFO.emails[0]}`}
-              className="text-ink underline hover:bg-signal"
+              className="mark-hover text-ink underline"
             >
               {CONTACT_INFO.emails[0]}
             </a>{' '}
@@ -111,7 +111,7 @@ export function ContactForm() {
         ) : (
           <button
             type="submit"
-            className="inline-block bg-ink px-[22px] py-3.5 font-sans text-[11px] font-bold uppercase tracking-widest text-paper hover:bg-black hover:text-signal"
+            className="inline-block bg-ink px-[22px] py-3.5 font-sans text-[11px] font-bold uppercase tracking-widest text-paper transition-colors duration-hover ease-hover hover:bg-black hover:text-signal focus-visible:bg-black focus-visible:text-signal"
           >
             Send message
           </button>

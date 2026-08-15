@@ -60,7 +60,7 @@ export function ReelsRail({ reels }: { reels: PublicReelItem[] }) {
           <button
             type="button"
             onClick={() => setActive(null)}
-            className="absolute right-5 top-5 border border-paper px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest text-paper hover:bg-signal hover:text-ink"
+            className="absolute right-5 top-5 border border-paper px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest text-paper transition-colors duration-hover ease-hover hover:bg-paper hover:text-ink focus-visible:bg-paper focus-visible:text-ink"
           >
             Close ×
           </button>

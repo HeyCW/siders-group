@@ -81,7 +81,7 @@ export default function ContactPage() {
                   <a
                     key={brand.name}
                     href="#"
-                    className="border border-ink px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest hover:bg-signal"
+                    className="border border-ink px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper"
                   >
                     {brand.name}
                   </a>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 const linkClass =
-  'border border-ink px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest hover:bg-signal';
+  'border border-ink px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper';
 
 /**
  * Real, working share actions — no backend required for any of these, unlike the counts in

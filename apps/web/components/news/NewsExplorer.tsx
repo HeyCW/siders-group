@@ -137,7 +137,7 @@ export function NewsExplorer({
 
         <button
           type="button"
-          className="ml-auto inline-flex items-center gap-2 whitespace-nowrap border border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest hover:bg-signal"
+          className="ml-auto inline-flex items-center gap-2 whitespace-nowrap border border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper"
         >
           Urutkan: Terbaru ⇅
         </button>
@@ -148,7 +148,7 @@ export function NewsExplorer({
           <button
             type="button"
             onClick={() => selectCategory(null)}
-            className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest hover:bg-ink hover:text-signal"
+            className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-signal focus-visible:bg-ink focus-visible:text-signal"
           >
             Kategori{' '}
             <span className="font-serif font-bold normal-case tracking-normal">
@@ -211,7 +211,7 @@ export function NewsExplorer({
             type="button"
             disabled={loadingMore}
             onClick={loadMore}
-            className="border-2 border-ink px-7 py-3.5 font-sans text-[11px] font-bold uppercase tracking-widest hover:bg-signal disabled:opacity-50"
+            className="border-2 border-ink px-7 py-3.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper disabled:opacity-50"
           >
             {loadingMore ? 'Loading…' : 'Load more'}
           </button>

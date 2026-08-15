@@ -1,12 +1,13 @@
 import { SectionHeading } from '../layout/SectionHeading';
 import { MediaSlot } from '../ui/MediaSlot';
+import { Reveal } from '../ui/Reveal';
 import { EDITION, GUIDE_OF_THE_WEEK } from '../../lib/content';
 
 export function GuideOfWeek() {
   return (
     <div className="pt-[clamp(32px,5vw,64px)]">
       <SectionHeading title="Siders Guide of the Week" trailing={EDITION} />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
+      <Reveal delayMs={90} className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
         {GUIDE_OF_THE_WEEK.map((pick, i) => (
           <div
             key={pick.place}
@@ -31,7 +32,7 @@ export function GuideOfWeek() {
             <p className="mt-3 text-[13px] leading-[1.65]">{pick.description}</p>
           </div>
         ))}
-      </div>
+      </Reveal>
     </div>
   );
 }

@@ -19,7 +19,11 @@ export function NavLinks({ className = '' }: { className?: string }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`px-2 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest ${active ? 'bg-signal' : 'bg-transparent'}`}
+            className={`relative px-2 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest ${
+              active
+                ? 'bg-signal'
+                : 'bg-transparent after:absolute after:inset-x-2 after:-bottom-px after:h-[2px] after:origin-left after:scale-x-0 after:bg-signal after:transition-transform after:duration-hover after:ease-hover after:content-[""] hover:after:scale-x-100 focus-visible:after:scale-x-100'
+            }`}
           >
             {item.label}
           </Link>

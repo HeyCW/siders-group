@@ -32,9 +32,9 @@ export function SiteFooter() {
             <Link
               key={item.href}
               href={item.href}
-              className="block border-b border-rule py-2.5 text-sm hover:bg-signal"
+              className="group block border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
             >
-              {item.label}
+              <span className="mark-group">{item.label}</span>
             </Link>
           ))}
         </div>
@@ -47,9 +47,9 @@ export function SiteFooter() {
             <Link
               key={brand.name}
               href="/news"
-              className="flex justify-between gap-3 border-b border-rule py-2.5 text-sm hover:bg-signal"
+              className="group flex justify-between gap-3 border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
             >
-              {brand.name} <span className="text-muted">↗</span>
+              <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
             </Link>
           ))}
         </div>
@@ -67,9 +67,9 @@ export function SiteFooter() {
           </div>
           <a
             href={`mailto:${CONTACT_INFO.emails[0]}`}
-            className="block border-b border-rule py-2.5 text-sm hover:bg-signal"
+            className="group block border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
           >
-            {CONTACT_INFO.emails[0]}
+            <span className="mark-group">{CONTACT_INFO.emails[0]}</span>
           </a>
           <div className="border-b border-rule py-2.5 text-sm">{CONTACT_INFO.whatsapp}</div>
           <div className="flex flex-wrap gap-2 pt-3.5">
@@ -77,7 +77,7 @@ export function SiteFooter() {
               <a
                 key={social}
                 href="#"
-                className="border-b-2 border-ink pb-0.5 font-sans text-[11px] font-bold uppercase tracking-widest hover:bg-signal"
+                className="mark-hover border-b-2 border-ink pb-0.5 font-sans text-[11px] font-bold uppercase tracking-widest"
               >
                 {social}
               </a>

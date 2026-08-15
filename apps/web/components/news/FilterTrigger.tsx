@@ -51,12 +51,12 @@ export function FilterOption({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 border-b border-rule py-2 text-left text-[13px] hover:bg-signal"
+      className="group flex w-full items-center gap-2.5 border-b border-rule py-2 text-left text-[13px] transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
     >
       <span
         className={`h-3 w-3 flex-none border border-ink ${selected ? 'bg-ink' : 'bg-transparent'}`}
       />
-      {label}
+      <span className="mark-group">{label}</span>
     </button>
   );
 }

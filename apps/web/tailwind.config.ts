@@ -27,6 +27,12 @@ export default {
       borderRadius: {
         DEFAULT: '2px',
       },
+      transitionDuration: {
+        hover: '120ms',
+      },
+      transitionTimingFunction: {
+        hover: 'cubic-bezier(0,0,.2,1)',
+      },
       keyframes: {
         ruledraw: {
           from: { transform: 'scaleX(0)' },
@@ -36,10 +42,15 @@ export default {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        riseIn: {
+          from: { opacity: '0', transform: 'translateY(14px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         ruledraw: 'ruledraw 240ms cubic-bezier(.22,1,.36,1) both',
         inkfade: 'inkfade 160ms ease-out both',
+        riseIn: 'riseIn 560ms cubic-bezier(.22,1,.36,1) both',
       },
     },
   },
