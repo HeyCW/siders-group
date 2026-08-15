@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Siders Broadsheet global resets (Claude Design export, `Siders Broadsheet.dc.html`). */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #f7f6f2;
+  }
+
+  a {
+    color: #141414;
+    text-decoration: none;
+  }
+
+  ::selection {
+    background: #ffd100;
+    color: #141414;
+  }
+
+  input,
+  textarea,
+  button {
+    font-family: var(--font-serif), Georgia, serif;
+  }
+}
+
+/* Highlighter-style hover for inline text links: a yellow mark confined to the text's lower
+   portion (like a real highlighter over a baseline), growing from the left on hover/focus rather
+   than flooding the whole link with fill. Reserved for links that sit inside running copy. */
+@layer components {
+  .mark-hover {
+    background-image: linear-gradient(#ffd100, #ffd100);
+    background-repeat: no-repeat;
+    background-position: 0 88%;
+    background-size: 0% 40%;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    transition: background-size 120ms cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  .mark-hover:hover,
+  .mark-hover:focus-visible {
+    background-size: 100% 40%;
+  }
+
+  /* Same mark, triggered by hovering/focusing an ancestor `.group` (a card or row) rather than
+     the marked text itself — so the highlight reads as feedback for the whole hit target.
+     `box-decoration-break: clone` gives each wrapped line its own copy of the mark, so a
+     two-line headline gets a highlight under each line instead of one rectangle spanning both. */
+  .mark-group {
+    display: inline;
+    background-image: linear-gradient(#ffd100, #ffd100);
+    background-repeat: no-repeat;
+    background-position: 0 88%;
+    background-size: 0% 40%;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    transition: background-size 120ms cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  .group:hover .mark-group,
+  .group:focus-visible .mark-group {
+    background-size: 100% 40%;
+  }
+}
+
+/* `::first-letter` only reaches a block-level descendant when applied directly to it, so this
+   targets the article body's first paragraph specifically — a Tailwind `first-letter:` utility
+   on the wrapping div would not reach inside a nested `<p>`. */
+.article-body > p:first-of-type::first-letter {
+  float: left;
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 0.82;
+  padding-right: 8px;
+}
+
+/* Hides the scrollbar on horizontally-scrolling rails (the Reels rail) while keeping the
+   element scrollable — the design treats the rail as swipeable, not as a visible scroll list. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

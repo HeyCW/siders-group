@@ -44,5 +44,22 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Start mock API (apps/web's `/` needs a reachable API to statically render at build time)
+        run: |
+          node apps/web/scripts/ci-mock-api.mjs &
+          echo $! > /tmp/ci-mock-api.pid
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:4310/home > /dev/null && exit 0
+            sleep 0.5
+          done
+          echo "mock API never came up" >&2
+          exit 1
+
       - name: Build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4310
         run: pnpm build
+
+      - name: Stop mock API
+        if: always()
+        run: kill "$(cat /tmp/ci-mock-api.pid)" 2>/dev/null || true
