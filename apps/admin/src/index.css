@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Siders editorial-console design tokens, scoped to `.siders-scope` so they don't leak into the
+ * rest of the admin app's plain gray/blue Tailwind palette. Shared by the login page and the
+ * persistent sidebar — the two surfaces meant to read as "the console itself" rather than a
+ * content page.
+ */
+.siders-scope {
+  --ink: #15181d;
+  --paper: #f3f4f0;
+  --rule: #dbdcd5;
+  --muted: #6e7168;
+  --signal: #2451d9;
+  --signal-hover: #1c3fb0;
+  /* Fixed regardless of light/dark toggle — the "wire panel" is deliberately always dark. */
+  --panel-bg: #15181d;
+  --panel-fg: #f3f4f0;
+  --panel-signal: #2451d9;
+  /* Article lifecycle color — "in print", the one status that isn't already spoken for by
+     `--muted` (draft) or `--signal` (scheduled, matching the sidebar/login's "queued" language). */
+  --status-published: #3f6b4a;
+  --signal-soft: color-mix(in srgb, var(--signal) 12%, transparent);
+  --muted-soft: color-mix(in srgb, var(--muted) 12%, transparent);
+  --status-published-soft: color-mix(in srgb, var(--status-published) 12%, transparent);
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+.dark .siders-scope {
+  --ink: #e9e8e2;
+  --paper: #1b1d20;
+  --rule: #34363a;
+  --muted: #9a9c93;
+  --signal: #6d8bff;
+  --signal-hover: #8ba1ff;
+  --status-published: #6fbf87;
+}
+
+.siders-scope .font-display {
+  font-family: 'Fraunces', ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+}
+
+.siders-scope .font-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

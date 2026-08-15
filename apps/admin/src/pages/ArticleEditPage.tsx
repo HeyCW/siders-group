@@ -6,10 +6,11 @@ import { articlesApi } from '../lib/articlesApi.js';
 import { categoriesApi, tagsApi } from '../lib/taxonomyApi.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { ApiError } from '../lib/api.js';
+import { ARTICLE_STATUS_STYLES } from '../lib/articleStatusStyles.js';
 import { EditorCanvas } from '../editor/EditorCanvas.js';
 import { useDebouncedCallback } from '../hooks/useDebouncedCallback.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
-import { useDarkMode } from '../hooks/useDarkMode.js';
+import { useChrome } from '../context/ChromeContext.js';
 import { SaveStatusIndicator, type SaveStatus } from '../components/SaveStatusIndicator.js';
 import { MultiSelectChips } from '../components/MultiSelectChips.js';
 import { PreviewModal } from '../components/PreviewModal.js';
@@ -44,14 +45,24 @@ function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
+const FIELD_LABEL = 'mb-1 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
+const FIELD_INPUT =
+  'w-full rounded-md border border-[var(--rule)] bg-transparent px-2 py-1 text-sm focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20';
+const OUTLINE_BUTTON =
+  'rounded-md border border-[var(--rule)] px-2.5 py-1 text-xs transition-colors hover:border-[var(--ink)]/30';
+
 /** The admin article authoring and management view: canvas, metadata sidebar, lifecycle
  *  actions, focus mode, and dark mode — see specs/article-editor/spec.md and
  *  specs/article-management/spec.md for the requirements this implements. */
 export function ArticleEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [isDark, toggleDark] = useDarkMode();
   const [focusMode, setFocusMode] = useState(false);
+  const { setHideChrome } = useChrome();
+  useEffect(() => {
+    setHideChrome(focusMode);
+    return () => setHideChrome(false);
+  }, [focusMode, setHideChrome]);
 
   const [article, setArticle] = useState<ArticleAdminResponse | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
@@ -253,29 +264,36 @@ export function ArticleEditPage() {
     }
   }
 
-  if (loadError) return <div className="p-8 text-red-600 dark:text-red-400">{loadError}</div>;
-  if (!article || !form) return <div className="p-8 text-gray-500 dark:text-gray-400">Loading…</div>;
+  if (loadError)
+    return (
+      <div className="siders-scope flex h-full min-h-full items-center justify-center bg-[var(--paper)] p-8 text-red-600 dark:text-red-400">
+        {loadError}
+      </div>
+    );
+  if (!article || !form)
+    return (
+      <div className="siders-scope flex h-full min-h-full items-center justify-center bg-[var(--paper)] p-8 font-mono text-sm text-[var(--muted)]">
+        Loading…
+      </div>
+    );
 
   const permissionDenied =
     publishState.forbidden || unpublishState.forbidden || deleteState.forbidden || scheduleState.forbidden;
+  const statusStyle = ARTICLE_STATUS_STYLES[article.status];
 
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-gray-900">
+    <div className="siders-scope flex h-full flex-col bg-[var(--paper)] text-[var(--ink)]">
       {!focusMode && (
-        <header className="flex items-center justify-between border-b border-gray-200 px-4 py-2 dark:border-gray-700">
-          <Link to="/articles" className="text-sm text-gray-500 hover:underline dark:text-gray-400">
+        <header className="flex items-center justify-between border-b border-[var(--rule)] px-4 py-2">
+          <Link to="/articles" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] hover:underline">
             ← Articles
           </Link>
           <div className="flex items-center gap-3">
             <SaveStatusIndicator status={saveStatus} errorMessage={saveError} />
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs capitalize text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <span className={`rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${statusStyle.chip}`}>
               {article.status}
             </span>
-            <button
-              type="button"
-              onClick={handlePreview}
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs dark:border-gray-600"
-            >
+            <button type="button" onClick={handlePreview} className={OUTLINE_BUTTON}>
               Preview
             </button>
             {article.status !== 'published' && (
@@ -283,7 +301,7 @@ export function ArticleEditPage() {
                 type="button"
                 onClick={handlePublish}
                 disabled={publishState.loading}
-                className="rounded-md bg-blue-600 px-2.5 py-1 text-xs text-white disabled:opacity-50"
+                className="rounded-md bg-[var(--signal)] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
               >
                 Publish
               </button>
@@ -293,7 +311,7 @@ export function ArticleEditPage() {
                 type="button"
                 onClick={handleUnpublish}
                 disabled={unpublishState.loading}
-                className="rounded-md border border-gray-300 px-2.5 py-1 text-xs dark:border-gray-600"
+                className={OUTLINE_BUTTON}
               >
                 Unpublish
               </button>
@@ -302,31 +320,19 @@ export function ArticleEditPage() {
               type="button"
               onClick={handleDelete}
               disabled={deleteState.loading}
-              className="rounded-md border border-red-300 px-2.5 py-1 text-xs text-red-600 dark:border-red-800 dark:text-red-400"
+              className="rounded-md border border-red-300 px-2.5 py-1 text-xs text-red-600 transition-colors hover:border-red-400 dark:border-red-800 dark:text-red-400"
             >
               Delete
             </button>
-            <button
-              type="button"
-              onClick={() => setFocusMode(true)}
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs dark:border-gray-600"
-            >
+            <button type="button" onClick={() => setFocusMode(true)} className={OUTLINE_BUTTON}>
               Focus mode
-            </button>
-            <button
-              type="button"
-              onClick={toggleDark}
-              aria-label="Toggle dark mode"
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs dark:border-gray-600"
-            >
-              {isDark ? '☀' : '🌙'}
             </button>
           </div>
         </header>
       )}
 
       {permissionDenied && (
-        <div className="bg-red-50 px-4 py-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
           You don&apos;t have permission to perform that action.
         </div>
       )}
@@ -337,7 +343,7 @@ export function ArticleEditPage() {
             value={form.title}
             onChange={(e) => patchForm({ title: e.target.value })}
             placeholder="Title"
-            className="mx-auto mt-8 block w-full max-w-3xl border-none bg-transparent px-4 text-4xl font-bold text-gray-900 outline-none placeholder:text-gray-300 dark:text-white dark:placeholder:text-gray-600"
+            className="mx-auto mt-8 block w-full max-w-3xl border-none bg-transparent px-4 font-display text-4xl text-[var(--ink)] outline-none placeholder:text-[var(--muted)]/40"
           />
           <EditorCanvas
             initialContent={form.bodyJson}
@@ -359,25 +365,16 @@ export function ArticleEditPage() {
         </main>
 
         {!focusMode && (
-          <aside className="w-80 shrink-0 overflow-y-auto border-l border-gray-200 p-4 dark:border-gray-700">
+          <aside className="w-80 shrink-0 overflow-y-auto border-l border-[var(--rule)] p-4">
             <div className="space-y-5">
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Slug
-                </label>
-                <input
-                  value={slugInput}
-                  onChange={(e) => setSlugInput(e.target.value)}
-                  onBlur={commitSlug}
-                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
-                />
+                <label className={FIELD_LABEL}>Slug</label>
+                <input value={slugInput} onChange={(e) => setSlugInput(e.target.value)} onBlur={commitSlug} className={FIELD_INPUT} />
                 {slugError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{slugError}</p>}
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Featured image
-                </label>
+                <label className={FIELD_LABEL}>Featured image</label>
                 {form.featuredImageUrl && (
                   <img src={form.featuredImageUrl} alt="" className="mb-2 w-full rounded-md" />
                 )}
@@ -393,15 +390,8 @@ export function ArticleEditPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Excerpt
-                </label>
-                <textarea
-                  value={form.excerpt}
-                  onChange={(e) => patchForm({ excerpt: e.target.value })}
-                  rows={3}
-                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
-                />
+                <label className={FIELD_LABEL}>Excerpt</label>
+                <textarea value={form.excerpt} onChange={(e) => patchForm({ excerpt: e.target.value })} rows={3} className={FIELD_INPUT} />
               </div>
 
               {taxonomyError && <p className="text-xs text-red-600 dark:text-red-400">{taxonomyError}</p>}
@@ -419,42 +409,32 @@ export function ArticleEditPage() {
               />
 
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  SEO title
-                </label>
-                <input
-                  value={form.seoTitle}
-                  onChange={(e) => patchForm({ seoTitle: e.target.value })}
-                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
-                />
+                <label className={FIELD_LABEL}>SEO title</label>
+                <input value={form.seoTitle} onChange={(e) => patchForm({ seoTitle: e.target.value })} className={FIELD_INPUT} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  SEO description
-                </label>
+                <label className={FIELD_LABEL}>SEO description</label>
                 <textarea
                   value={form.seoDescription}
                   onChange={(e) => patchForm({ seoDescription: e.target.value })}
                   rows={2}
-                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
+                  className={FIELD_INPUT}
                 />
               </div>
 
-              <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Schedule publish
-                </label>
+              <div className="border-t border-[var(--rule)] pt-4">
+                <label className={FIELD_LABEL}>Schedule publish</label>
                 <input
                   type="datetime-local"
                   value={scheduleAt}
                   onChange={(e) => setScheduleAt(e.target.value)}
-                  className="mb-2 w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
+                  className={`mb-2 ${FIELD_INPUT}`}
                 />
                 <button
                   type="button"
                   onClick={handleSchedule}
                   disabled={scheduleState.loading || !scheduleAt}
-                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm disabled:opacity-50 dark:border-gray-600"
+                  className="w-full rounded-md bg-[var(--signal)] px-2 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
                 >
                   Schedule
                 </button>
@@ -468,7 +448,7 @@ export function ArticleEditPage() {
         <button
           type="button"
           onClick={() => setFocusMode(false)}
-          className="fixed bottom-4 right-4 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs shadow dark:border-gray-600 dark:bg-gray-800"
+          className="fixed bottom-4 right-4 rounded-full border border-[var(--rule)] bg-[var(--paper)] px-3 py-1.5 text-xs text-[var(--ink)] shadow"
         >
           Exit focus mode
         </button>

@@ -5,12 +5,22 @@ import { ApiError } from '../lib/api.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { reelsApi } from '../lib/reelsApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
+import { REEL_STATUS_STYLES } from '../lib/reelStatusStyles.js';
 
 const STATUS_LABELS: Record<ReelStatus, string> = {
   draft: 'Draft',
   published: 'Published',
   unavailable: 'Unavailable — source video no longer available',
 };
+
+const MAX_STAGGERED_ROWS = 8;
+const STAGGER_STEP_MS = 40;
+
+const FIELD_LABEL = 'mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
+const TEXT_INPUT =
+  'w-full rounded-md border border-[var(--rule)] bg-transparent px-3 py-2 text-sm placeholder:text-[var(--muted)]/60 focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20';
+const FILE_LABEL =
+  'inline-block cursor-pointer rounded-md border border-[var(--rule)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)]/30';
 
 /**
  * The reel library: create, edit, and delete reels that reference a third-party provider's
@@ -177,182 +187,203 @@ export function ReelLibraryPage() {
   const forbidden = createState.forbidden || updateState.forbidden || removeState.forbidden;
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-1 text-2xl font-bold text-gray-900 dark:text-white">Reel Library</h1>
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Reels reference a video hosted on Instagram, TikTok, or YouTube — this system stores no video of its own,
-        only a poster image and the video&apos;s identity.
-      </p>
-
-      {forbidden && (
-        <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          You don&apos;t have permission to manage the reel library.
+    <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="mb-1">
+          <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">{reels.length} in the library</p>
+          <h1 className="font-display text-3xl">Reel library</h1>
+        </div>
+        <p className="mb-6 max-w-xl text-sm text-[var(--muted)]">
+          Reels reference a video hosted on Instagram, TikTok, or YouTube — this system stores no video of its own,
+          only a poster image and the video&apos;s identity.
         </p>
-      )}
-      {/* Page-level rather than scoped to the edit form: the status <select> and Delete button
-          that trigger updateState/removeState both live in the row's non-editing branch, so an
-          error from either would otherwise have nowhere to render. */}
-      {updateState.errorMessage && !updateState.forbidden && (
-        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{updateState.errorMessage}</p>
-      )}
-      {removeState.errorMessage && !removeState.forbidden && (
-        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{removeState.errorMessage}</p>
-      )}
 
-      <div className="mb-6 space-y-3 rounded-md border border-gray-200 p-4 dark:border-gray-700">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Reel URL</label>
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.instagram.com/reel/..."
-            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          />
-          {parsed && (
-            <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-              Recognized: {parsed.provider} · {parsed.externalId}
-            </p>
-          )}
-          {urlIsInvalid && (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-              This URL doesn&apos;t match a recognized provider (Instagram, TikTok, or YouTube Shorts).
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
-            Poster image (required)
-          </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handlePosterSelected(e.target.files?.[0] ?? null)}
-            className="text-sm"
-          />
-          {uploadingPoster && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Uploading…</p>}
-          {posterUploadError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{posterUploadError}</p>}
-          {posterPreviewUrl && (
-            <img src={posterPreviewUrl} alt="" className="mt-2 h-24 w-auto rounded-md object-cover" />
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
-            Caption (optional)
-          </label>
-          <input
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          />
-        </div>
-
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={!canCreate}
-          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-        >
-          {createState.loading ? 'Adding…' : 'Add reel'}
-        </button>
-        {createState.errorMessage && !createState.forbidden && (
-          <p className="text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
+        {forbidden && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            You don&apos;t have permission to manage the reel library.
+          </p>
         )}
-      </div>
-
-      {loadError && <p className="text-red-600 dark:text-red-400">{loadError}</p>}
-      {loading && <p className="text-gray-500 dark:text-gray-400">Loading…</p>}
-
-      <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
-        {!loading && reels.length === 0 && (
-          <li className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">No reels yet.</li>
+        {/* Page-level rather than scoped to the edit form: the status <select> and Delete button
+            that trigger updateState/removeState both live in the row's non-editing branch, so an
+            error from either would otherwise have nowhere to render. */}
+        {updateState.errorMessage && !updateState.forbidden && (
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">{updateState.errorMessage}</p>
         )}
-        {reels.map((reel) =>
-          editingId === reel.id ? (
-            <li key={reel.id} className="space-y-2 px-3 py-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Editing {reel.provider} · {reel.externalId} — the video reference itself can&apos;t change. Status is
-                set from the dropdown on the list row; this form is caption and poster only.
+        {removeState.errorMessage && !removeState.forbidden && (
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">{removeState.errorMessage}</p>
+        )}
+
+        <div className="mb-8 space-y-4 rounded-lg border border-[var(--rule)] p-5">
+          <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">New reel</p>
+          <div>
+            <label className={FIELD_LABEL}>Reel URL</label>
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://www.instagram.com/reel/..."
+              className={TEXT_INPUT}
+            />
+            {parsed && (
+              <p className="mt-1.5 font-mono text-xs text-[var(--status-published)]">
+                Recognized: {parsed.provider} · {parsed.externalId}
               </p>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Caption</label>
-                <input
-                  value={editCaption}
-                  onChange={(e) => setEditCaption(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
-                  Replace poster (optional)
-                </label>
+            )}
+            {urlIsInvalid && (
+              <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+                This URL doesn&apos;t match a recognized provider (Instagram, TikTok, or YouTube Shorts).
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className={FIELD_LABEL}>Poster image (required)</label>
+            <div className="flex items-center gap-3">
+              <label className={FILE_LABEL}>
+                Choose file
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleEditPosterSelected(e.target.files?.[0] ?? null)}
-                  className="text-sm"
+                  onChange={(e) => handlePosterSelected(e.target.files?.[0] ?? null)}
+                  className="hidden"
                 />
-                {editUploadingPoster && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Uploading…</p>}
-                {editPosterUploadError && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{editPosterUploadError}</p>
-                )}
-                {editPosterPreviewUrl && (
-                  <img src={editPosterPreviewUrl} alt="" className="mt-2 h-20 w-auto rounded-md object-cover" />
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  disabled={updateState.loading || editUploadingPoster}
-                  className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-                >
-                  {updateState.loading ? 'Saving…' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="rounded-md px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300"
-                >
-                  Cancel
-                </button>
-              </div>
-            </li>
-          ) : (
-            <li key={reel.id} className="flex items-center justify-between gap-3 px-3 py-2">
-              <div className="flex min-w-0 items-center gap-3">
-                <img src={reel.posterUrl} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-gray-900 dark:text-white">
-                    {reel.provider} · {reel.externalId}
-                  </p>
-                  {reel.caption && <p className="truncate text-xs text-gray-400">{reel.caption}</p>}
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <select
-                  value={reel.status}
-                  onChange={(e) => handleStatusChange(reel.id, reelStatusSchema.parse(e.target.value))}
-                  className="rounded-md border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
-                >
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" onClick={() => startEdit(reel)} className="text-xs text-blue-600 dark:text-blue-400">
-                  Edit
-                </button>
-                <button type="button" onClick={() => handleRemove(reel.id)} className="text-xs text-red-600 dark:text-red-400">
-                  Delete
-                </button>
-              </div>
-            </li>
-          ),
+              </label>
+              {uploadingPoster && <span className="font-mono text-xs text-[var(--muted)]">Uploading…</span>}
+              {posterPreviewUrl && <img src={posterPreviewUrl} alt="" className="h-14 w-14 rounded-md object-cover" />}
+            </div>
+            {posterUploadError && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{posterUploadError}</p>}
+          </div>
+
+          <div>
+            <label className={FIELD_LABEL}>Caption (optional)</label>
+            <input value={caption} onChange={(e) => setCaption(e.target.value)} className={TEXT_INPUT} />
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={!canCreate}
+              className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
+            >
+              {createState.loading ? 'Adding…' : 'Add reel'}
+            </button>
+            {createState.errorMessage && !createState.forbidden && (
+              <p className="text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
+            )}
+          </div>
+        </div>
+
+        {loadError && (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            {loadError}
+          </p>
         )}
-      </ul>
+        {loading && <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>}
+
+        {!loading && reels.length === 0 && <p className="text-sm text-[var(--muted)]">No reels yet.</p>}
+
+        <ul className="space-y-1">
+          {reels.map((reel, index) => {
+            const statusStyle = REEL_STATUS_STYLES[reel.status];
+            return (
+              <li
+                key={reel.id}
+                className="relative motion-safe:animate-[fadeInUp_0.4s_ease_forwards] motion-safe:opacity-0"
+                style={{ animationDelay: `${Math.min(index, MAX_STAGGERED_ROWS) * STAGGER_STEP_MS}ms` }}
+              >
+                {editingId === reel.id ? (
+                  <div className="space-y-3 rounded-lg border border-[var(--rule)] p-4">
+                    <p className="text-xs text-[var(--muted)]">
+                      Editing {reel.provider} · {reel.externalId} — the video reference itself can&apos;t change.
+                      Status is set from the dropdown on the list row; this form is caption and poster only.
+                    </p>
+                    <div>
+                      <label className={FIELD_LABEL}>Caption</label>
+                      <input value={editCaption} onChange={(e) => setEditCaption(e.target.value)} className={TEXT_INPUT} />
+                    </div>
+                    <div>
+                      <label className={FIELD_LABEL}>Replace poster (optional)</label>
+                      <div className="flex items-center gap-3">
+                        <label className={FILE_LABEL}>
+                          Choose file
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleEditPosterSelected(e.target.files?.[0] ?? null)}
+                            className="hidden"
+                          />
+                        </label>
+                        {editUploadingPoster && <span className="font-mono text-xs text-[var(--muted)]">Uploading…</span>}
+                        {editPosterPreviewUrl && (
+                          <img src={editPosterPreviewUrl} alt="" className="h-14 w-14 rounded-md object-cover" />
+                        )}
+                      </div>
+                      {editPosterUploadError && (
+                        <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{editPosterUploadError}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={updateState.loading || editUploadingPoster}
+                        className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
+                      >
+                        {updateState.loading ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4 rounded-lg py-3 pl-5 pr-3 transition-colors hover:bg-[var(--ink)]/[0.03]">
+                    <span className={`absolute inset-y-2 left-0 w-1 rounded-full ${statusStyle.rule}`} aria-hidden="true" />
+                    <img src={reel.posterUrl} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-display text-lg capitalize">
+                        {reel.provider} · {reel.externalId}
+                      </p>
+                      {reel.caption && <p className="mt-0.5 truncate font-mono text-xs text-[var(--muted)]">{reel.caption}</p>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <select
+                        value={reel.status}
+                        onChange={(e) => handleStatusChange(reel.id, reelStatusSchema.parse(e.target.value))}
+                        className="rounded-md border border-[var(--rule)] bg-transparent px-2 py-1.5 text-xs focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
+                      >
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(reel)}
+                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(reel.id)}
+                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }

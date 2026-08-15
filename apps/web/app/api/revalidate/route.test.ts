@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST } from './route.js';
+import { POST } from './route';
 
 // revalidatePath requires Next's request-scoped static generation store, which
 // only exists inside the real server runtime. Mock it for this unit test and

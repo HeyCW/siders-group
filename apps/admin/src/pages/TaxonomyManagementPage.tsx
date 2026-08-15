@@ -15,6 +15,9 @@ export interface TaxonomyApi {
   remove(id: string): Promise<void>;
 }
 
+const MAX_STAGGERED_ROWS = 8;
+const STAGGER_STEP_MS = 40;
+
 /**
  * Category and tag management share this one screen shape — both are `{id, name, slug}` CRUD
  * gated on their own permission (specs/category-management/spec.md,
@@ -64,6 +67,16 @@ export function TaxonomyManagementPage({
     }
   }
 
+  function startEdit(item: TaxonomyItem) {
+    setEditingId(item.id);
+    setEditingName(item.name);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingName('');
+  }
+
   async function handleSaveEdit(id: string) {
     if (!editingName.trim()) return;
     try {
@@ -88,80 +101,126 @@ export function TaxonomyManagementPage({
   const forbidden = createState.forbidden || updateState.forbidden || removeState.forbidden;
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
-      <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
+    <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
+      <div className="mx-auto max-w-2xl p-6">
+        <div className="mb-6">
+          <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">
+            {items.length} defined
+          </p>
+          <h1 className="font-display text-3xl">{title}</h1>
+        </div>
 
-      {forbidden && (
-        <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          You don&apos;t have permission to manage {title.toLowerCase()}.
-        </p>
-      )}
+        {forbidden && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            You don&apos;t have permission to manage {title.toLowerCase()}.
+          </p>
+        )}
 
-      <div className="mb-4 flex gap-2">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-          placeholder={`New ${singularLabel} name`}
-          className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-        />
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={createState.loading}
-          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-        >
-          Add
-        </button>
-      </div>
-      {createState.errorMessage && !createState.forbidden && (
-        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
-      )}
+        <div className="mb-6">
+          <label htmlFor="new-taxonomy-name" className="mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]">
+            New {singularLabel}
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="new-taxonomy-name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              placeholder={`${singularLabel} name`}
+              className="flex-1 rounded-md border border-[var(--rule)] bg-transparent px-3 py-2 text-sm placeholder:text-[var(--muted)]/60 focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
+            />
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={createState.loading || !newName.trim()}
+              className="shrink-0 rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
+            >
+              {createState.loading ? 'Adding…' : 'Add'}
+            </button>
+          </div>
+          {createState.errorMessage && !createState.forbidden && (
+            <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
+          )}
+        </div>
 
-      {loadError && <p className="text-red-600 dark:text-red-400">{loadError}</p>}
-      {loading && <p className="text-gray-500 dark:text-gray-400">Loading…</p>}
+        {loadError && (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            {loadError}
+          </p>
+        )}
+        {loading && <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>}
 
-      <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-        {items.map((item) => (
-          <li key={item.id} className="flex items-center justify-between py-2">
-            {editingId === item.id ? (
-              <input
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
-                autoFocus
-                className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
-              />
-            ) : (
-              <div>
-                <p className="text-sm text-gray-900 dark:text-white">{item.name}</p>
-                <p className="text-xs text-gray-400">{item.slug}</p>
-              </div>
-            )}
-            <div className="flex gap-2 text-xs">
+        {!loading && !loadError && items.length === 0 && (
+          <p className="text-sm text-[var(--muted)]">No {title.toLowerCase()} yet. Add the first one above.</p>
+        )}
+
+        <ul className="space-y-1">
+          {items.map((item, index) => (
+            <li
+              key={item.id}
+              className="motion-safe:animate-[fadeInUp_0.4s_ease_forwards] motion-safe:opacity-0"
+              style={{ animationDelay: `${Math.min(index, MAX_STAGGERED_ROWS) * STAGGER_STEP_MS}ms` }}
+            >
               {editingId === item.id ? (
-                <button type="button" onClick={() => handleSaveEdit(item.id)} className="text-blue-600 dark:text-blue-400">
-                  Save
-                </button>
+                <div className="flex items-center gap-2 rounded-lg py-2 pl-3 pr-2">
+                  <input
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
+                    autoFocus
+                    className="flex-1 rounded-md border border-[var(--rule)] bg-transparent px-2.5 py-1.5 text-sm focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSaveEdit(item.id)}
+                    disabled={updateState.loading}
+                    className="shrink-0 font-mono text-xs uppercase tracking-wide text-[var(--signal)] hover:text-[var(--signal-hover)]"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="shrink-0 font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingId(item.id);
-                    setEditingName(item.name);
-                  }}
-                  className="text-gray-500 dark:text-gray-400"
-                >
-                  Rename
-                </button>
+                <div className="flex items-center justify-between gap-3 rounded-lg py-2.5 pl-3 pr-2 transition-colors hover:bg-[var(--ink)]/[0.03]">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-[var(--ink)]">{item.name}</p>
+                    <p className="truncate font-mono text-xs text-[var(--muted)]">{item.slug}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(item)}
+                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(item.id)}
+                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
               )}
-              <button type="button" onClick={() => handleRemove(item.id)} className="text-red-600 dark:text-red-400">
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+
+        {removeState.errorMessage && !removeState.forbidden && (
+          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{removeState.errorMessage}</p>
+        )}
+        {updateState.errorMessage && !updateState.forbidden && (
+          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{updateState.errorMessage}</p>
+        )}
+      </div>
     </div>
   );
 }

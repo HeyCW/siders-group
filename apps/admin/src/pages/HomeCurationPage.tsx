@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api.js';
 import { articlesApi } from '../lib/articlesApi.js';
 import { curationApi } from '../lib/curationApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
+import { ARTICLE_STATUS_STYLES } from '../lib/articleStatusStyles.js';
 
 const MAX_ENTRIES = 10;
 
@@ -23,6 +24,19 @@ interface PickedItem {
 
 function toPickedItem(entry: HomeCurationEntryResponse): PickedItem {
   return { id: entry.article.id, title: entry.article.title, slug: entry.article.slug, status: entry.status, isPubliclyVisible: entry.isPubliclyVisible };
+}
+
+function IconGrip({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 12 20" fill="currentColor" className={className}>
+      <circle cx="3" cy="4" r="1.3" />
+      <circle cx="9" cy="4" r="1.3" />
+      <circle cx="3" cy="10" r="1.3" />
+      <circle cx="9" cy="10" r="1.3" />
+      <circle cx="3" cy="16" r="1.3" />
+      <circle cx="9" cy="16" r="1.3" />
+    </svg>
+  );
 }
 
 /**
@@ -93,120 +107,139 @@ export function HomeCurationPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-1 text-2xl font-bold text-gray-900 dark:text-white">Homepage Curation</h1>
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Drag to reorder. The first article leads the homepage. Positions left empty are filled with the most
-        recently published articles.
-      </p>
-
-      {saveState.forbidden && (
-        <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          You don&apos;t have permission to manage homepage curation.
+    <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="mb-1">
+          <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">
+            {picked.length}/{MAX_ENTRIES} curated
+          </p>
+          <h1 className="font-display text-3xl">Home curation</h1>
+        </div>
+        <p className="mb-6 max-w-xl text-sm text-[var(--muted)]">
+          Drag to reorder. The first article leads the homepage. Positions left empty are filled with the most
+          recently published articles.
         </p>
-      )}
-      {saveState.errorMessage && !saveState.forbidden && (
-        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{saveState.errorMessage}</p>
-      )}
-      {loadError && <p className="text-red-600 dark:text-red-400">{loadError}</p>}
-      {loading && <p className="text-gray-500 dark:text-gray-400">Loading…</p>}
 
-      {!loading && (
-        <>
-          <ul className="mb-4 divide-y divide-gray-200 rounded-md border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
-            {picked.length === 0 && (
-              <li className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
-                Nothing curated. The homepage will show a purely chronological feed.
-              </li>
-            )}
-            {picked.map((item, index) => (
-              <li
-                key={item.id}
-                draggable
-                onDragStart={() => setDragIndex(index)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDrop(index)}
-                className="flex cursor-move items-center justify-between gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+        {saveState.forbidden && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            You don&apos;t have permission to manage homepage curation.
+          </p>
+        )}
+        {saveState.errorMessage && !saveState.forbidden && (
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">{saveState.errorMessage}</p>
+        )}
+        {loadError && (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+            {loadError}
+          </p>
+        )}
+        {loading && <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>}
+
+        {!loading && (
+          <>
+            <ul className="mb-4 rounded-lg border border-[var(--rule)]">
+              {picked.length === 0 && (
+                <li className="px-4 py-6 text-center text-sm text-[var(--muted)]">
+                  Nothing curated. The homepage will show a purely chronological feed.
+                </li>
+              )}
+              {picked.map((item, index) => {
+                const statusStyle = ARTICLE_STATUS_STYLES[item.status];
+                return (
+                  <li
+                    key={item.id}
+                    draggable
+                    onDragStart={() => setDragIndex(index)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDrop(index)}
+                    className={`relative flex cursor-move items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[var(--ink)]/[0.03] ${index > 0 ? 'border-t border-[var(--rule)]' : ''}`}
+                  >
+                    <span className={`absolute inset-y-2 left-0 w-1 rounded-full ${statusStyle.rule}`} aria-hidden="true" />
+                    <IconGrip className="ml-2 h-4 w-4 shrink-0 text-[var(--muted)]/50" />
+                    <span className="w-5 shrink-0 font-mono text-xs text-[var(--muted)]">{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-[var(--ink)]">{item.title}</p>
+                      <p className="truncate font-mono text-xs text-[var(--muted)]">{item.slug}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${statusStyle.chip}`}>
+                        {item.status}
+                      </span>
+                      {item.isPubliclyVisible === false && (
+                        <span className="rounded-full bg-amber-500/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                          Not yet live
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeArticle(item.id)}
+                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="mb-8 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saveState.loading}
+                className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="text-xs text-gray-400">{index + 1}</span>
+                {saveState.loading ? 'Saving…' : 'Save order'}
+              </button>
+              <button
+                type="button"
+                onClick={clearAll}
+                disabled={picked.length === 0}
+                className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-40"
+              >
+                Clear all
+              </button>
+              {picked.length >= MAX_ENTRIES && (
+                <span className="font-mono text-xs text-[var(--muted)]">Maximum of {MAX_ENTRIES} curated articles reached</span>
+              )}
+            </div>
+
+            <p className="mb-2 font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Add an article</p>
+            <ul className="rounded-lg border border-[var(--rule)]">
+              {pickableCandidates.length === 0 && (
+                <li className="px-4 py-6 text-center text-sm text-[var(--muted)]">No more articles to add.</li>
+              )}
+              {pickableCandidates.map((article, index) => (
+                <li
+                  key={article.id}
+                  className={`flex items-center justify-between gap-3 px-3 py-2.5 ${index > 0 ? 'border-t border-[var(--rule)]' : ''}`}
+                >
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-gray-900 dark:text-white">{item.title}</p>
-                    <p className="truncate text-xs text-gray-400">{item.slug}</p>
+                    <p className="truncate text-sm text-[var(--ink)]">{article.title}</p>
+                    <p className="truncate font-mono text-xs text-[var(--muted)]">{article.slug}</p>
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs capitalize text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                    {item.status}
-                  </span>
-                  {item.isPubliclyVisible === false && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                      not yet live
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span
+                      className={`rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${ARTICLE_STATUS_STYLES[article.status].chip}`}
+                    >
+                      {article.status}
                     </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeArticle(item.id)}
-                    className="text-xs text-red-600 dark:text-red-400"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mb-6 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saveState.loading}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-            >
-              {saveState.loading ? 'Saving…' : 'Save'}
-            </button>
-            <button
-              type="button"
-              onClick={clearAll}
-              disabled={picked.length === 0}
-              className="rounded-md px-3 py-1.5 text-sm text-gray-600 disabled:opacity-50 dark:text-gray-300"
-            >
-              Clear all
-            </button>
-            {picked.length >= MAX_ENTRIES && (
-              <span className="text-xs text-gray-400">Maximum of {MAX_ENTRIES} curated articles reached</span>
-            )}
-          </div>
-
-          <h2 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">Add an article</h2>
-          <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
-            {pickableCandidates.length === 0 && (
-              <li className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">No more articles to add.</li>
-            )}
-            {pickableCandidates.map((article) => (
-              <li key={article.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-gray-900 dark:text-white">{article.title}</p>
-                  <p className="truncate text-xs text-gray-400">{article.slug}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs capitalize text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                    {article.status}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => addArticle(article)}
-                    disabled={picked.length >= MAX_ENTRIES}
-                    className="text-xs text-blue-600 disabled:opacity-50 dark:text-blue-400"
-                  >
-                    Add
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+                    <button
+                      type="button"
+                      onClick={() => addArticle(article)}
+                      disabled={picked.length >= MAX_ENTRIES}
+                      className="font-mono text-xs uppercase tracking-wide text-[var(--signal)] hover:text-[var(--signal-hover)] disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
     </div>
   );
 }
