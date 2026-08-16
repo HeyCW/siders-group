@@ -1,11 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { API_URL } from '../../lib/env';
 import { useReaderSession } from '../../lib/readerSession';
 
-function signInHref(currentPath: string): string {
-  return `${API_URL}/auth/google?next=${encodeURIComponent(currentPath)}`;
+function signInHref(currentLocation: string): string {
+  return `${API_URL}/auth/google?next=${encodeURIComponent(currentLocation)}`;
 }
 
 /**
@@ -18,6 +19,9 @@ function signInHref(currentPath: string): string {
 export function ReaderControl({ className = '' }: { className?: string }) {
   const pathname = usePathname();
   const { session, signOut } = useReaderSession();
+  // Declared unconditionally per the Rules of Hooks even though it is only read in the
+  // authenticated branch below.
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const base = 'font-sans text-[11px] font-bold uppercase tracking-widest';
 
@@ -30,7 +34,19 @@ export function ReaderControl({ className = '' }: { className?: string }) {
 
   if (session.status === 'anonymous') {
     return (
-      <a href={signInHref(pathname ?? '/')} className={`${base} text-muted hover:text-ink ${className}`}>
+      <a
+        href={signInHref(pathname ?? '/')}
+        // `usePathname()` carries no query string, but `/news`'s category filter lives in one
+        // (`docs/ARCHITECTURE.md` §8.1 - "Filters live in the URL, so results are shareable").
+        // Reading `window.location` here rather than `useSearchParams()` keeps this a plain
+        // synchronous click handler: that hook forces a Suspense boundary around every render
+        // of this component, and this component is mounted in the root layout, so it would
+        // reach `/` and `/news/[slug]` too — routes 7.2 keeps statically rendered.
+        onClick={(e) => {
+          e.currentTarget.href = signInHref(window.location.pathname + window.location.search);
+        }}
+        className={`${base} text-muted hover:text-ink ${className}`}
+      >
         Sign in
       </a>
     );
@@ -39,12 +55,16 @@ export function ReaderControl({ className = '' }: { className?: string }) {
   const { account } = session;
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {account.avatarUrl ? (
+      {account.avatarUrl && !avatarFailed ? (
         <img
+          // Remounts on a URL change, so a fresh avatar starts unfailed rather than inheriting
+          // a stale `avatarFailed` from a previous account or a previous (now-dead) URL.
+          key={account.avatarUrl}
           src={account.avatarUrl}
           alt=""
           className="h-5 w-5 rounded-full object-cover"
           referrerPolicy="no-referrer"
+          onError={() => setAvatarFailed(true)}
         />
       ) : (
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-[10px] font-bold text-paper">

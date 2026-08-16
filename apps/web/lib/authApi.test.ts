@@ -155,6 +155,31 @@ describe('getReaderAccount', () => {
     expect(fetchMock.mock.calls.some((c) => (c[0] as string).includes('/auth/refresh'))).toBe(false);
   });
 
+  it('shares exactly one in-flight re-pairing request across concurrent csrf_failed rejections', async () => {
+    let bootstrapCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/auth/csrf')) {
+        bootstrapCalls += 1;
+        return Promise.resolve(jsonResponse(undefined, 204));
+      }
+      if (url.includes('/auth/me')) {
+        // Each call to /auth/me fails once with csrf_failed, then succeeds after bootstrap resolves.
+        return Promise.resolve(
+          bootstrapCalls > 0
+            ? jsonResponse({ success: true, data: ACCOUNT })
+            : jsonResponse({ success: false, error: { code: 'csrf_failed', message: 'nope' } }, 403),
+        );
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const [a, b] = await Promise.all([getReaderAccount(), getReaderAccount()]);
+    expect(a).toEqual(ACCOUNT);
+    expect(b).toEqual(ACCOUNT);
+    expect(bootstrapCalls).toBe(1);
+  });
+
   it('does not chain a refresh after a csrf re-pair retry fails again', async () => {
     const fetchMock = vi
       .fn()

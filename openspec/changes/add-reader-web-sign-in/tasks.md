@@ -3,7 +3,7 @@
 - [x] 1.1 Add `apps/web/lib/authApi.ts` with a raw fetch helper: `credentials: 'include'`, the `x-csrf-token` header read from the script-readable `csrf_token` cookie, envelope unwrapping, and an `ApiError` carrying `status` and `code`. It takes no caching options — see design.md, "Two fetch clients, not one client with an authenticated mode".
 - [x] 1.2 Add the readable-cookie check used by the anonymous fast path, as a named export so it can be tested directly.
 - [x] 1.3 Implement single-flight `refreshSession()` calling `POST /auth/refresh` outside the recovery cycle, resolving to a boolean and never throwing.
-- [x] 1.4 Implement single-flight `bootstrapCsrfCookie()` calling `GET /auth/csrf` outside the recovery cycle.
+- [x] 1.4 Implement single-flight `bootstrapCsrfCookie()` calling `GET /auth/csrf` outside the recovery cycle — see spec.md, "A CSRF failure is recovered by re-pairing, not by refreshing".
 - [x] 1.5 Implement the recovery wrapper: 401 → refresh → retry once; 403 `csrf_failed` → re-pair → retry once; at most one retry total across both paths, no chaining between them.
 - [x] 1.6 Expose `getReaderAccount()` (`GET /auth/me`, returning `ReaderAccountResponse` from `@siders/contracts`) and `signOutReader()` (`POST /auth/logout`), both through the recovery wrapper.
 - [x] 1.7 Leave `apps/web/lib/api.ts` unmodified and confirm nothing in it imports the new module.
@@ -16,6 +16,7 @@
 - [x] 2.4 Test that a retry rejected again triggers no second refresh or retry.
 - [x] 2.5 Test that concurrent 401s share exactly one in-flight refresh.
 - [x] 2.6 Test that a 403 `csrf_failed` re-pairs and retries once, and never refreshes.
+- [x] 2.9 Test that concurrent `csrf_failed` rejections share exactly one in-flight re-pairing request.
 - [x] 2.7 Test that recovery paths do not chain — a request retried after re-pairing is not then refreshed.
 - [x] 2.8 Test that the CSRF header is sent on state-changing requests and matches the cookie value.
 
@@ -24,7 +25,7 @@
 - [x] 3.1 Add `apps/web/lib/readerSession.tsx` as a Client Component exporting `ReaderSessionProvider` and `useReaderSession()`, with state `loading | anonymous | authenticated`.
 - [x] 3.2 Probe once on mount via `getReaderAccount()`; resolve `anonymous` immediately and without a fetch when the cookie check fails.
 - [x] 3.3 Implement `signOut()` that calls `signOutReader()` and resolves to `anonymous` regardless of the call's outcome.
-- [x] 3.4 Wrap `children` in `app/layout.tsx` with the provider, changing no page's caching directives and adding no `cookies()` call anywhere in the tree.
+- [x] 3.4 Wrap `SiteHeader`, `children`, and `SiteFooter` together in `app/layout.tsx` with the provider — `SiteHeader` is where `ReaderControl` is rendered (tasks 5.4, 5.5), so it must be inside the provider too, not just `children`. Changes no page's caching directives and adds no `cookies()` call anywhere in the tree.
 
 ## 4. Provider tests
 
@@ -46,6 +47,7 @@
 - [x] 6.2 Test that the authenticated state renders the name and a sign-out control.
 - [x] 6.3 Test that the loading state renders no signed-in presentation.
 - [x] 6.4 Test that the sign-in href carries the current in-app location as `next` and names no other origin.
+- [x] 6.5 Test that the sign-in href's `next` carries the query string on click — `usePathname()` alone drops it, which is why `/news`'s category filter needs the click-time `window.location` read in `ReaderControl.tsx`.
 
 ## 7. Caching verification
 
@@ -65,4 +67,4 @@
 ## 9. Configuration and completion
 
 - [x] 9.1 Document the `COOKIE_DOMAIN` requirement for any deployment where `apps/web` and `apps/api` are on different subdomains, and the per-environment `GOOGLE_REDIRECT_URI` registration. Already covered by `docs/ARCHITECTURE.md` §10 (production values and the "one registrable domain" rationale) and this change's own `proposal.md`/`design.md` — no new doc needed.
-- [x] 9.2 Run build, lint, and the full test suite; confirm no TypeScript errors and no `any`. `tsc --noEmit` clean, `eslint` clean on all new/modified files, `vitest run` 41/41 passing across the whole `apps/web` suite. `next build` could not be run to a fully clean success in this environment (no live API/database — see 7.2), but a clean-cache build produces an identical pre-existing prerender failure with and without this change, confirming no regression was introduced.
+- [x] 9.2 Run build, lint, and the full test suite; confirm no TypeScript errors and no `any`. `tsc --noEmit` clean, `eslint` clean on all new/modified files, `vitest run` 43/43 passing across the whole `apps/web` suite (547/547 across the monorepo). `next build` could not be run to a fully clean success in this environment (no live API/database — see 7.2), but a clean-cache build produces an identical pre-existing prerender failure with and without this change, confirming no regression was introduced.

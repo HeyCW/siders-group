@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ReaderControl } from './ReaderControl';
 import { ReaderSessionProvider } from '../../lib/readerSession';
 
@@ -64,6 +64,26 @@ describe('ReaderControl', () => {
     expect(href).toContain('/auth/google?next=');
     expect(href).toContain(encodeURIComponent('/news/some-article'));
     expect(href.startsWith('http://localhost:4000/')).toBe(true);
+  });
+
+  it('carries the query string into next on click, which usePathname alone drops', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    setCsrfCookie(null);
+    window.history.pushState({}, '', '/news?category=budaya');
+
+    render(
+      <ReaderSessionProvider>
+        <ReaderControl />
+      </ReaderSessionProvider>,
+    );
+
+    const link = await screen.findByRole('link', { name: /sign in/i });
+    // Rendered href (from usePathname, no query) — confirms the gap this click handler closes.
+    expect(link.getAttribute('href') ?? '').not.toContain(encodeURIComponent('?category=budaya'));
+
+    fireEvent.click(link);
+
+    expect(link.getAttribute('href') ?? '').toContain(encodeURIComponent('/news?category=budaya'));
   });
 
   it('renders the name and a sign-out control when authenticated', async () => {

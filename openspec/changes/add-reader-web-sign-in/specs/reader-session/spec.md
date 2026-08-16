@@ -94,11 +94,20 @@ When a state-changing request is rejected for a missing or invalid CSRF token, t
 recover by calling the CSRF re-pairing endpoint and retrying the original request once, and SHALL
 NOT attempt a session refresh for that rejection. A request SHALL be retried at most once across
 both recovery paths combined, and one path SHALL NOT chain into the other for the same rejection.
+Regardless of how many requests discover this rejection at approximately the same time, the site
+SHALL have at most one re-pairing request in flight at any time, and every request that discovers
+the rejection while one is already in flight SHALL await that same attempt rather than starting
+its own.
 
 #### Scenario: A stale CSRF cookie is re-paired and the request retried
 
 - **WHEN** a state-changing request is rejected for a missing or invalid CSRF token
 - **THEN** the site calls the re-pairing endpoint and retries the original request exactly once
+
+#### Scenario: Concurrent CSRF failures share one re-pairing attempt
+
+- **WHEN** multiple requests are rejected for a missing or invalid CSRF token at approximately the same time
+- **THEN** the site issues exactly one re-pairing request, and every rejected request retries only after that one attempt resolves
 
 #### Scenario: A CSRF failure does not trigger a refresh
 
