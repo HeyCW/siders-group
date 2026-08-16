@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { NavLinks } from './NavLinks';
+import { ReaderControl } from './ReaderControl';
 
 /**
  * Hidden above the fold (the full masthead is already visible there) and slides in once the
@@ -27,7 +28,14 @@ export function StickyNav() {
         <Link href="/" className="font-serif text-lg font-bold tracking-[0.14em]">
           SIDERS
         </Link>
-        <NavLinks />
+        {/* Grouped so the row stays two-child and `justify-between` keeps NavLinks where it
+            was — ReaderControl joins the existing right-hand space rather than becoming a
+            third flex item that would re-center it (design.md - "The utility slot renders in
+            both header surfaces"). */}
+        <div className="flex items-center gap-4">
+          <NavLinks />
+          <ReaderControl className="shrink-0" />
+        </div>
       </div>
     </div>
   );

@@ -519,9 +519,9 @@ https://cdn.siders.id/cdn-cgi/image/width=800,quality=75,format=auto/media/cover
 | `/news/[slug]` | SSG + on-demand revalidate on publish | Fastest possible article load, correct OG tags |
 | `/contact` | Static | — |
 
-Server Components fetch from the API directly over the internal URL, forwarding the incoming cookie header so the server render knows whether the reader is signed in. Only genuinely interactive leaves — like button, comment composer, share sheet, reels player — are Client Components.
+Server Components fetch from the API directly over the internal URL. Reader session state is deliberately **not** forwarded to them: `add-reader-web-sign-in` resolves it client-side instead, because reading the cookie header in a Server Component — even just in the root layout — would opt the whole route tree into dynamic rendering and kill ISR on `/` and SSG on `/news/[slug]`. Public content is identical for anonymous and signed-in readers; only the masthead's session-dependent control varies, and it resolves after the route's content is already rendered. This is revisited if an inherently-dynamic authenticated route (e.g. `/account`) is ever added to justify forwarding the cookie. Only genuinely interactive leaves — like button, comment composer, share sheet, reels player — are Client Components.
 
-Data fetching uses TanStack Query on the client for comments and likes, with `credentials: 'include'` on every request so session cookies travel. A single fetch wrapper handles the 401 → refresh → retry cycle in one place; never scatter that logic across call sites.
+Data fetching uses TanStack Query on the client for comments and likes, with `credentials: 'include'` on every request so session cookies travel. A single fetch wrapper handles the 401 → refresh → retry cycle in one place; never scatter that logic across call sites — `apps/web/lib/authApi.ts` is this for reader session calls today.
 
 ### 8.2 `apps/admin` — Vite SPA
 
