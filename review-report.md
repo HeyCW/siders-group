@@ -1,6 +1,6 @@
 # Review report
 
-**Verdict:** Rejected with changes
+**Verdict:** Approve with changes
 
 ## Reviewed at
 | Range | Files | +/- | Date |
@@ -14,21 +14,18 @@ Spec-only change: the `add-reader-web-sign-in` OpenSpec proposal for reader Goog
 — whether the change's factual claims about the existing codebase are true, and whether the design
 holds up if built exactly as written.
 
-The factual claims are, with one exception, accurate; the load-bearing ones were each re-derived
-from source (see "Verified as accurate"). The central design argument — that the anonymous fast
-path is a correctness requirement rather than an optimization, because probing unconditionally
-would let anonymous traffic behind a shared NAT drain `refreshRateLimiter()`'s 30-per-15-minutes
-budget and lock out genuine returning readers — checks out exactly as written, including the
-`401 invalid_refresh_token` shape the throttled caller receives.
+The claims are accurate. Every load-bearing one was re-derived from source (see "Verified as
+accurate"), and none were found wrong. The central design argument — that the anonymous fast path
+is a correctness requirement rather than an optimization, because probing unconditionally would let
+anonymous traffic behind a shared NAT drain `refreshRateLimiter()`'s 30-per-15-minutes budget and
+lock out genuine returning readers — checks out exactly as written, including the
+`401 invalid_refresh_token` shape the throttled caller receives. The scoping is disciplined: the
+non-goals are real non-goals, the deferred pieces are each named with the condition that would
+revive them, and the risks section states the failure modes plainly rather than defensively.
 
-Three findings rise to **Major**, all resolvable by editing the artifacts before task 1.1 begins.
-The provider-placement task would ship a control that cannot read its own context, because
-`SiteHeader` sits outside `{children}` in the current layout. The spec delta drops the
-single-flight requirement that the mirrored `admin-session` capability states for the same CSRF
-re-pairing mechanism, while `tasks.md` implements it — so the archived contract would not require
-behavior the code has. And the change makes a spec requirement that directly contradicts
-`docs/ARCHITECTURE.md` §8.1 without the doc-amendment task this repo has attached to every
-comparable departure. Three Minor findings follow. Nothing here is a security defect.
+Two Minor findings and one Nit, none of which change the design. Both Minor findings are one-line
+edits to `tasks.md`. Nothing here is a correctness, security, or performance defect in the design
+itself.
 
 Standards used: `CLAUDE.md`, `docs/ARCHITECTURE.md`, the eight archived changes in
 `openspec/changes/archive/`, and the existing capability specs in `openspec/specs/` — chiefly
@@ -37,23 +34,58 @@ Standards used: `CLAUDE.md`, `docs/ARCHITECTURE.md`, the eight archived changes 
 `openspec/config.yaml` is an unfilled template. Conventions findings therefore cite `file:line`
 precedent from archived changes rather than a named rule.
 
+## Severity calibration
+
+A first pass graded this 3 Major + 3 Minor. Both counts were wrong, and the correction is recorded
+here rather than quietly applied — the same disposition the PR #9 review used.
+
+Three findings were withdrawn entirely on re-reading them in the surrounding artifact rather than
+against an idealized one:
+
+- **"`design.md:12` says the reader client is keyed on 401, but the CSRF branch is a 403."**
+  Withdrawn. The paragraph opens with "**Readers are rejected with 401, staff with 403**" and is
+  explicitly contrasting the two clients' *session* branches. Within that frame "keyed on 401" is
+  correct shorthand, and `tasks.md:7` (1.5) spells out both branches unambiguously. Reading the
+  clause without its own paragraph's frame was the error.
+- **"`StickyNav`'s right-hand space is not clear — it holds `NavLinks`."** Withdrawn. The row is
+  `max-w-[1120px]` holding a short wordmark and three 11px uppercase links
+  (`apps/web/lib/content.tsx:13-17`). There is abundant clear space, which is the design's actual
+  claim; whether the control becomes a third flex child or joins a wrapper is a layout detail
+  resolved on sight, not a spec question.
+- **"The fast path's accepted lockout is absent from the normative spec."** Withdrawn on two
+  counts. `design.md` already weighs it explicitly as a "second-order effect worth accepting", and
+  `design.md` archives alongside the spec in the same change directory. The spec requirement also
+  already states the behavior normatively — a caller with no CSRF marker is resolved anonymous
+  with no request issued — which covers a caller holding `sid_rt` without needing a separate
+  scenario.
+
+Two findings were downgraded:
+
+- The provider-placement finding was graded Major on the theory that it "fails quietly". It does
+  not. It is a one-word imprecision in a task line that surfaces the moment task 5.5 is written,
+  and the design intent is unambiguous. **Minor.**
+- The `ARCHITECTURE.md` §8.1 finding was graded Major against `add-auth-foundation`'s §14, which
+  rewrote sections that had become *wrong*. This change defers a behavior §8.1 *anticipated* but
+  that never existed, which is the shape of `add-news-management-system`'s single deferral note,
+  not a seven-task rewrite. **Minor.**
+- The CSRF single-flight finding was graded Major by holding the reader spec to `admin-session`'s
+  requirement set. That imports a concurrency concern this change does not have and whose omission
+  the design deliberately argues. **Nit.**
+
 ## Findings
 
 | # | Severity | Aspect(s) | File:line | Title |
 |---|---|---|---|---|
-| 1 | Major | correctness | `openspec/changes/add-reader-web-sign-in/tasks.md:27` | Wrapping only `children` leaves both render sites of the control outside the provider |
-| 2 | Major | conventions, correctness | `openspec/changes/add-reader-web-sign-in/specs/reader-session/spec.md:92` | Spec omits the single-flight requirement for CSRF re-pairing that `tasks.md` implements and `admin-session` mandates |
-| 3 | Major | conventions | `openspec/changes/add-reader-web-sign-in/proposal.md:33` | A spec requirement contradicts `docs/ARCHITECTURE.md` §8.1, with no task to amend it |
-| 4 | Minor | correctness | `openspec/changes/add-reader-web-sign-in/design.md:12` | "A mirror of it keyed on 401" is wrong for the CSRF branch, which is a 403 |
-| 5 | Minor | correctness | `openspec/changes/add-reader-web-sign-in/design.md:124` | `StickyNav`'s right-hand space is not clear — it holds `NavLinks` |
-| 6 | Minor | conventions | `openspec/changes/add-reader-web-sign-in/specs/reader-session/spec.md:20` | The fast path's accepted lockout is argued in `design.md` but absent from the normative spec |
+| 1 | Minor | correctness | `openspec/changes/add-reader-web-sign-in/tasks.md:27` | Wrapping `children` puts the provider below both render sites of the control |
+| 2 | Minor | conventions | `openspec/changes/add-reader-web-sign-in/proposal.md:33` | The §8.1 deferral is recorded in the change but not in `docs/ARCHITECTURE.md` |
+| 3 | Nit | conventions | `openspec/changes/add-reader-web-sign-in/tasks.md:6` | Task 1.4's single-flight qualifier has no spec requirement or test behind it |
 
 ## Details
 
-### 1. Major — Wrapping only `children` leaves both render sites of the control outside the provider
+### 1. Minor — Wrapping `children` puts the provider below both render sites of the control
 
 `tasks.md:27` (3.4) says "Wrap `children` in `app/layout.tsx` with the provider", and
-`proposal.md:66` states the same in Impact: "Modified: `app/layout.tsx` wraps children in the
+`proposal.md:66` restates it in Impact: "Modified: `app/layout.tsx` wraps children in the
 provider."
 
 `apps/web/app/layout.tsx:30-32` renders:
@@ -66,17 +98,16 @@ provider."
 </body>
 ```
 
-`<SiteHeader />` is a sibling of `{children}`, not a descendant. `SiteHeader` is where
-`apps/web/components/layout/SiteHeader.tsx:9` renders `<StickyNav />`, and tasks 5.4 and 5.5
-(`tasks.md:40-41`) put `ReaderControl` in *both* of those surfaces. Wrapping only `{children}`
-therefore leaves every render site of the session-dependent control outside the provider's
-context, and `useReaderSession()` resolves against no provider.
+`<SiteHeader />` is a sibling of `{children}`, not a descendant, and it is where
+`apps/web/components/layout/SiteHeader.tsx:9` renders `<StickyNav />`. Tasks 5.4 and 5.5
+(`tasks.md:40-41`) put `ReaderControl` in both of those surfaces. Taken literally, 3.4 places the
+provider below every render site of the control.
 
-This fails quietly in the direction the change cares about: the component tests in section 6 mount
-`ReaderControl` under their own wrapper and pass, the caching checks in section 7 pass, and the
-defect surfaces only at manual step 8.2.
+This is an imprecision in the task text, not a flaw in the design — the provider obviously has to
+enclose the header, and an implementer hits the missing context the moment they write 5.5. Worth
+fixing because it costs one word now and a few minutes of confusion later.
 
-**Fix.** State the wrap in terms of the body's contents, not `children`:
+**Fix.** State the wrap in terms of the body's contents rather than the `children` prop:
 
 ```tsx
 <body className="min-h-screen bg-paper font-serif text-ink">
@@ -88,147 +119,87 @@ defect surfaces only at manual step 8.2.
 </body>
 ```
 
-Amend `tasks.md:27` and `proposal.md:66` to match. This does not weaken the change's caching
-argument — `ReaderSessionProvider` is a Client Component boundary, so wrapping Server Component
-children in it leaves them server-rendered; the `revalidate` exports on `app/page.tsx:13` and
-`app/news/[slug]/page.tsx:12` are untouched either way.
+Amend `tasks.md:27` and `proposal.md:66` to match. This does not weaken the caching argument:
+`ReaderSessionProvider` is a Client Component boundary, so Server Component children passed
+through it stay server-rendered, and the `revalidate` exports on `app/page.tsx:13` and
+`app/news/[slug]/page.tsx:12` are untouched. Task 7.2 already checks that.
 
-### 2. Major — Spec omits the single-flight requirement for CSRF re-pairing
+### 2. Minor — The §8.1 deferral is recorded in the change but not in `docs/ARCHITECTURE.md`
 
-`spec.md:92`, "A CSRF failure is recovered by re-pairing, not by refreshing", specifies the
-branch, the single retry, and the no-chaining rule — but says nothing about concurrency, and has
-no scenario for concurrent `csrf_failed` rejections. Contrast the sibling capability at
-`openspec/specs/admin-session/spec.md:98`, which states it explicitly:
-
-> Regardless of how many requests discover a `csrf_failed` 403 at approximately the same time, the
-> app SHALL have at most one such recovery call in flight at a time […]
-
-and backs it with a "Concurrent CSRF failures share one recovery call" scenario. The reader spec's
-own refresh requirement (`spec.md:74`) does carry the equivalent guarantee, so the omission reads
-as an oversight rather than a decision.
-
-Meanwhile `tasks.md:6` (1.4) says "Implement **single-flight** `bootstrapCsrfCookie()`", and
-`apps/admin/src/lib/api.ts` already ships exactly that mechanism. So the change implements a
-behavior its own normative spec does not require. That inversion matters here because the spec
-delta is what gets archived into `openspec/specs/reader-session/` and becomes the durable
-contract: a later refactor could delete `inFlightBootstrap` and violate nothing.
-
-**Fix.** Add the concurrency sentence and a matching scenario to `spec.md:92`, mirroring
-`admin-session`'s wording, and add a test task alongside `tasks.md:14` (2.6) covering concurrent
-`csrf_failed` — section 2 currently tests concurrent 401s (2.5) but not concurrent CSRF failures.
-
-Alternatively, if single-flight bootstrap is genuinely unnecessary at one write endpoint, drop
-task 1.4's single-flight qualifier and say so in `design.md` — but note that `design.md` does not
-currently discuss the bootstrap mechanism at all, whereas the admin change recorded the reasoning
-("Bootstrap is single-flight for stampede avoidance, not for the destructive reason refresh is").
-
-### 3. Major — A spec requirement contradicts `docs/ARCHITECTURE.md` §8.1, with no task to amend it
-
-`docs/ARCHITECTURE.md` §8.1 currently states:
+`docs/ARCHITECTURE.md` §8.1 states:
 
 > Server Components fetch from the API directly over the internal URL, forwarding the incoming
 > cookie header so the server render knows whether the reader is signed in.
 
-This change does the opposite, and elevates the opposite into a normative requirement.
-`spec.md:139`, "Public content rendering does not vary by session", requires that "Session
-resolution SHALL happen after the route's content is rendered". `proposal.md:33` names the
-departure and argues it well — forwarding the cookie header from the root layout would opt the
-whole route tree into dynamic rendering and kill ISR on every article — but records it only as a
-non-goal of this change. Nothing amends §8.1, and `tasks.md` has no documentation section.
+`proposal.md:33` defers this, and does so properly — it cites the section by number, names the
+consequence (dynamic rendering across the route tree, killing ISR on every article), and states
+the condition that would revive it. `spec.md:139` then makes the deferred posture normative:
+session resolution "SHALL happen after the route's content is rendered".
 
-This repo's settled practice is to amend the architecture doc in the same change that departs from
-it, as an explicit task:
+The gap is only that nothing writes the deferral back into §8.1, and `tasks.md` section 9 covers
+env-var documentation (`COOKIE_DOMAIN`, `GOOGLE_REDIRECT_URI`) rather than the architecture doc.
+The precedent is `openspec/changes/archive/2026-08-11-add-news-management-system/tasks.md:113`,
+which is exactly this shape — a single task recording that media storage is local for this change
+and the R2 pipeline deferred.
 
-- `openspec/changes/archive/2026-08-09-add-auth-foundation/tasks.md:129-135` — a seven-task
-  section 14 rewriting §§4, 5.1, 5.3, 5.4, 5.5, and 11 after the auth design diverged.
-- `openspec/changes/archive/2026-08-11-add-news-management-system/tasks.md:113` — updating §7 to
-  record local-filesystem media storage and the deferred R2 pipeline.
+Worth doing because §8.1 is the document a future implementer reads first, and the sentence as
+written points at the one approach this change establishes must not be taken from the root layout.
+It is Minor rather than Major because §8.1's own route-strategy table already shows `/` as ISR and
+`/news/[slug]` as SSG on the same screen, so the tension is visible in place.
 
-The consequence of skipping it is concrete: §8.1 remains the document a future implementer reads,
-and following it would reintroduce the exact ISR regression this change exists to avoid.
+**Fix.** Add one task to section 9: amend §8.1 to record that reader session state resolves
+client-side, that public routes deliberately do not vary by session, and the condition under which
+server-rendered session state is revisited. §8.1's next paragraph — "A single fetch wrapper handles
+the 401 → refresh → retry cycle in one place; never scatter that logic across call sites" — is
+satisfied by this change and needs no edit.
 
-**Fix.** Add a documentation task updating §8.1 to record that reader session state resolves
-client-side, that public routes deliberately do not vary by session, and why — the same shape as
-the two precedents above. §8.1's next paragraph ("A single fetch wrapper handles the 401 → refresh
-→ retry cycle in one place; never scatter that logic across call sites") is satisfied by this
-change and needs no edit; only the cookie-forwarding sentence is now wrong.
+### 3. Nit — Task 1.4's single-flight qualifier has no spec requirement or test behind it
 
-### 4. Minor — "A mirror of it keyed on 401" is wrong for the CSRF branch
+`tasks.md:6` (1.4) says "Implement **single-flight** `bootstrapCsrfCookie()`". No requirement in
+the spec delta asks for it, no test task covers it (section 2 tests concurrent 401s at 2.5 but not
+concurrent `csrf_failed`), and `design.md` does not discuss it.
 
-`design.md:12` says the admin interceptor "is therefore 403-keyed and cannot be reused verbatim —
-the reader client is a mirror of it keyed on 401, with two recovery branches instead of three".
+This is deliberate rather than an oversight, and the asymmetry is defensible: `spec.md:74` requires
+single-flight refresh because a raced second presentation of a refresh credential is treated as
+reuse and revokes the session lineage, whereas a duplicated bootstrap merely re-issues the same
+cookie. `design.md` argues that distinction directly. The reader client also has exactly one write
+(`POST /auth/logout`), so there is no concurrency to guard — unlike the admin client, where
+autosave, publish, and taxonomy CRUD are genuinely concurrent, which is why
+`openspec/specs/admin-session/spec.md:98` states the guarantee there.
 
-The branch count is right — `apps/admin/src/lib/api.ts` branches on `csrf_failed`, `forbidden`,
-and `password_change_required`, and readers have no `password_change_required` concept. But the
-reader client cannot be keyed on 401 alone. `createCsrfMiddleware` raises
-`new AppError('CSRF token missing or invalid', 403, 'csrf_failed')`
-(`apps/api/src/lib/csrf.ts:105-118`), so the CSRF branch this change specifies at `spec.md:92` is
-still a **403**. `tasks.md:7` (1.5) gets this right — "401 → refresh → retry once; 403
-`csrf_failed` → re-pair → retry once" — but `design.md` is the document an implementer reads for
-intent, and as written it describes a client that never enters its own CSRF branch.
-
-**Fix.** Reword to something like: "the reader client is a mirror of it, keyed on 401 for the
-session branch while the CSRF branch stays 403-keyed as it is in the admin client, with two
-recovery branches instead of three."
-
-### 5. Minor — `StickyNav`'s right-hand space is not clear
-
-`design.md:124` says `StickyNav` "already has a `justify-between` row with clear space at the
-right", and `tasks.md:40` (5.4) says to render the control "in `StickyNav`'s existing right-hand
-space".
-
-`apps/web/components/layout/StickyNav.tsx:26-32` is a two-child `justify-between` row: the
-wordmark `<Link>` on the left and `<NavLinks />` on the right. The right-hand slot is occupied.
-Adding a third child redistributes all three across the row and moves `NavLinks` to the centre,
-silently changing the sticky bar's composition — the same kind of layout fight `design.md:122`
-correctly identifies as the reason not to put the control in the masthead.
-
-**Fix.** Say explicitly that the control is grouped with `NavLinks` inside a shared right-hand
-wrapper (so the row stays two-child), and correct the "clear space" phrasing in `design.md:124`.
-
-### 6. Minor — The fast path's accepted lockout is argued in `design.md` but absent from the spec
-
-`spec.md:20`, "A reader with no session marker triggers no session request", makes the absence of
-the CSRF cookie conclusive. `design.md:95-98` correctly identifies and accepts the consequence: a
-reader holding a live `sid_rt` but no `csrf_token` is shown as signed out despite holding a usable
-credential, costing "one extra sign-in click rather than an error".
-
-Worth recording as a requirement rather than only as design prose, because the platform has a
-mechanism aimed at exactly this state that this change deliberately does not use.
-`openspec/specs/authentication/spec.md:93`, "A CSRF cookie can be re-paired with an existing
-session", specifies `GET /auth/csrf` to recover "a live `sid_rt` with no `csrf_token`", and
-`apps/api/src/modules/auth/auth.routes.ts:135-152` implements it against the refresh credential.
-The reader client will hold that credential and decline to use it. That is a defensible choice —
-probing `/auth/csrf` unconditionally would reintroduce a per-visitor request and drag the
-bootstrap rate limiter into the anonymous path — but as written, a future reader of the archived
-capability sees only "absence is conclusive" with no record that the alternative was weighed.
-
-**Fix.** Add a short scenario or a normative sentence to `spec.md:20` stating that a caller
-holding a session credential but no CSRF marker is resolved as anonymous and is not re-paired, so
-the behavior is specified rather than incidental.
+The only residue is that a task implements a behavior nothing else in the change records, which is
+the kind of thing `openspec-verify-change` flags. Resolvable either way in one line: drop the
+qualifier from 1.4, or add a sentence to `spec.md:92` and a test to section 2. Not worth blocking
+on.
 
 ## Verified as accurate
 
-Checked against source; all correct as stated:
+Checked against source; all correct as stated. Listed so a second pass does not have to re-derive
+them:
 
 - The whole consumed API surface exists as described — `GET /auth/google` and
   `/auth/google/callback` (`google.routes.ts:53,71`), `GET /auth/me` behind `requireReader()`,
   `POST /auth/refresh`, `POST /auth/logout`, and `GET /auth/csrf` (`auth.routes.ts:126-152`).
 - `requireReader()` answers `401 unauthenticated` while `requireStaff`/`requirePermission` answer
   `403 forbidden` for the same condition (`apps/api/src/middleware/authorize.ts:110-116`, `195`,
-  `224`) — the premise the whole 401-keyed design rests on.
+  `224`) — the premise the 401-keyed session branch rests on.
 - `refreshRateLimiter()` is 30 per 15 minutes keyed on `clientIp`, and a throttled caller receives
-  `401 invalid_refresh_token`, identical to a genuine rejection
-  (`auth.routes.ts:19,36,71-78`). The design's NAT-exhaustion argument holds precisely.
+  `401 invalid_refresh_token`, identical to a genuine rejection (`auth.routes.ts:19,36,71-78`).
+  The NAT-exhaustion argument holds precisely, including the claim that the failure is invisible in
+  development and looks like a backend bug.
 - `csrf_token` is `httpOnly: false` (`csrf.ts:66-76`) and is set with
   `maxAge: REFRESH_TOKEN_MAX_AGE_MS` at every call site — sign-in, refresh, and re-pairing
   (`google.routes.ts:112`, `auth.controller.ts:27`, `auth.routes.ts:146`) — which is 30 days
-  (`cookies.ts:11`), matching `sid_rt`. It is never issued without a session, so the fast path's
-  premise is sound.
+  (`cookies.ts:11`), matching `sid_rt`. It is never issued without an identifiable session
+  (`auth.routes.ts:139-147`), so the fast path's premise that the cookie implies a session is sound.
+- Two concurrent refreshes really would revoke the session lineage, per
+  `openspec/specs/authentication/spec.md:216` — so single-flight refresh is load-bearing as claimed.
 - `COOKIE_DOMAIN` is `z.string().optional()` with no default (`apps/api/src/config/env.ts:86`),
-  making session cookies host-only exactly as the risk states.
+  making session cookies host-only exactly as the risk states, and the localhost-shared-host
+  explanation for why local development works is correct.
 - `resolveRedirectTarget` validates `next` against `APP_ORIGIN` and `ADMIN_ORIGIN` and falls back
-  to the default landing page (`apps/api/src/lib/redirect.ts:14-29`).
+  to the default landing page (`apps/api/src/lib/redirect.ts:14-29`), so the open-redirect claim
+  holds.
 - `apps/web/lib/api.ts` is public-only by construction and documents itself as such;
   `revalidate = 60` on `app/page.tsx:13` and `app/news/[slug]/page.tsx:12`, `cache: 'no-store'` on
   `app/news/page.tsx:21-22`.
@@ -238,6 +209,9 @@ Checked against source; all correct as stated:
 - `StickyNav`'s `scrollY > 240` threshold and the masthead's `clamp(…,92px)` serif wordmark are
   both as described (`StickyNav.tsx:16`, `SiteHeader.tsx:16-19`).
 - Access credential lifetime is 15 minutes (`cookies.ts:10`), so manual step 8.3 is correct.
+- A deactivated reader is genuinely indistinguishable from no session: `requireReader()` returns
+  the same `401 unauthenticated` for `status !== 'active'` as for no session at all
+  (`authorize.ts:114-116`). The spec is right to specify this rather than leave it accidental.
 - `proposal.md:44` — "Modified Capabilities: None" — holds. `openspec/specs/web-public-site/spec.md`
   has no masthead, header, or session requirement that a session-dependent control would alter.
 
@@ -249,11 +223,11 @@ Checked against source; all correct as stated:
 | Spec delta format — `## ADDED Requirements`, `### Requirement:` with SHALL wording, `#### Scenario:` in WHEN/THEN form | Yes |
 | `proposal.md` structure — Why / What Changes / Capabilities / Impact, with New and Modified capability subsections | Yes |
 | `design.md` structure — Context / Goals-Non-Goals / Decisions / Risks-Trade-offs / Migration Plan | Yes |
-| New capability mirrors its sibling's requirement set where the concern is shared (`admin-session`) | **No** — finding 2 |
-| `docs/ARCHITECTURE.md` amended in the change that departs from it (precedent: `add-auth-foundation` §14, `add-news-management-system` 12.1) | **No** — finding 3 |
+| Deviations from `docs/ARCHITECTURE.md` recorded in the change (precedent: `add-news-management-system` 12.1) | Partly — recorded in `proposal.md:33`, not written back to §8.1 (finding 2) |
 | `CLAUDE.md` — Testing: build, lint, tests, no TS errors before completion | Yes — `tasks.md:68` (9.2) |
 | `CLAUDE.md` — TypeScript strict, never `any` | Yes — `tasks.md:68` (9.2) states it explicitly |
-| `CLAUDE.md` — Composition over inheritance, no duplicated logic | Yes — the deliberate duplication at `design.md:73-75` is argued rather than incidental |
+| `CLAUDE.md` — Composition over inheritance, no duplicated logic | Yes — the deliberate duplication at `design.md:73-75` is argued, not incidental |
+| `CLAUDE.md` — Frontend: hooks over classes, reusable components | Yes — one provider + hook, one shared `ReaderControl` across both surfaces |
 
 ---
 _Generated by [Claude Code](https://claude.ai/code)_
