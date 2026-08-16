@@ -201,23 +201,11 @@ describe('PartnerService.reorder', () => {
   });
 });
 
-describe('PartnerService revalidation failure', () => {
-  it('does not fail the write when revalidation fails', async () => {
-    // `revalidateHomePath` (lib/revalidate.ts) already swallows every failure internally and
-    // never rejects — this service awaits it with no try/catch, inheriting that guarantee rather
-    // than re-implementing it (specs/partner-management/spec.md - "Revalidation failure does not
-    // fail the write"). This test documents that the mock here matches the real contract: a
-    // service call resolves normally even though revalidation was attempted.
-    revalidateHomePathMock.mockClear();
-    revalidateHomePathMock.mockResolvedValueOnce(undefined);
-    const { repository } = createFakePartnerRepository();
-    const service = createPartnerService(repository, revalidateEnv, logger);
-
-    await expect(
-      service.create({ name: 'Acme', logoMediaId: '11111111-1111-1111-1111-000000000001', websiteUrl: 'https://acme.example.com' }),
-    ).resolves.toMatchObject({ name: 'Acme' });
-  });
-});
+// "Revalidation failure does not fail the write" is not testable here: this file mocks
+// `revalidateHomePath`, so making the mock reject would test a contract the real helper does not
+// have (it swallows every failure internally and never rejects), while making it resolve tests
+// nothing at all. That claim is covered for real in `partner.service.revalidation.test.ts`, which
+// runs the genuine helper over a failing `fetch`.
 
 describe('PublicPartnerService.listPublic', () => {
   it('returns only active partners', async () => {

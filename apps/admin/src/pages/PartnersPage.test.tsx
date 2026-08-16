@@ -66,8 +66,49 @@ describe('PartnersPage — new partner form', () => {
 
     fireEvent.change(screen.getByLabelText('Website URL'), { target: { value: 'not-a-url' } });
 
-    expect(screen.getByText('Enter a valid absolute URL.')).toBeTruthy();
+    expect(screen.getByText('Enter a valid http(s) URL.')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Add partner' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  /** The form validates by the same `isHttpUrl` the request contract refines on, so a scheme the
+   *  server would reject is caught here rather than coming back as an opaque 400
+   *  (specs/partner-management/spec.md - "The admin surface rejects it before submission"). */
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>'])(
+    'rejects the non-http(s) scheme %s',
+    async (value) => {
+      await renderPage();
+
+      fireEvent.change(screen.getByLabelText('Website URL'), { target: { value } });
+
+      expect(screen.getByText('Enter a valid http(s) URL.')).toBeTruthy();
+      expect((screen.getByRole('button', { name: 'Add partner' }) as HTMLButtonElement).disabled).toBe(true);
+    },
+  );
+});
+
+describe('PartnersPage — edit form', () => {
+  /** The edit form validates the website URL by the same rule as the create form, rather than
+   *  letting the server's 400 be the only feedback. */
+  it('blocks saving an edit whose website URL is invalid, with field-level feedback', async () => {
+    await renderPage([partner({ id: 'a' })]);
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Edit' }).click();
+    });
+
+    // Both the create form and the open edit row label a field "Website URL"; this is the edit
+    // row's, distinguished by the per-partner id the page assigns it.
+    const urlInput = screen
+      .getAllByLabelText('Website URL')
+      .find((el) => el.id === 'edit-partner-website-url-a') as HTMLInputElement;
+    fireEvent.change(urlInput, { target: { value: 'javascript:alert(1)' } });
+
+    expect(screen.getByText('Enter a valid http(s) URL.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(partnersApi.update).not.toHaveBeenCalled();
+
+    fireEvent.change(urlInput, { target: { value: 'https://acme.example.com' } });
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
 

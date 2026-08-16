@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isHttpUrl,
   partnerCreateRequestSchema,
   partnerReorderRequestSchema,
   partnerUpdateRequestSchema,
@@ -43,6 +44,25 @@ describe('partnerCreateRequestSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  /**
+   * `z.string().url()` alone accepts every one of these — `new URL()` parses any scheme. They
+   * reach an `href` on the public home page, so the scheme allowlist is what stops a
+   * `settings.manage` holder from planting executable script there
+   * (specs/partner-management/spec.md - "A partner website URL must be http or https").
+   */
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)', 'file:///etc/passwd'])(
+    'rejects the non-http(s) scheme %s',
+    (websiteUrl) => {
+      const result = partnerCreateRequestSchema.safeParse({ name: 'Acme Corp', logoMediaId: id(1), websiteUrl });
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it.each(['http://acme.example.com', 'https://acme.example.com/path?q=1'])('accepts %s', (websiteUrl) => {
+    const result = partnerCreateRequestSchema.safeParse({ name: 'Acme Corp', logoMediaId: id(1), websiteUrl });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects an extra field, such as a client-supplied sortOrder', () => {
     const result = partnerCreateRequestSchema.safeParse({
       name: 'Acme Corp',
@@ -62,6 +82,11 @@ describe('partnerUpdateRequestSchema', () => {
 
   it('rejects a website URL that is not a valid absolute URL', () => {
     const result = partnerUpdateRequestSchema.safeParse({ websiteUrl: 'not-a-url' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a non-http(s) scheme on update, the same as on create', () => {
+    const result = partnerUpdateRequestSchema.safeParse({ websiteUrl: 'javascript:alert(1)' });
     expect(result.success).toBe(false);
   });
 
@@ -85,5 +110,21 @@ describe('partnerReorderRequestSchema', () => {
   it('rejects duplicate ids', () => {
     const result = partnerReorderRequestSchema.safeParse({ partnerIds: [id(1), id(1)] });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('isHttpUrl', () => {
+  it.each([
+    ['https://acme.example.com', true],
+    ['http://acme.example.com', true],
+    ['javascript:alert(1)', false],
+    ['data:text/html,<script>alert(1)</script>', false],
+    ['vbscript:msgbox(1)', false],
+    ['file:///etc/passwd', false],
+    ['mailto:hi@acme.example.com', false],
+    ['not-a-url', false],
+    ['', false],
+  ])('%s -> %s', (value, expected) => {
+    expect(isHttpUrl(value)).toBe(expected);
   });
 });

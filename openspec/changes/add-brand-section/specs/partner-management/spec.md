@@ -41,6 +41,26 @@ SHALL have a name, a logo, a website URL, and an active flag defaulting to activ
 - **WHEN** a staff member submits a partner with a website URL that is not a valid absolute URL
 - **THEN** the system rejects the request and does not create or update the partner
 
+### Requirement: A partner website URL must be http or https
+A partner's website URL is rendered as a link target on a public page, so validity as an absolute
+URL is not sufficient: the scheme SHALL be `http` or `https`. Any other scheme — including
+`javascript`, `data`, `vbscript`, `file` and `mailto` — SHALL be rejected on both create and
+update. The rule SHALL be enforced by the shared request contract, so the admin surface and the
+API cannot diverge on it.
+
+#### Scenario: A script-bearing scheme is rejected
+- **WHEN** a staff member submits a partner whose website URL uses the `javascript` or `data` scheme
+- **THEN** the system rejects the request, creates or updates no partner, and no such value is ever
+  served to the public site
+
+#### Scenario: An ordinary web address is accepted
+- **WHEN** a staff member submits a partner whose website URL uses `http` or `https`
+- **THEN** the request is accepted
+
+#### Scenario: The admin surface rejects it before submission
+- **WHEN** a staff member types a website URL with a non-http(s) scheme into the partner form
+- **THEN** the form reports it as invalid and does not allow the partner to be saved
+
 #### Scenario: Admin list includes inactive partners
 - **WHEN** a staff member holding `settings.manage` lists partners
 - **THEN** the response includes both active and inactive partners

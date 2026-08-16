@@ -65,4 +65,40 @@ describe('PartnerGrid', () => {
     expect(staticGrid.querySelector('.animate-marquee')).toBeNull();
     expect(staticGrid.className).toContain('motion-reduce:block');
   });
+
+  /**
+   * Pinning the two interaction states apart, because they are not the same and the difference is
+   * the fix for a measured bug: hover pauses in place, focus *clears* the animation so the track
+   * snaps back to `translateX(0)` where the tabbable copies live. With `focus-within` merely
+   * pausing, a link tabbed to mid-cycle measured 0 of 160px visible inside the `overflow-hidden`
+   * clip in Chromium — a transform does not move scroll position, so nothing recovered it. jsdom
+   * cannot evaluate either state, so this asserts the class contract that produces them; the
+   * behaviour itself is verified in a real browser (tasks.md 8.2).
+   */
+  it('pauses on hover but clears the animation on focus, so a focused tile returns to view', () => {
+    render(<PartnerGrid partners={partners} />);
+
+    const track = screen.getByTestId('partner-ticker').firstElementChild as HTMLElement;
+
+    expect(track.className).toContain('hover:[animation-play-state:paused]');
+    expect(track.className).toContain('focus-within:[animation:none]');
+    expect(track.className).not.toContain('focus-within:[animation-play-state:paused]');
+  });
+
+  /** The reduced-motion branch renders from the same `PartnerTile` as the ticker, so a reader who
+   *  prefers reduced motion still gets click-through to each partner's site — one reachable link
+   *  per partner, none of them `aria-hidden` duplicates. */
+  it('gives the reduced-motion grid one reachable link per partner, matching the ticker', () => {
+    render(<PartnerGrid partners={partners} />);
+
+    const staticGrid = screen.getByTestId('partner-static-grid');
+    const links = within(staticGrid).getAllByRole('link', { hidden: true });
+
+    expect(links).toHaveLength(partners.length);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(partners.map((p) => p.websiteUrl));
+    for (const link of links) {
+      expect(link).not.toHaveAttribute('aria-hidden');
+      expect(link).not.toHaveAttribute('tabindex');
+    }
+  });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { PartnerResponse } from '@siders/contracts';
+import { isHttpUrl, type PartnerResponse } from '@siders/contracts';
 import { ApiError } from '../lib/api.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { partnersApi } from '../lib/partnersApi.js';
@@ -24,14 +24,15 @@ function IconGrip({ className }: { className?: string }) {
   );
 }
 
-function isValidWebsiteUrl(value: string): boolean {
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/**
+ * The same predicate the server enforces, imported rather than re-derived: `isHttpUrl` is what
+ * `partnerCreateRequestSchema.websiteUrl` refines on, so this form cannot drift from the rule that
+ * actually decides the request (packages/contracts/src/partner.ts). A local `new URL()` check
+ * would accept `javascript:` and hand the operator a 400 they could not have predicted.
+ */
+const isValidWebsiteUrl = isHttpUrl;
+
+const WEBSITE_URL_HINT = 'Enter a valid http(s) URL.';
 
 /**
  * The partner directory: create, edit, delete, reorder, and toggle active partners backing the
@@ -54,6 +55,9 @@ export function PartnersPage() {
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  /** Bumped after a successful create so the file input remounts empty. Without it the input keeps
+   *  the previous selection and re-picking the same file fires no `change` event. */
+  const [logoInputKey, setLogoInputKey] = useState(0);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -90,6 +94,16 @@ export function PartnersPage() {
     !createState.loading &&
     !uploadingLogo;
 
+  // The edit form validates the same field by the same rule as the create form above — an invalid
+  // URL is caught here with field-level feedback rather than only as a generic 400 from the server.
+  const editWebsiteUrlIsInvalid = editWebsiteUrl.trim().length > 0 && !isValidWebsiteUrl(editWebsiteUrl.trim());
+  const canSaveEdit =
+    editName.trim().length > 0 &&
+    editWebsiteUrl.trim().length > 0 &&
+    !editWebsiteUrlIsInvalid &&
+    !updateState.loading &&
+    !editUploadingLogo;
+
   async function handleLogoSelected(file: File | null) {
     setLogoUploadError(null);
     if (!file) {
@@ -120,6 +134,7 @@ export function PartnersPage() {
       setWebsiteUrl('');
       setLogoPreviewUrl(null);
       setLogoMediaId(null);
+      setLogoInputKey((k) => k + 1);
     } catch {
       /* surfaced via createState.errorMessage */
     }
@@ -161,7 +176,7 @@ export function PartnersPage() {
   }
 
   async function handleSaveEdit() {
-    if (!editingId) return;
+    if (!editingId || !canSaveEdit) return;
     try {
       const updated = await runUpdate(editingId, {
         name: editName.trim(),
@@ -269,7 +284,7 @@ export function PartnersPage() {
               className={TEXT_INPUT}
             />
             {websiteUrlIsInvalid && (
-              <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">Enter a valid absolute URL.</p>
+              <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{WEBSITE_URL_HINT}</p>
             )}
           </div>
 
@@ -279,6 +294,7 @@ export function PartnersPage() {
               <label className={FILE_LABEL}>
                 Choose file
                 <input
+                  key={logoInputKey}
                   type="file"
                   accept="image/*"
                   onChange={(e) => handleLogoSelected(e.target.files?.[0] ?? null)}
@@ -348,6 +364,9 @@ export function PartnersPage() {
                       onChange={(e) => setEditWebsiteUrl(e.target.value)}
                       className={TEXT_INPUT}
                     />
+                    {editWebsiteUrlIsInvalid && (
+                      <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{WEBSITE_URL_HINT}</p>
+                    )}
                   </div>
                   <div>
                     <label className={FIELD_LABEL}>Replace logo (optional)</label>
@@ -374,7 +393,7 @@ export function PartnersPage() {
                     <button
                       type="button"
                       onClick={handleSaveEdit}
-                      disabled={updateState.loading || editUploadingLogo}
+                      disabled={!canSaveEdit}
                       className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
                     >
                       {updateState.loading ? 'Saving…' : 'Save'}

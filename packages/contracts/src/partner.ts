@@ -1,6 +1,30 @@
 import { z } from 'zod';
 
 /**
+ * A partner's website URL is the one admin-supplied value in this system that reaches an `href`
+ * on a public page (`apps/web/components/home/PartnerGrid.tsx`), so "absolute URL" is not a
+ * sufficient rule: `z.string().url()` defers to `new URL()`, which happily accepts
+ * `javascript:`, `data:` and `vbscript:`. React renders those into the SSR HTML with nothing but
+ * a console warning, which would turn `settings.manage` into script execution on the public site.
+ * The scheme allowlist is the guard (specs/partner-management/spec.md - "A partner website URL
+ * must be http or https"), and it is exported so the admin form validates identically rather than
+ * re-deriving the rule (`apps/admin/src/pages/PartnersPage.tsx`).
+ */
+export function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+const websiteUrlSchema = z
+  .string()
+  .url()
+  .refine(isHttpUrl, { message: 'Website URL must use http or https' });
+
+/**
  * A partner requires a logo at creation — mirrors `reelCreateRequestSchema.posterMediaId`
  * (specs/partner-management/spec.md - "A partner requires a logo"). `isActive` defaults to
  * active, matching the stored column default.
@@ -9,7 +33,7 @@ export const partnerCreateRequestSchema = z
   .object({
     name: z.string().min(1).max(200),
     logoMediaId: z.string().uuid(),
-    websiteUrl: z.string().url(),
+    websiteUrl: websiteUrlSchema,
     isActive: z.boolean().optional(),
   })
   .strict();
@@ -24,7 +48,7 @@ export const partnerUpdateRequestSchema = z
   .object({
     name: z.string().min(1).max(200).optional(),
     logoMediaId: z.string().uuid().optional(),
-    websiteUrl: z.string().url().optional(),
+    websiteUrl: websiteUrlSchema.optional(),
     isActive: z.boolean().optional(),
   })
   .strict();

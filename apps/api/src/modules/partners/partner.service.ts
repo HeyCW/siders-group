@@ -15,7 +15,6 @@ export interface PartnerService {
   update(id: string, input: UpdatePartnerInput): Promise<PartnerRow>;
   delete(id: string): Promise<void>;
   reorder(partnerIds: string[]): Promise<PartnerRow[]>;
-  listPublic(): Promise<PartnerRow[]>;
 }
 
 function invalidLogoMediaError(): AppError {
@@ -76,10 +75,6 @@ export function createPartnerService(
       const rows = await repository.reorder(partnerIds);
       await revalidateHomePath(revalidateEnv, logger);
       return rows;
-    },
-
-    listPublic() {
-      return repository.listActiveOrdered();
     },
   };
 }
