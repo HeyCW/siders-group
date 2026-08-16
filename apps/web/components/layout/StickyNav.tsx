@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { NavLinks } from './NavLinks';
+import { ReaderControl } from './ReaderControl';
 
 /**
  * Hidden above the fold (the full masthead is already visible there) and slides in once the
@@ -28,6 +29,7 @@ export function StickyNav() {
           SIDERS
         </Link>
         <NavLinks />
+        <ReaderControl className="shrink-0" />
       </div>
     </div>
   );

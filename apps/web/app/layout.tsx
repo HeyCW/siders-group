@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Source_Serif_4, Libre_Franklin } from 'next/font/google';
 import { SiteHeader } from '../components/layout/SiteHeader';
 import { SiteFooter } from '../components/layout/SiteFooter';
+import { ReaderSessionProvider } from '../lib/readerSession';
 import './globals.css';
 
 const sourceSerif = Source_Serif_4({
@@ -27,9 +28,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${sourceSerif.variable} ${libreFranklin.variable}`}>
       <body className="min-h-screen bg-paper font-serif text-ink">
-        <SiteHeader />
-        {children}
-        <SiteFooter />
+        <ReaderSessionProvider>
+          <SiteHeader />
+          {children}
+          <SiteFooter />
+        </ReaderSessionProvider>
       </body>
     </html>
   );
