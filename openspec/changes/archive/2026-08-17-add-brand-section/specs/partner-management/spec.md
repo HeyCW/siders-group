@@ -41,6 +41,10 @@ SHALL have a name, a logo, a website URL, and an active flag defaulting to activ
 - **WHEN** a staff member submits a partner with a website URL that is not a valid absolute URL
 - **THEN** the system rejects the request and does not create or update the partner
 
+#### Scenario: Admin list includes inactive partners
+- **WHEN** a staff member holding `settings.manage` lists partners
+- **THEN** the response includes both active and inactive partners
+
 ### Requirement: A partner website URL must be http or https
 A partner's website URL is rendered as a link target on a public page, so validity as an absolute
 URL is not sufficient: the scheme SHALL be `http` or `https`. Any other scheme — including
@@ -60,10 +64,6 @@ API cannot diverge on it.
 #### Scenario: The admin surface rejects it before submission
 - **WHEN** a staff member types a website URL with a non-http(s) scheme into the partner form
 - **THEN** the form reports it as invalid and does not allow the partner to be saved
-
-#### Scenario: Admin list includes inactive partners
-- **WHEN** a staff member holding `settings.manage` lists partners
-- **THEN** the response includes both active and inactive partners
 
 ### Requirement: A partner requires a logo
 A partner SHALL reference a logo image stored by this system as a media record. A partner SHALL
