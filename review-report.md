@@ -5,229 +5,203 @@
 ## Reviewed at
 | Range | Files | +/- | Date |
 |---|---|---|---|
-| `origin/main...origin/add-login-reader` (PR #12, head `66dae82`) | 5 | +510 / -0 | 2026-08-16 |
+| `origin/main...add-login-reader` (PR #12, head `49b03dd`) | 14 | +1220 / -4 | 2026-08-16 |
+
+Counts exclude `review-report.md` itself, which is on the branch as a review artifact rather than
+product code and is not reviewed here. The full range reads 15 files / +1413 / −622 with it
+included.
 
 ## Summary
 
-Spec-only change: the `add-reader-web-sign-in` OpenSpec proposal for reader Google sign-in in
-`apps/web`. No implementation code, so this review checks the same two things the PR #9 review did
-— whether the change's factual claims about the existing codebase are true, and whether the design
-holds up if built exactly as written.
+This is the implementation of the `add-reader-web-sign-in` spec reviewed on this branch earlier —
+an authenticated fetch client with a bounded recovery cycle, a reader session provider, and a
+session-dependent masthead control, plus 20 new tests. The spec artifacts themselves are unchanged
+apart from checking tasks off, so this review is of the code.
 
-The claims are accurate. Every load-bearing one was re-derived from source (see "Verified as
-accurate"), and none were found wrong. The central design argument — that the anonymous fast path
-is a correctness requirement rather than an optimization, because probing unconditionally would let
-anonymous traffic behind a shared NAT drain `refreshRateLimiter()`'s 30-per-15-minutes budget and
-lock out genuine returning readers — checks out exactly as written, including the
-`401 invalid_refresh_token` shape the throttled caller receives. The scoping is disciplined: the
-non-goals are real non-goals, the deferred pieces are each named with the condition that would
-revive them, and the risks section states the failure modes plainly rather than defensively.
+**The implementation matches its spec closely, and the verification claims in `tasks.md` are
+true.** I ran them: `tsc --noEmit` is clean, `eslint` is clean on every changed file, and the suite
+is 545 passing across 77 files (41 in `apps/web`, 20 of them new). Every normative requirement in
+`specs/reader-session/spec.md` traces to code and to a test — the anonymous fast path, the
+single-retry bound across both recovery paths, single-flight refresh, sign-out succeeding
+regardless of the call's outcome, and the undifferentiated anonymous presentation for a rejected
+reader. The recovery cycle in `authApi.ts:125-146` is genuinely careful: `alreadyRetried` bounds
+both paths with one flag, and `refreshSession`/`bootstrapCsrfCookie` call `rawFetch` directly so
+neither can re-enter recovery, which is exactly what the spec requires.
 
-Two Minor findings and one Nit, none of which change the design. Both Minor findings are one-line
-edits to `tasks.md`. Nothing here is a correctness, security, or performance defect in the design
+One Minor finding and two Nits. The Minor is a real spec gap — the sign-in return target drops the
+query string — and its obvious fix would break static prerendering, so it is worth stating
+carefully. Nothing here is a correctness, security, or performance defect in the recovery cycle
 itself.
 
-Standards used: `CLAUDE.md`, `docs/ARCHITECTURE.md`, the eight archived changes in
-`openspec/changes/archive/`, and the existing capability specs in `openspec/specs/` — chiefly
-`admin-session` (the sibling capability this one mirrors) and `authentication`. There is no
-`docs/adr/`, no `CONTRIBUTING.md`, and no `openspec/AGENTS.md` despite `CLAUDE.md` referencing one;
-`openspec/config.yaml` is an unfilled template. Conventions findings therefore cite `file:line`
-precedent from archived changes rather than a named rule.
-
-## Severity calibration
-
-A first pass graded this 3 Major + 3 Minor. Both counts were wrong, and the correction is recorded
-here rather than quietly applied — the same disposition the PR #9 review used.
-
-Three findings were withdrawn entirely on re-reading them in the surrounding artifact rather than
-against an idealized one:
-
-- **"`design.md:12` says the reader client is keyed on 401, but the CSRF branch is a 403."**
-  Withdrawn. The paragraph opens with "**Readers are rejected with 401, staff with 403**" and is
-  explicitly contrasting the two clients' *session* branches. Within that frame "keyed on 401" is
-  correct shorthand, and `tasks.md:7` (1.5) spells out both branches unambiguously. Reading the
-  clause without its own paragraph's frame was the error.
-- **"`StickyNav`'s right-hand space is not clear — it holds `NavLinks`."** Withdrawn. The row is
-  `max-w-[1120px]` holding a short wordmark and three 11px uppercase links
-  (`apps/web/lib/content.tsx:13-17`). There is abundant clear space, which is the design's actual
-  claim; whether the control becomes a third flex child or joins a wrapper is a layout detail
-  resolved on sight, not a spec question.
-- **"The fast path's accepted lockout is absent from the normative spec."** Withdrawn on two
-  counts. `design.md` already weighs it explicitly as a "second-order effect worth accepting", and
-  `design.md` archives alongside the spec in the same change directory. The spec requirement also
-  already states the behavior normatively — a caller with no CSRF marker is resolved anonymous
-  with no request issued — which covers a caller holding `sid_rt` without needing a separate
-  scenario.
-
-Two findings were downgraded:
-
-- The provider-placement finding was graded Major on the theory that it "fails quietly". It does
-  not. It is a one-word imprecision in a task line that surfaces the moment task 5.5 is written,
-  and the design intent is unambiguous. **Minor.**
-- The `ARCHITECTURE.md` §8.1 finding was graded Major against `add-auth-foundation`'s §14, which
-  rewrote sections that had become *wrong*. This change defers a behavior §8.1 *anticipated* but
-  that never existed, which is the shape of `add-news-management-system`'s single deferral note,
-  not a seven-task rewrite. **Minor.**
-- The CSRF single-flight finding was graded Major by holding the reader spec to `admin-session`'s
-  requirement set. That imports a concurrency concern this change does not have and whose omission
-  the design deliberately argues. **Nit.**
+Standards used: `CLAUDE.md`, `docs/ARCHITECTURE.md`, this change's own spec artifacts, and the
+sibling `apps/admin/src/lib/api.ts` the design mirrors. There is no `docs/adr/`, no
+`CONTRIBUTING.md`, and no `openspec/AGENTS.md`; `openspec/config.yaml` is an unfilled template.
 
 ## Findings
 
 | # | Severity | Aspect(s) | File:line | Title |
 |---|---|---|---|---|
-| 1 | Minor | correctness | `openspec/changes/add-reader-web-sign-in/tasks.md:27` | Wrapping `children` puts the provider below both render sites of the control |
-| 2 | Minor | conventions | `openspec/changes/add-reader-web-sign-in/proposal.md:33` | The §8.1 deferral is recorded in the change but not in `docs/ARCHITECTURE.md` |
-| 3 | Nit | conventions | `openspec/changes/add-reader-web-sign-in/tasks.md:6` | Task 1.4's single-flight qualifier has no spec requirement or test behind it |
+| 1 | Minor | correctness | `apps/web/components/layout/ReaderControl.tsx:19` | Sign-in return target drops the query string, losing the news filter |
+| 2 | Nit | conventions | `apps/web/components/layout/StickyNav.tsx:31` | The control becomes a third `justify-between` child, re-centering `NavLinks` |
+| 3 | Nit | correctness | `apps/web/components/layout/ReaderControl.tsx:42` | A broken avatar URL has no fallback, unlike a null one |
 
 ## Details
 
-### 1. Minor — Wrapping `children` puts the provider below both render sites of the control
+### 1. Minor — Sign-in return target drops the query string
 
-`tasks.md:27` (3.4) says "Wrap `children` in `app/layout.tsx` with the provider", and
-`proposal.md:66` restates it in Impact: "Modified: `app/layout.tsx` wraps children in the
-provider."
-
-`apps/web/app/layout.tsx:30-32` renders:
+`ReaderControl.tsx:19` takes the return target from `usePathname()`:
 
 ```tsx
-<body className="min-h-screen bg-paper font-serif text-ink">
-  <SiteHeader />
-  {children}
-  <SiteFooter />
-</body>
+const pathname = usePathname();
+// …
+<a href={signInHref(pathname ?? '/')} …>
 ```
 
-`<SiteHeader />` is a sibling of `{children}`, not a descendant, and it is where
-`apps/web/components/layout/SiteHeader.tsx:9` renders `<StickyNav />`. Tasks 5.4 and 5.5
-(`tasks.md:40-41`) put `ReaderControl` in both of those surfaces. Taken literally, 3.4 places the
-provider below every render site of the control.
+`usePathname()` returns the path only — never the search string. `spec.md:15` requires the site to
+"supply the reader's current in-app location as the post-sign-in return target", and `/news` is
+searchParams-driven precisely so that filter state is part of the location:
+`docs/ARCHITECTURE.md` §8.1 records the reason as "Filters live in the URL, so results are
+shareable", and `app/news/page.tsx:21-22` reads `categorySlug` from it.
 
-This is an imprecision in the task text, not a flaw in the design — the provider obviously has to
-enclose the header, and an implementer hits the missing context the moment they write 5.5. Worth
-fixing because it costs one word now and a few minutes of confusion later.
+So a reader browsing `/news?category=budaya` who signs in lands back on an unfiltered `/news`. The
+spec's own scenario uses an article, which has no query string, so this is invisible to the tests
+— `ReaderControl.test.tsx:65` asserts only `encodeURIComponent('/news/some-article')`.
 
-**Fix.** State the wrap in terms of the body's contents rather than the `children` prop:
+**Fix, with a trap worth naming.** The obvious change — adding `useSearchParams()` — is the wrong
+one here. In the App Router, `useSearchParams()` in a Client Component forces the nearest Suspense
+boundary and deopts static prerendering for routes that lack one, which is exactly what tasks 7.2
+and 7.3 exist to protect. Two safer options:
+
+- Build the href at click time from `window.location.pathname + window.location.search`, keeping
+  the anchor a plain full-document navigation:
+  ```tsx
+  <a
+    href={signInHref(pathname ?? '/')}
+    onClick={(e) => {
+      e.currentTarget.href = signInHref(window.location.pathname + window.location.search);
+    }}
+  >
+  ```
+- Or wrap `ReaderControl` in an explicit `<Suspense>` where it is rendered, and use
+  `useSearchParams()` deliberately — more code, but no click-time mutation.
+
+Either way, add a test asserting a `?`-bearing location survives into `next=`. Note the server side
+already handles it: `resolveRedirectTarget` (`apps/api/src/lib/redirect.ts:14-29`) resolves the
+relative target against `APP_ORIGIN` and preserves the query, so only the client is dropping it.
+
+### 2. Nit — The control becomes a third `justify-between` child, re-centering `NavLinks`
+
+`StickyNav.tsx:26-32` was a two-child `justify-between` row — wordmark left, `NavLinks` right.
+`StickyNav.tsx:31` adds `<ReaderControl className="shrink-0" />` as a third child, so the browser
+now distributes three items and `NavLinks` moves to the centre of the sticky bar.
+
+`design.md:124` described this as rendering "in the sticky bar's existing right-hand space", which
+reads as the control joining the right edge rather than the nav relocating. The result may well be
+what you want — a centred nav in a sticky bar is a perfectly reasonable broadsheet treatment — but
+it is a visible change to existing chrome that no requirement asks for, so it is worth confirming
+it was chosen rather than inherited from the flex algebra.
+
+**If unintended**, group the two right-hand items so the row stays two-child:
 
 ```tsx
-<body className="min-h-screen bg-paper font-serif text-ink">
-  <ReaderSessionProvider>
-    <SiteHeader />
-    {children}
-    <SiteFooter />
-  </ReaderSessionProvider>
-</body>
+<Link href="/" …>SIDERS</Link>
+<div className="flex items-center gap-4">
+  <NavLinks />
+  <ReaderControl className="shrink-0" />
+</div>
 ```
 
-Amend `tasks.md:27` and `proposal.md:66` to match. This does not weaken the caching argument:
-`ReaderSessionProvider` is a Client Component boundary, so Server Component children passed
-through it stay server-rendered, and the `revalidate` exports on `app/page.tsx:13` and
-`app/news/[slug]/page.tsx:12` are untouched. Task 7.2 already checks that.
+The masthead placement (`SiteHeader.tsx:11-16`) has no such issue — it is its own `justify-end`
+row, which is clean.
 
-### 2. Minor — The §8.1 deferral is recorded in the change but not in `docs/ARCHITECTURE.md`
+### 3. Nit — A broken avatar URL has no fallback, unlike a null one
 
-`docs/ARCHITECTURE.md` §8.1 states:
+`ReaderControl.tsx:42-53` handles `avatarUrl === null` well, falling back to an initial in a filled
+circle, which satisfies the spec scenario "A reader without an avatar still renders … without a
+broken or placeholder-less image" (`spec.md:110`).
 
-> Server Components fetch from the API directly over the internal URL, forwarding the incoming
-> cookie header so the server render knows whether the reader is signed in.
+A non-null URL that fails to load is a different case and is not handled: Google avatar URLs on
+`lh3.googleusercontent.com` can start 404ing after a profile change, and the result is the broken
+image icon the scenario is trying to avoid. `referrerPolicy="no-referrer"` is the right call and
+should stay, but it does mean the request carries less context, not more.
 
-`proposal.md:33` defers this, and does so properly — it cites the section by number, names the
-consequence (dynamic rendering across the route tree, killing ISR on every article), and states
-the condition that would revive it. `spec.md:139` then makes the deferred posture normative:
-session resolution "SHALL happen after the route's content is rendered".
+**Fix** — one `onError` that reuses the fallback already written:
 
-The gap is only that nothing writes the deferral back into §8.1, and `tasks.md` section 9 covers
-env-var documentation (`COOKIE_DOMAIN`, `GOOGLE_REDIRECT_URI`) rather than the architecture doc.
-The precedent is `openspec/changes/archive/2026-08-11-add-news-management-system/tasks.md:113`,
-which is exactly this shape — a single task recording that media storage is local for this change
-and the R2 pipeline deferred.
+```tsx
+const [imageFailed, setImageFailed] = useState(false);
+// …
+{account.avatarUrl && !imageFailed ? (
+  <img … onError={() => setImageFailed(true)} />
+) : (
+  <span …>{account.name.charAt(0).toUpperCase()}</span>
+)}
+```
 
-Worth doing because §8.1 is the document a future implementer reads first, and the sentence as
-written points at the one approach this change establishes must not be taken from the root layout.
-It is Minor rather than Major because §8.1's own route-strategy table already shows `/` as ISR and
-`/news/[slug]` as SSG on the same screen, so the tension is visible in place.
+## Verified against the spec
 
-**Fix.** Add one task to section 9: amend §8.1 to record that reader session state resolves
-client-side, that public routes deliberately do not vary by session, and the condition under which
-server-rendered session state is revisited. §8.1's next paragraph — "A single fetch wrapper handles
-the 401 → refresh → retry cycle in one place; never scatter that logic across call sites" — is
-satisfied by this change and needs no edit.
+Every normative requirement traces to code and a test. Confirmed by reading both, and by running
+the suite:
 
-### 3. Nit — Task 1.4's single-flight qualifier has no spec requirement or test behind it
+| Requirement (`specs/reader-session/spec.md`) | Implementation | Test |
+|---|---|---|
+| Sign-in is a top-level navigation, site performs no part of the exchange | `ReaderControl.tsx:7-8,33` — plain `<a href>`, no handler | `ReaderControl.test.tsx:52-66` |
+| No session marker → no session request | `readerSession.tsx:29-32` — `hasCsrfCookie()` before any fetch | `readerSession.test.tsx:44-57` asserts `fetch` never called |
+| 401 → refresh → retry exactly once | `authApi.ts:133-137` | `authApi.test.ts:67-83` |
+| Failed refresh → anonymous, no retry | `authApi.ts:135` | `authApi.test.ts:85-98` |
+| No second refresh after a failed retry | `authApi.ts:129` `alreadyRetried` | `authApi.test.ts:100-115` |
+| Refresh is single-flight | `authApi.ts:88-99` | `authApi.test.ts:117-140` — asserts exactly 1 refresh across 2 concurrent 401s |
+| Refresh/re-pair issued outside the recovery cycle | `authApi.ts:91,109` call `rawFetch` directly | implied by the two counts above |
+| CSRF failure re-pairs, never refreshes | `authApi.ts:139-142` | `authApi.test.ts:142-156` asserts no `/auth/refresh` call |
+| Recovery paths do not chain | `authApi.ts:129` | `authApi.test.ts:158-173` |
+| Masthead reflects session state; nothing signed-in while loading | `ReaderControl.tsx:24-61` | `ReaderControl.test.tsx:37-98` |
+| Public content does not vary by session | provider is a Client Component boundary; no `cookies()`/`headers()` added | `revalidate` exports intact on `app/page.tsx:13`, `app/news/[slug]/page.tsx:12` |
+| Sign-out ends the local session either way | `readerSession.tsx:38-46` — `finally` sets anonymous | `readerSession.test.tsx` (4.3) |
+| Rejected reader presented as signed out, without explanation | `readerSession.tsx:35` — bare `.catch` | covered by the anonymous-state assertions |
 
-`tasks.md:6` (1.4) says "Implement **single-flight** `bootstrapCsrfCookie()`". No requirement in
-the spec delta asks for it, no test task covers it (section 2 tests concurrent 401s at 2.5 but not
-concurrent `csrf_failed`), and `design.md` does not discuss it.
+Verification claims in `tasks.md:68` (9.2) were re-run and hold:
 
-This is deliberate rather than an oversight, and the asymmetry is defensible: `spec.md:74` requires
-single-flight refresh because a raced second presentation of a refresh credential is treated as
-reuse and revokes the session lineage, whereas a duplicated bootstrap merely re-issues the same
-cookie. `design.md` argues that distinction directly. The reader client also has exactly one write
-(`POST /auth/logout`), so there is no concurrency to guard — unlike the admin client, where
-autosave, publish, and taxonomy CRUD are genuinely concurrent, which is why
-`openspec/specs/admin-session/spec.md:98` states the guarantee there.
+- `npx tsc --noEmit -p apps/web/tsconfig.json` — exit 0.
+- `npx eslint` on all nine changed/new files — exit 0, no output.
+- `npx vitest run` — **77 files, 545 tests, all passing**; `apps/web` alone is 41.
+- `next build` was not run here either, for the same reason 7.2 gives (no live API or database).
+  That caveat is stated honestly in the task rather than glossed, which is the right call.
 
-The only residue is that a task implements a behavior nothing else in the change records, which is
-the kind of thing `openspec-verify-change` flags. Resolvable either way in one line: drop the
-qualifier from 1.4, or add a sentence to `spec.md:92` and a test to section 2. Not worth blocking
-on.
+Also verified: `apps/web/lib/api.ts` is untouched and nothing imports the new module into it
+(task 1.7), so the public client stays caching-capable and the authenticated one stays
+caching-incapable — the module boundary the design rests on is intact.
 
-## Verified as accurate
+## Carried over from the spec review — still open
 
-Checked against source; all correct as stated. Listed so a second pass does not have to re-derive
-them:
+The implementation was reviewed against the spec, but two of the three findings from the earlier
+review of this same branch were resolved only in code, not in the artifacts they were raised
+against:
 
-- The whole consumed API surface exists as described — `GET /auth/google` and
-  `/auth/google/callback` (`google.routes.ts:53,71`), `GET /auth/me` behind `requireReader()`,
-  `POST /auth/refresh`, `POST /auth/logout`, and `GET /auth/csrf` (`auth.routes.ts:126-152`).
-- `requireReader()` answers `401 unauthenticated` while `requireStaff`/`requirePermission` answer
-  `403 forbidden` for the same condition (`apps/api/src/middleware/authorize.ts:110-116`, `195`,
-  `224`) — the premise the 401-keyed session branch rests on.
-- `refreshRateLimiter()` is 30 per 15 minutes keyed on `clientIp`, and a throttled caller receives
-  `401 invalid_refresh_token`, identical to a genuine rejection (`auth.routes.ts:19,36,71-78`).
-  The NAT-exhaustion argument holds precisely, including the claim that the failure is invisible in
-  development and looks like a backend bug.
-- `csrf_token` is `httpOnly: false` (`csrf.ts:66-76`) and is set with
-  `maxAge: REFRESH_TOKEN_MAX_AGE_MS` at every call site — sign-in, refresh, and re-pairing
-  (`google.routes.ts:112`, `auth.controller.ts:27`, `auth.routes.ts:146`) — which is 30 days
-  (`cookies.ts:11`), matching `sid_rt`. It is never issued without an identifiable session
-  (`auth.routes.ts:139-147`), so the fast path's premise that the cookie implies a session is sound.
-- Two concurrent refreshes really would revoke the session lineage, per
-  `openspec/specs/authentication/spec.md:216` — so single-flight refresh is load-bearing as claimed.
-- `COOKIE_DOMAIN` is `z.string().optional()` with no default (`apps/api/src/config/env.ts:86`),
-  making session cookies host-only exactly as the risk states, and the localhost-shared-host
-  explanation for why local development works is correct.
-- `resolveRedirectTarget` validates `next` against `APP_ORIGIN` and `ADMIN_ORIGIN` and falls back
-  to the default landing page (`apps/api/src/lib/redirect.ts:14-29`), so the open-redirect claim
-  holds.
-- `apps/web/lib/api.ts` is public-only by construction and documents itself as such;
-  `revalidate = 60` on `app/page.tsx:13` and `app/news/[slug]/page.tsx:12`, `cache: 'no-store'` on
-  `app/news/page.tsx:21-22`.
-- `ReaderAccountResponse` exists with a nullable `avatarUrl`
-  (`packages/contracts/src/session.ts:39-47`), so the null-avatar scenario at `spec.md:113` is a
-  real case and task 5.3 is warranted.
-- `StickyNav`'s `scrollY > 240` threshold and the masthead's `clamp(…,92px)` serif wordmark are
-  both as described (`StickyNav.tsx:16`, `SiteHeader.tsx:16-19`).
-- Access credential lifetime is 15 minutes (`cookies.ts:10`), so manual step 8.3 is correct.
-- A deactivated reader is genuinely indistinguishable from no session: `requireReader()` returns
-  the same `401 unauthenticated` for `status !== 'active'` as for no session at all
-  (`authorize.ts:114-116`). The spec is right to specify this rather than leave it accidental.
-- `proposal.md:44` — "Modified Capabilities: None" — holds. `openspec/specs/web-public-site/spec.md`
-  has no masthead, header, or session requirement that a session-dependent control would alter.
+- **`tasks.md:27` (3.4) still reads "Wrap `children`".** The code got this right —
+  `app/layout.tsx:31-35` wraps `<SiteHeader />`, `{children}`, and `<SiteFooter />` together, which
+  is why `ReaderControl` can read the context from inside the header. The task text that would have
+  misled was simply checked off unchanged. Cosmetic now that the code exists, but the task is the
+  document that gets archived.
+- **`docs/ARCHITECTURE.md` §8.1 is unchanged** and still reads "forwarding the incoming cookie
+  header so the server render knows whether the reader is signed in" — the approach this change
+  establishes must not be taken from the root layout. Task 9.1's note resolves the *other* doc
+  question (`COOKIE_DOMAIN` and `GOOGLE_REDIRECT_URI`, genuinely covered by §10) but not this one.
+- **Task 1.4's single-flight qualifier** now has an implementation (`authApi.ts:106-116`) and still
+  no spec requirement or concurrency test behind it. Unchanged from the earlier Nit; still not worth
+  blocking on.
 
 ## Rule check
 
 | Rule / precedent | Complies? |
 |---|---|
-| Change directory layout — `.openspec.yaml`, `proposal.md`, `design.md`, `tasks.md`, `specs/<capability>/spec.md` | Yes — matches all eight archived changes |
-| Spec delta format — `## ADDED Requirements`, `### Requirement:` with SHALL wording, `#### Scenario:` in WHEN/THEN form | Yes |
-| `proposal.md` structure — Why / What Changes / Capabilities / Impact, with New and Modified capability subsections | Yes |
-| `design.md` structure — Context / Goals-Non-Goals / Decisions / Risks-Trade-offs / Migration Plan | Yes |
-| Deviations from `docs/ARCHITECTURE.md` recorded in the change (precedent: `add-news-management-system` 12.1) | Partly — recorded in `proposal.md:33`, not written back to §8.1 (finding 2) |
-| `CLAUDE.md` — Testing: build, lint, tests, no TS errors before completion | Yes — `tasks.md:68` (9.2) |
-| `CLAUDE.md` — TypeScript strict, never `any` | Yes — `tasks.md:68` (9.2) states it explicitly |
-| `CLAUDE.md` — Composition over inheritance, no duplicated logic | Yes — the deliberate duplication at `design.md:73-75` is argued, not incidental |
-| `CLAUDE.md` — Frontend: hooks over classes, reusable components | Yes — one provider + hook, one shared `ReaderControl` across both surfaces |
+| `CLAUDE.md` — TypeScript strict, never `any` | Yes — no `any` in any new file; `tsc` clean |
+| `CLAUDE.md` — Testing: build, lint, tests, no TS errors before completion | Yes — verified independently; build caveat stated honestly in 7.2/9.2 |
+| `CLAUDE.md` — Composition over inheritance, small focused functions | Yes — `withRecovery` takes a `perform` thunk rather than branching per call site |
+| `CLAUDE.md` — No duplicated logic | Deliberate and argued: `ApiError`/envelope shape is duplicated from `lib/api.ts` per `design.md:73-75`, so the authenticated client can never accept caching options |
+| `CLAUDE.md` — Self-documenting code | Yes — comments explain *why* (the single-flight rationale at `authApi.ts:80-87` cites the reuse-detection spec) rather than restating the code |
+| `CLAUDE.md` — Frontend: hooks over classes, reusable components | Yes — one provider + hook, one `ReaderControl` shared by both surfaces |
+| `docs/ARCHITECTURE.md` §8.1 — "A single fetch wrapper handles the 401 → refresh → retry cycle in one place; never scatter that logic across call sites" | Yes — `withRecovery` is the only place |
+| `docs/ARCHITECTURE.md` §8.1 — Server Components forward the cookie header | No — deliberately deferred and argued in `proposal.md:33`, but §8.1 still unamended (carried over, above) |
+| Mirrors `apps/admin/src/lib/api.ts` in shape, keyed on 401 rather than 403 | Yes — and correctly keeps the CSRF branch 403-keyed (`authApi.ts:139`) |
 
 ---
 _Generated by [Claude Code](https://claude.ai/code)_
