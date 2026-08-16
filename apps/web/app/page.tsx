@@ -1,4 +1,4 @@
-import { getHomeFeed, getReels } from '../lib/api';
+import { getHomeFeed, getPartners, getReels } from '../lib/api';
 import { Container } from '../components/layout/Container';
 import { Hero } from '../components/home/Hero';
 import { IntroBlurb } from '../components/home/IntroBlurb';
@@ -13,9 +13,10 @@ import { CtaBand } from '../components/home/CtaBand';
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [articles, reels] = await Promise.all([
+  const [articles, reels, partners] = await Promise.all([
     getHomeFeed(3, { next: { revalidate: 60 } }),
     getReels({ next: { revalidate: 60 } }),
+    getPartners({ next: { revalidate: 60 } }),
   ]);
 
   return (
@@ -39,7 +40,7 @@ export default async function HomePage() {
       </Container>
       <Container>
         <AnakUsahaTiles />
-        <PartnerGrid />
+        <PartnerGrid partners={partners} />
         <CtaBand />
       </Container>
     </div>

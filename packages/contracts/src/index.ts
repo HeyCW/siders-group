@@ -14,3 +14,4 @@ export * from './reelProvider.js';
 export * from './reel.js';
 export * from './reelsCuration.js';
 export * from './dashboard.js';
+export * from './partner.js';
