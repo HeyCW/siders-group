@@ -1,4 +1,4 @@
-import { getHomeFeed, getReels } from '../lib/api';
+import { getHomeFeed, getPartners, getReels } from '../lib/api';
 import { Container } from '../components/layout/Container';
 import { Hero } from '../components/home/Hero';
 import { IntroBlurb } from '../components/home/IntroBlurb';
@@ -13,9 +13,15 @@ import { CtaBand } from '../components/home/CtaBand';
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [articles, reels] = await Promise.all([
+  const [articles, reels, partners] = await Promise.all([
     getHomeFeed(3, { next: { revalidate: 60 } }),
     getReels({ next: { revalidate: 60 } }),
+    // The partner strip is the one section on this page with a defined empty state — it renders
+    // nothing at all when the list is empty (specs/web-public-site/spec.md - "No partners means no
+    // section"). So a failing `/partners` degrades to a hidden section instead of taking the
+    // articles and reels down with it through `Promise.all`; there is no `error.tsx` here to catch
+    // it otherwise.
+    getPartners({ next: { revalidate: 60 } }).catch(() => []),
   ]);
 
   return (
@@ -39,7 +45,7 @@ export default async function HomePage() {
       </Container>
       <Container>
         <AnakUsahaTiles />
-        <PartnerGrid />
+        <PartnerGrid partners={partners} />
         <CtaBand />
       </Container>
     </div>

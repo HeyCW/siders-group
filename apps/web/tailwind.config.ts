@@ -46,11 +46,19 @@ export default {
           from: { opacity: '0', transform: 'translateY(14px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        marquee: {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-50%)' },
+        },
       },
       animation: {
         ruledraw: 'ruledraw 240ms cubic-bezier(.22,1,.36,1) both',
         inkfade: 'inkfade 160ms ease-out both',
         riseIn: 'riseIn 560ms cubic-bezier(.22,1,.36,1) both',
+        // Pure CSS, no scroll-position JS (design.md - "Ticker is pure CSS, not JS-driven"). The
+        // track it animates is two identical halves back to back, so translating one full half's
+        // width (-50%) loops seamlessly into the second half's identical start.
+        marquee: 'marquee 36s linear infinite',
       },
     },
   },

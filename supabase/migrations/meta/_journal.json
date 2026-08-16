@@ -29,6 +29,13 @@
       "when": 1786525103015,
       "tag": "0003_boring_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786900488855,
+      "tag": "0004_steep_leper_queen",
+      "breakpoints": true
     }
   ]
 }

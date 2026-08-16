@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage.js';
 import { ChangePasswordPage } from './pages/ChangePasswordPage.js';
 import { ReelLibraryPage } from './pages/ReelLibraryPage.js';
 import { ReelsCurationPage } from './pages/ReelsCurationPage.js';
+import { PartnersPage } from './pages/PartnersPage.js';
 import { categoriesApi, tagsApi } from './lib/taxonomyApi.js';
 import { SessionProvider } from './session/SessionContext.js';
 import { RedirectIfAuthenticated, RequireSession } from './session/RouteGuards.js';
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="/curation" element={<HomeCurationPage />} />
             <Route path="/reels" element={<ReelLibraryPage />} />
             <Route path="/reels-curation" element={<ReelsCurationPage />} />
+            <Route path="/partners" element={<PartnersPage />} />
           </Route>
         </Route>
       </Routes>

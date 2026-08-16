@@ -89,6 +89,17 @@ function IconReelsCuration(props: IconProps) {
   );
 }
 
+function IconPartners(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <circle cx="6" cy="7" r="2.3" />
+      <circle cx="14" cy="7" r="2.3" />
+      <path d="M2.5 16v-1a3.5 3.5 0 0 1 3.5-3.5h0A3.5 3.5 0 0 1 9.5 15v1" />
+      <path d="M10.5 16v-1a3.5 3.5 0 0 1 3.5-3.5h0a3.5 3.5 0 0 1 3.5 3.5v1" />
+    </IconShell>
+  );
+}
+
 function IconChevron(props: IconProps) {
   return (
     <IconShell {...props}>
@@ -132,6 +143,10 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/reels', label: 'Reels library', icon: IconReelsLibrary, permission: 'news.manage' },
       { to: '/reels-curation', label: 'Reels curation', icon: IconReelsCuration, permission: 'news.manage' },
     ],
+  },
+  {
+    label: 'Site',
+    items: [{ to: '/partners', label: 'Partners', icon: IconPartners, permission: 'settings.manage' }],
   },
 ];
 

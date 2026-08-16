@@ -2,6 +2,7 @@ import type {
   ArticlePublicCard,
   ArticlePublicDetail,
   CategoryResponse,
+  PublicPartner,
   PublicReelItem,
 } from '@siders/contracts';
 import { API_URL } from './env';
@@ -104,4 +105,8 @@ export function getCategories(init?: RequestInit): Promise<CategoryResponse[]> {
 
 export function getReels(init?: RequestInit): Promise<PublicReelItem[]> {
   return apiFetch<PublicReelItem[]>('/reels', init);
+}
+
+export function getPartners(init?: RequestInit): Promise<PublicPartner[]> {
+  return apiFetch<PublicPartner[]>('/partners', init);
 }

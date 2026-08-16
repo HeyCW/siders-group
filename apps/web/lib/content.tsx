@@ -33,9 +33,6 @@ export const SUB_BRANDS: SubBrand[] = [
   { name: 'Siders Culture', kind: 'News & Community', tile: '#FFFFFF', tileInk: '#141414' },
 ];
 
-/** The design's own placeholder-tile treatment for sponsor marks not yet supplied as SVGs. */
-export const PARTNERS: string[] = Array.from({ length: 12 }, () => 'Brand');
-
 export const MANIFESTO = {
   headline: (
     <>
