@@ -521,17 +521,19 @@ https://cdn.siders.id/cdn-cgi/image/width=800,quality=75,format=auto/media/cover
 
 Server Components fetch from the API directly over the internal URL. Reader session state is deliberately **not** forwarded to them: `add-reader-web-sign-in` resolves it client-side instead, because reading the cookie header in a Server Component — even just in the root layout — would opt the whole route tree into dynamic rendering and kill ISR on `/` and SSG on `/news/[slug]`. Public content is identical for anonymous and signed-in readers; only the masthead's session-dependent control varies, and it resolves after the route's content is already rendered. This is revisited if an inherently-dynamic authenticated route (e.g. `/account`) is ever added to justify forwarding the cookie. Only genuinely interactive leaves — like button, comment composer, share sheet, reels player — are Client Components.
 
-Data fetching uses TanStack Query on the client for comments and likes, with `credentials: 'include'` on every request so session cookies travel. A single fetch wrapper handles the 401 → refresh → retry cycle in one place; never scatter that logic across call sites — `apps/web/lib/authApi.ts` is this for reader session calls today.
+Client data fetching for comments and likes is a plain `useState`/`useEffect` hook per island (`apps/web/components/article/useArticleEngagement.ts`), with `credentials: 'include'` on every request so session cookies travel. A single fetch wrapper handles the 401 → refresh → retry cycle in one place; never scatter that logic across call sites — `apps/web/lib/authApi.ts` is this for reader session calls today.
 
 ### 8.2 `apps/admin` — Vite SPA
 
-No SEO requirement, so no SSR complexity. React Router, TanStack Query for server state, react-hook-form with the shared Zod resolvers.
+No SEO requirement, so no SSR complexity. React Router for routing. Server state is fetched per page with `useState`/`useEffect` behind the shared `useAsyncAction` hook, and forms are controlled components validated against the shared Zod contracts directly.
+
+> TanStack Query and react-hook-form were both named here originally and neither was ever added as a dependency to `apps/web` or `apps/admin`. This paragraph described libraries the project does not use for several changes before anyone checked. If either is adopted later, this line changes together with the `package.json`, not after it.
 
 Unlike the reader-facing 401 → refresh → retry cycle above, the admin fetch wrapper's cycle is 403-keyed: `requireStaff`/`requirePermission` answer 403, not 401, for "no session" (see §5.5), so recovery branches on the response's error `code` — `forbidden` triggers refresh-then-retry, `csrf_failed` triggers CSRF-cookie recovery, `password_change_required` routes to the forced password-change screen — rather than on status code alone (`openspec/specs/admin-session`).
 
 The editor is the centrepiece: Tiptap with a slash-command extension, bubble menu, drag handles, markdown input rules, and an upload extension wired to the presigned-URL flow. Autosave is a debounced mutation with optimistic status display.
 
-The moderation queue polls every 30 seconds. Without Supabase Realtime, a websocket layer would be the only alternative, and it is not worth building for a queue two people look at.
+The moderation queue polls every 30 seconds. Without Supabase Realtime, a websocket layer would be the only alternative, and it is not worth building for a queue two people look at. (Planned, not built — `openspec/changes/add-community-moderation`.)
 
 ---
 
