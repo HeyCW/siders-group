@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Container } from '../../components/layout/Container';
 import { ContactForm } from '../../components/contact/ContactForm';
-import { MediaSlot } from '../../components/ui/MediaSlot';
+import { ContactMap } from '../../components/contact/ContactMap';
 import { CONTACT_INFO, SUB_BRANDS } from '../../lib/content';
 
 export const metadata: Metadata = {
@@ -102,13 +102,9 @@ export default function ContactPage() {
           <div className="border-b border-ink pb-2 font-sans text-[11px] font-bold uppercase tracking-widest">
             Find us
           </div>
-          <MediaSlot
-            src={null}
-            alt="Map to the Siders head office"
-            label="Map"
-            aspectClassName="aspect-[21/9]"
-            className="mt-3"
-          />
+          <div className="relative mt-3 w-full border border-rule bg-white aspect-[4/3] md:aspect-[21/9]">
+            <ContactMap query={CONTACT_INFO.mapQuery} />
+          </div>
         </div>
       </Container>
     </div>

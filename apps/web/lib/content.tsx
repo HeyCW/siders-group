@@ -80,6 +80,7 @@ export const CONTACT_INFO = {
   address: ['Jalan Raya Darmo, Surabaya', 'Jawa Timur, Indonesia'],
   whatsapp: '+62 812 0000 0000',
   emails: ['karyasiders@gmail.com', 'partnership@siders.id'],
+  mapQuery: 'Jalan Raya Darmo, Surabaya',
 };
 
 export const FOOTER_DESCRIPTION =
