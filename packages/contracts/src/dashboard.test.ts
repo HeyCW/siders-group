@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_CADENCE_WEEKS, DASHBOARD_DUE_SOON_LIMIT, dashboardResponseSchema } from './dashboard.js';
+import {
+  DASHBOARD_CADENCE_WEEKS,
+  DASHBOARD_DUE_SOON_LIMIT,
+  DASHBOARD_TOP_ARTICLES_LIMIT,
+  dashboardResponseSchema,
+} from './dashboard.js';
 
 const id = (n: number) => `11111111-1111-1111-1111-${String(n).padStart(12, '0')}`;
 
@@ -27,6 +32,11 @@ function wellFormedPayload() {
       overdueUnpromotedCount: 0,
     },
     readers: { newLast7d: 12, activeLast30d: 340 },
+    readership: {
+      last7dViews: 5210,
+      last7dUniqueViews: 3140,
+      topArticles: [{ id: id(9), title: 'Election results', slug: 'election-results', views: 812 }],
+    },
   };
 }
 
@@ -82,6 +92,29 @@ describe('dashboardResponseSchema', () => {
   it('rejects a negative count', () => {
     const payload = wellFormedPayload();
     payload.readers.newLast7d = -1;
+    expect(dashboardResponseSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('accepts an empty readership section, which is what no recorded views looks like', () => {
+    const payload = wellFormedPayload();
+    payload.readership = { last7dViews: 0, last7dUniqueViews: 0, topArticles: [] };
+    expect(dashboardResponseSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('rejects topArticles beyond the cap', () => {
+    const payload = wellFormedPayload();
+    payload.readership.topArticles = Array.from({ length: DASHBOARD_TOP_ARTICLES_LIMIT + 1 }, (_, i) => ({
+      id: id(i + 20),
+      title: `Article ${i}`,
+      slug: `article-${i}`,
+      views: i,
+    }));
+    expect(dashboardResponseSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects a negative view count on a top article', () => {
+    const payload = wellFormedPayload();
+    payload.readership.topArticles[0]!.views = -1;
     expect(dashboardResponseSchema.safeParse(payload).success).toBe(false);
   });
 });

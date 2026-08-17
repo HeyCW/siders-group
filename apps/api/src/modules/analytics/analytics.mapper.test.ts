@@ -15,6 +15,13 @@ function fixture(): DashboardData {
       overdueUnpromotedCount: 0,
     },
     readers: { newLast7d: 6, activeLast30d: 90 },
+    readership: {
+      last7dViews: 1200,
+      last7dUniqueViews: 800,
+      topArticles: [
+        { id: '22222222-2222-2222-2222-222222222222', title: 'Most read', slug: 'most-read', views: 640 },
+      ],
+    },
   };
 }
 
@@ -32,6 +39,7 @@ describe('toDashboardResponse', () => {
     expect(result.contentDebt).toEqual(data.contentDebt);
     expect(result.curationIntegrity).toEqual(data.curationIntegrity);
     expect(result.readers).toEqual(data.readers);
+    expect(result.readership).toEqual(data.readership);
     expect(result.upNext.dueWithin48hTotal).toBe(data.upNext.dueWithin48hTotal);
     expect(result.upNext.overdueUnpromotedCount).toBe(data.upNext.overdueUnpromotedCount);
   });

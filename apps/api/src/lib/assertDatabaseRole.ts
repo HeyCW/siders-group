@@ -3,10 +3,26 @@ import type { Database } from '@siders/db';
 import type { Logger } from './logger.js';
 
 /**
- * The tables `add-news-management-system` and `add-home-curation` created with RLS enabled and
- * no policies.
+ * The tables `add-news-management-system`, `add-home-curation`, and `add-article-engagement`
+ * created with RLS enabled and no policies.
+ *
+ * The four engagement tables matter here more than the rest: a connection subject to RLS reads
+ * zero rows from them as ordinary empty 200s, which on an article page is indistinguishable from
+ * "nobody has commented yet" — a silently wrong page rather than an error anyone would chase.
  */
-const GUARDED_TABLES = ['media', 'articles', 'categories', 'tags', 'article_categories', 'article_tags', 'home_curation'];
+const GUARDED_TABLES = [
+  'media',
+  'articles',
+  'categories',
+  'tags',
+  'article_categories',
+  'article_tags',
+  'home_curation',
+  'likes',
+  'comments',
+  'article_views_daily',
+  'view_seen',
+];
 
 interface TableRlsRow {
   relname: string;

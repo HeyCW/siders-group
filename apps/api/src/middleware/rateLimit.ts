@@ -145,3 +145,57 @@ export function publicReadRateLimiter(name: string) {
     },
   });
 }
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * The reader-engagement write budgets from `docs/ARCHITECTURE.md` §9.3 — views 60/hour, likes
+ * 60/hour, comments 10/hour. Each gets its own `name`, so exhausting one never spends another
+ * (specs/article-engagement/spec.md - "Exhausting one budget does not exhaust another"); see the
+ * `name` option above for the two live bugs a shared namespace has already caused here.
+ */
+const ENGAGEMENT_RATE_LIMITS = {
+  view: { name: 'engagement-view', windowMs: HOUR_MS, max: 60 },
+  like: { name: 'engagement-like', windowMs: HOUR_MS, max: 60 },
+  comment: { name: 'engagement-comment', windowMs: HOUR_MS, max: 10 },
+} as const;
+
+/**
+ * The caller's reader id, for the two reader-gated engagement limiters. Keying on the reader
+ * rather than the address is what keeps a shared office or campus address from collapsing every
+ * reader behind it into one comment budget (specs/article-engagement/spec.md - "Readers behind
+ * one address have separate comment budgets").
+ *
+ * Falls back to the address only if `req.auth` is somehow absent. These limiters are always
+ * declared after `requireReader`, which rejects an anonymous caller before this runs, so the
+ * fallback is unreachable in practice — it exists so a future misordering degrades to
+ * IP-limiting rather than dropping every anonymous caller into one shared `'unknown'` bucket.
+ */
+function readerKey(req: Request): string {
+  return req.auth?.subjectId ?? clientIp(req);
+}
+
+function engagementLimiter(config: { name: string; windowMs: number; max: number }, keyGenerator: (req: Request) => string) {
+  return rateLimit({
+    ...config,
+    keyGenerator,
+    onLimited: (_req, res) => {
+      res.status(429).json({ success: false, error: { code: 'rate_limited', message: 'Too many requests' } });
+    },
+  });
+}
+
+/** 60/hour per client address — `docs/ARCHITECTURE.md` §9.3. */
+export function viewRateLimiter() {
+  return engagementLimiter(ENGAGEMENT_RATE_LIMITS.view, clientIp);
+}
+
+/** 60/hour per reader — `docs/ARCHITECTURE.md` §9.3. */
+export function likeRateLimiter() {
+  return engagementLimiter(ENGAGEMENT_RATE_LIMITS.like, readerKey);
+}
+
+/** 10/hour per reader — `docs/ARCHITECTURE.md` §9.3. */
+export function commentRateLimiter() {
+  return engagementLimiter(ENGAGEMENT_RATE_LIMITS.comment, readerKey);
+}

@@ -10,3 +10,4 @@ export * from './homeCuration';
 export * from './reels';
 export * from './reelsCuration';
 export * from './partners';
+export * from './engagement';
