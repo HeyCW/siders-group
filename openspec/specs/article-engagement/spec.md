@@ -58,9 +58,9 @@ article's engagement counts and comments from being displayed.
 - **THEN** the engagement counts and comments still load and render
 
 ### Requirement: Likes require a reader session and toggle
-Liking SHALL be available only to an authenticated reader whose account is active, and SHALL
-toggle: a reader who has not liked an article likes it, and a reader who has liked it removes that
-like. A reader SHALL hold at most one like per article. Anonymous callers SHALL be rejected.
+Liking SHALL be available only to an authenticated reader, and SHALL toggle: a reader who has not
+liked an article likes it, and a reader who has liked it removes that like. A reader SHALL hold at
+most one like per article. Anonymous callers SHALL be rejected.
 
 #### Scenario: An anonymous caller cannot like
 - **WHEN** a caller holding no reader session attempts to like an article
@@ -78,9 +78,9 @@ like. A reader SHALL hold at most one like per article. Anonymous callers SHALL 
 - **WHEN** a reader's like requests for one article race each other
 - **THEN** at most one like exists for that reader and article
 
-### Requirement: A muted reader may still like
-Muting SHALL restrict a reader from authoring content and SHALL NOT restrict liking, since a like
-publishes no reader-authored text.
+### Requirement: A sanctioned reader may still like
+Muting or banning SHALL restrict a reader from authoring content and SHALL NOT restrict liking,
+since a like publishes no reader-authored text.
 
 #### Scenario: A muted reader likes an article
 - **WHEN** a reader whose mute period has not elapsed likes an article
@@ -90,10 +90,18 @@ publishes no reader-authored text.
 - **WHEN** a reader whose mute period has not elapsed submits a comment
 - **THEN** the request is rejected and no comment is recorded
 
+#### Scenario: A banned reader likes an article
+- **WHEN** a reader who is banned likes an article
+- **THEN** the like is recorded
+
+#### Scenario: A banned reader cannot comment
+- **WHEN** a reader who is banned submits a comment
+- **THEN** the request is rejected and no comment is recorded
+
 ### Requirement: Comments require a reader session and publish immediately
-Submitting a comment SHALL be available only to an authenticated reader whose account is active
-and whose mute period has elapsed. An accepted comment SHALL become publicly visible immediately,
-with no review step. A comment body SHALL be required, non-blank, and bounded in length.
+Submitting a comment SHALL be available only to an authenticated reader who is neither banned nor
+currently muted. An accepted comment SHALL become publicly visible immediately, with no review
+step. A comment body SHALL be required, non-blank, and bounded in length.
 
 #### Scenario: An anonymous caller cannot comment
 - **WHEN** a caller holding no reader session submits a comment

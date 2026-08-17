@@ -9,6 +9,7 @@ export const PERMISSION_KEYS = [
   'role.manage',
   'dashboard.view',
   'settings.manage',
+  'moderation.manage',
 ] as const;
 
 export const permissionKeySchema = z.enum(PERMISSION_KEYS);

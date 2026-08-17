@@ -70,7 +70,13 @@ system specifically: reporting applies to comments only, not articles or reels; 
 told the outcome of their report; no reputation or trust weighting of reporters; and anonymous
 visitors cannot report — reader-gated to keep a report attributable to one account and
 rate-limitable per identity, an accepted cost that means a signed-out reader who sees abuse has no
-route to flag it.
+route to flag it. **No reader-facing report control in `apps/web` this launch** — `POST
+/comments/:id/report` exists, is reader-gated and rate-limited, and is exercised by task 5.3's
+manual pass, but no UI element in the public site calls it yet; building one is a natural, small
+follow-up once this change's staff-facing half has been used in practice. This is a deliberate scope
+line, not an oversight: `apps/admin`'s comment queue, `reported` filter, and dismiss action are all
+independently useful without it — a moderator can still act on a comment a colleague or a support
+inbox flagged manually.
 
 ## Capabilities
 
