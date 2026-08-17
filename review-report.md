@@ -5,203 +5,278 @@
 ## Reviewed at
 | Range | Files | +/- | Date |
 |---|---|---|---|
-| `origin/main...add-login-reader` (PR #12, head `49b03dd`) | 14 | +1220 / -4 | 2026-08-16 |
-
-Counts exclude `review-report.md` itself, which is on the branch as a review artifact rather than
-product code and is not reviewed here. The full range reads 15 files / +1413 / −622 with it
-included.
+| `2c0685c..bb64012` (PR #14, `add-view-comment-like-feature`) | 46 | +4889 / -50 | 2026-08-17 |
 
 ## Summary
 
-This is the implementation of the `add-reader-web-sign-in` spec reviewed on this branch earlier —
-an authenticated fetch client with a bounded recovery cycle, a reader session provider, and a
-session-dependent masthead control, plus 20 new tests. The spec artifacts themselves are unchanged
-apart from checking tasks off, so this review is of the code.
+Views, likes, and comments on the article page: four new tables with RLS default-deny, a five-endpoint
+engagement module, three rate-limit budgets, a Client Component island on `/news/[slug]`, and a
+Readership tile on the admin dashboard. The route's `revalidate = 60` is untouched and nothing
+engagement-related is fetched during server rendering, so the ISR constraint the design is built
+around genuinely holds.
 
-**The implementation matches its spec closely, and the verification claims in `tasks.md` are
-true.** I ran them: `tsc --noEmit` is clean, `eslint` is clean on every changed file, and the suite
-is 545 passing across 77 files (41 in `apps/web`, 20 of them new). Every normative requirement in
-`specs/reader-session/spec.md` traces to code and to a test — the anonymous fast path, the
-single-retry bound across both recovery paths, single-flight refresh, sign-out succeeding
-regardless of the call's outcome, and the undifferentiated anonymous presentation for a rejected
-reader. The recovery cycle in `authApi.ts:125-146` is genuinely careful: `alreadyRetried` bounds
-both paths with one flag, and `refreshSession`/`bootstrapCsrfCookie` call `rawFetch` directly so
-neither can re-enter recovery, which is exactly what the spec requires.
+**The verification claims in `tasks.md` are true.** I ran them: `eslint` clean, `tsc --noEmit` clean
+across all six projects, 680 tests passing across 88 files. Task 8.3 is correctly left unchecked —
+the three behaviours it names really are the ones no test here reaches.
 
-One Minor finding and two Nits. The Minor is a real spec gap — the sign-in return target drops the
-query string — and its obvious fix would break static prerendering, so it is worth stating
-carefully. Nothing here is a correctness, security, or performance defect in the recovery cycle
-itself.
+The work is careful and the reasoning in the comments is largely load-bearing rather than decorative:
+the visibility gate answers 404 rather than 403 on all five operations, `readerRequest` reuse means
+the 401→refresh→retry cycle keeps one implementation, the rate-limit namespaces are per-budget, and
+comment bodies never touch `sanitizeHtml` or `dangerouslySetInnerHTML`.
 
-Standards used: `CLAUDE.md`, `docs/ARCHITECTURE.md`, this change's own spec artifacts, and the
-sibling `apps/admin/src/lib/api.ts` the design mirrors. There is no `docs/adr/`, no
-`CONTRIBUTING.md`, and no `openspec/AGENTS.md`; `openspec/config.yaml` is an unfilled template.
+**One Major finding.** It is a client-side ordering defect, not an API defect: the engagement summary
+is fetched anonymously for a returning reader whose access token has expired, so the Like button
+renders un-pressed on an article they have already liked — and pressing it deletes the like. Four
+Minors and two Nits follow. Nothing here is a security defect.
+
+Standards used: `CLAUDE.md`, `docs/ARCHITECTURE.md` (§6.3, §8.1, §9.1–9.4, §11), this change's own
+spec artifacts, and the sibling patterns in `authApi.ts`, `rateLimit.ts`, and `article.repository.ts`.
+There is no `docs/adr/`, no `CONTRIBUTING.md`, and no review guide.
 
 ## Findings
 
 | # | Severity | Aspect(s) | File:line | Title |
 |---|---|---|---|---|
-| 1 | Minor | correctness | `apps/web/components/layout/ReaderControl.tsx:19` | Sign-in return target drops the query string, losing the news filter |
-| 2 | Nit | conventions | `apps/web/components/layout/StickyNav.tsx:31` | The control becomes a third `justify-between` child, re-centering `NavLinks` |
-| 3 | Nit | correctness | `apps/web/components/layout/ReaderControl.tsx:42` | A broken avatar URL has no fallback, unlike a null one |
+| 1 | Major | correctness | `apps/web/components/article/useArticleEngagement.ts:60` | Expired access token makes the summary anonymous, so the like button un-likes |
+| 2 | Minor | correctness | `apps/web/components/article/EngagementBar.tsx:81` | Signed-out visitors never see the like count |
+| 3 | Minor | conventions | `apps/admin/src/pages/DashboardPage.tsx:260` | `topArticles.slug` is fetched and contracted but never rendered |
+| 4 | Minor | correctness | `apps/web/components/article/useArticleEngagement.ts:160` | Offset paging repeats a comment when one is posted between pages |
+| 5 | Minor | performance | `apps/api/src/modules/engagement/engagement.service.ts:31` | Three redundant visibility SELECTs per article page load |
+| 6 | Nit | conventions | `apps/web/components/article/CommentSection.tsx:123` | Comment count formatted two different ways on one page |
+| 7 | Nit | hygiene | `supabase/migrations/0005_fast_vindicator.sql:75` | Migration comment names BYPASSRLS; the architecture says table ownership |
 
 ## Details
 
-### 1. Minor — Sign-in return target drops the query string
+### 1. Major — expired access token makes the summary anonymous, so the like button un-likes
 
-`ReaderControl.tsx:19` takes the return target from `usePathname()`:
+`apps/web/components/article/useArticleEngagement.ts:60`, with
+`apps/web/components/article/EngagementBar.tsx:81`
 
-```tsx
-const pathname = usePathname();
-// …
-<a href={signInHref(pathname ?? '/')} …>
+`GET /articles/:id/engagement` is declared `requirePublic()`. `authenticate` treats a missing,
+invalid, **or expired** access token as anonymous and never errors
+(`apps/api/src/middleware/authenticate.ts:30`), so an expired credential produces a perfectly
+ordinary 200 with `likedByReader: false` — no 401, so `withRecovery` never refreshes and never
+retries. The endpoint is right in isolation; the client's request ordering is what breaks.
+
+The access token TTL is 15 minutes (`apps/api/src/lib/tokens.ts:7`), and the mount sequence loses
+the race by construction rather than by luck:
+
+- Child effects run before parent effects, so `EngagementBar`'s effect fires before
+  `ReaderSessionProvider`'s. `POST /view` goes out at t=0.
+- `GET /auth/me` goes out at t≈0, returns 401 at t≈RTT, and `POST /auth/refresh` starts at t≈RTT.
+- The view POST resolves at t≈RTT, and `getArticleEngagement` starts *there* — concurrent with the
+  refresh, roughly a full round trip before the new `sid_at` cookie exists.
+
+So for any reader returning after 15 minutes — the ordinary case that refresh tokens exist to serve —
+the summary is read anonymously. The failure is then silent and destructive:
+
+1. Summary arrives with `likedByReader: false`.
+2. The session resolves to `authenticated`, so `EngagementBar:81` renders `LikeButton` with
+   `liked={false}` — hollow star, `aria-pressed="false"` — on an article the reader has already liked.
+3. The reader presses it. By now the refresh has landed, so `POST /like` succeeds, the server finds
+   the existing row and **deletes it**, returning `{ liked: false, likeCount: n-1 }`.
+4. The optimistic update flashes liked, then settles back to un-liked with the count one lower.
+
+The reader pressed "like" and lost their like, with no error anywhere. This contradicts
+`specs/article-engagement/spec.md` — "A signed-in reader's own like state is reported" — at the level
+that matters, which is what the reader sees.
+
+Not covered by the tests: `EngagementBar.test.tsx:69-79` stubs `fetch` to resolve `/auth/me`
+immediately and mocks `engagementApi` wholesale, so the summary's `likedByReader` is supplied
+directly and the token-expiry path is never exercised.
+
+**Fix.** Re-read the summary once the session resolves. Pass the settled identity into the hook and
+key a refetch on it:
+
+```ts
+// EngagementBar.tsx
+const { session } = useReaderSession();
+const readerId = session.status === 'authenticated' ? session.account.id : null;
+const { state, ... } = useArticleEngagement(articleId, readerId);
+
+// useArticleEngagement.ts — alongside the existing mount effect
+useEffect(() => {
+  if (readerId === null) return;
+  let cancelled = false;
+  getArticleEngagement(articleId)
+    .then((summary) => {
+      if (!cancelled) {
+        setState((current) => (current.status === 'ready' ? { ...current, summary } : current));
+      }
+    })
+    .catch(() => undefined); // the mount load already owns the unavailable state
+  return () => { cancelled = true; };
+}, [articleId, readerId]);
 ```
 
-`usePathname()` returns the path only — never the search string. `spec.md:15` requires the site to
-"supply the reader's current in-app location as the post-sign-in return target", and `/news` is
-searchParams-driven precisely so that filter state is part of the location:
-`docs/ARCHITECTURE.md` §8.1 records the reason as "Filters live in the URL, so results are
-shareable", and `app/news/page.tsx:21-22` reads `categorySlug` from it.
+That costs one extra GET for signed-in readers only, and it is the same shape as the existing
+"replace the optimistic guess with the server's number" rule the toggle already follows.
 
-So a reader browsing `/news?category=budaya` who signs in lands back on an unfiltered `/news`. The
-spec's own scenario uses an article, which has no query string, so this is invisible to the tests
-— `ReaderControl.test.tsx:65` asserts only `encodeURIComponent('/news/some-article')`.
+An alternative worth considering instead: make the like control render disabled-pending (not
+un-pressed) until `likedByReader` is known to have been read with a live session. The refetch is
+simpler and matches the file's existing idiom, so I'd take it.
 
-**Fix, with a trap worth naming.** The obvious change — adding `useSearchParams()` — is the wrong
-one here. In the App Router, `useSearchParams()` in a Client Component forces the nearest Suspense
-boundary and deopts static prerendering for routes that lack one, which is exactly what tasks 7.2
-and 7.3 exist to protect. Two safer options:
+### 2. Minor — signed-out visitors never see the like count
 
-- Build the href at click time from `window.location.pathname + window.location.search`, keeping
-  the anchor a plain full-document navigation:
-  ```tsx
-  <a
-    href={signInHref(pathname ?? '/')}
-    onClick={(e) => {
-      e.currentTarget.href = signInHref(window.location.pathname + window.location.search);
-    }}
-  >
-  ```
-- Or wrap `ReaderControl` in an explicit `<Suspense>` where it is rendered, and use
-  `useSearchParams()` deliberately — more code, but no click-time mutation.
+`apps/web/components/article/EngagementBar.tsx:81-88`
 
-Either way, add a test asserting a `?`-bearing location survives into `next=`. Note the server side
-already handles it: `resolveRedirectTarget` (`apps/api/src/lib/redirect.ts:14-29`) resolves the
-relative target against `APP_ORIGIN` and preserves the query, so only the client is dropping it.
+`summary.likeCount` is rendered *only* inside `LikeButton`, and `LikeButton` renders only when
+`session.status === 'authenticated'`. View count and comment count render unconditionally. So the
+overwhelming majority of visitors — anonymous ones — see "1.200 kali dibaca · 3 komentar" and no
+like figure at all, then watch a like count materialise if they ever sign in.
 
-### 2. Nit — The control becomes a third `justify-between` child, re-centering `NavLinks`
+`specs/web-public-site/spec.md` requires that a sign-in prompt appear "in place of the like control",
+which is satisfied; it does not ask for the *count* to disappear with it. Hiding a real number from
+most of the audience is also in tension with this capability's own founding requirement, "Article
+engagement affordances carry no fabricated activity" — the spirit there is that the bar tells the
+truth about activity, and to an anonymous reader it currently tells them nothing about likes.
 
-`StickyNav.tsx:26-32` was a two-child `justify-between` row — wordmark left, `NavLinks` right.
-`StickyNav.tsx:31` adds `<ReaderControl className="shrink-0" />` as a third child, so the browser
-now distributes three items and `NavLinks` moves to the centre of the sticky bar.
-
-`design.md:124` described this as rendering "in the sticky bar's existing right-hand space", which
-reads as the control joining the right edge rather than the nav relocating. The result may well be
-what you want — a centred nav in a sticky bar is a perfectly reasonable broadsheet treatment — but
-it is a visible change to existing chrome that no requirement asks for, so it is worth confirming
-it was chosen rather than inherited from the flex algebra.
-
-**If unintended**, group the two right-hand items so the row stays two-child:
+**Fix.** Render the count as a static counter beside the sign-in prompt, matching the view and
+comment counters:
 
 ```tsx
-<Link href="/" …>SIDERS</Link>
-<div className="flex items-center gap-4">
-  <NavLinks />
-  <ReaderControl className="shrink-0" />
-</div>
-```
-
-The masthead placement (`SiteHeader.tsx:11-16`) has no such issue — it is its own `justify-end`
-row, which is clean.
-
-### 3. Nit — A broken avatar URL has no fallback, unlike a null one
-
-`ReaderControl.tsx:42-53` handles `avatarUrl === null` well, falling back to an initial in a filled
-circle, which satisfies the spec scenario "A reader without an avatar still renders … without a
-broken or placeholder-less image" (`spec.md:110`).
-
-A non-null URL that fails to load is a different case and is not handled: Google avatar URLs on
-`lh3.googleusercontent.com` can start 404ing after a profile change, and the result is the broken
-image icon the scenario is trying to avoid. `referrerPolicy="no-referrer"` is the right call and
-should stay, but it does mean the request carries less context, not more.
-
-**Fix** — one `onError` that reuses the fallback already written:
-
-```tsx
-const [imageFailed, setImageFailed] = useState(false);
-// …
-{account.avatarUrl && !imageFailed ? (
-  <img … onError={() => setImageFailed(true)} />
-) : (
-  <span …>{account.name.charAt(0).toUpperCase()}</span>
+{session.status === 'anonymous' && (
+  <>
+    <SignInPrompt action="untuk menyukai artikel ini." />
+    <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted tabular-nums">
+      {formatCount(summary.likeCount)} suka
+    </span>
+  </>
 )}
 ```
 
-## Verified against the spec
+### 3. Minor — `topArticles.slug` is fetched and contracted but never rendered
 
-Every normative requirement traces to code and a test. Confirmed by reading both, and by running
-the suite:
+`apps/admin/src/pages/DashboardPage.tsx:260-264`, with
+`apps/api/src/modules/analytics/analytics.repository.ts:305` and
+`packages/contracts/src/dashboard.ts` (`dashboardTopArticleSchema`)
 
-| Requirement (`specs/reader-session/spec.md`) | Implementation | Test |
-|---|---|---|
-| Sign-in is a top-level navigation, site performs no part of the exchange | `ReaderControl.tsx:7-8,33` — plain `<a href>`, no handler | `ReaderControl.test.tsx:52-66` |
-| No session marker → no session request | `readerSession.tsx:29-32` — `hasCsrfCookie()` before any fetch | `readerSession.test.tsx:44-57` asserts `fetch` never called |
-| 401 → refresh → retry exactly once | `authApi.ts:133-137` | `authApi.test.ts:67-83` |
-| Failed refresh → anonymous, no retry | `authApi.ts:135` | `authApi.test.ts:85-98` |
-| No second refresh after a failed retry | `authApi.ts:129` `alreadyRetried` | `authApi.test.ts:100-115` |
-| Refresh is single-flight | `authApi.ts:88-99` | `authApi.test.ts:117-140` — asserts exactly 1 refresh across 2 concurrent 401s |
-| Refresh/re-pair issued outside the recovery cycle | `authApi.ts:91,109` call `rawFetch` directly | implied by the two counts above |
-| CSRF failure re-pairs, never refreshes | `authApi.ts:139-142` | `authApi.test.ts:142-156` asserts no `/auth/refresh` call |
-| Recovery paths do not chain | `authApi.ts:129` | `authApi.test.ts:158-173` |
-| Masthead reflects session state; nothing signed-in while loading | `ReaderControl.tsx:24-61` | `ReaderControl.test.tsx:37-98` |
-| Public content does not vary by session | provider is a Client Component boundary; no `cookies()`/`headers()` added | `revalidate` exports intact on `app/page.tsx:13`, `app/news/[slug]/page.tsx:12` |
-| Sign-out ends the local session either way | `readerSession.tsx:38-46` — `finally` sets anonymous | `readerSession.test.tsx` (4.3) |
-| Rejected reader presented as signed out, without explanation | `readerSession.tsx:35` — bare `.catch` | covered by the anonymous-state assertions |
+`specs/admin-dashboard/spec.md` — "The most-read articles are listed with their counts": *"it lists
+the most-read articles of the trailing 30 days, each with its title, **its public path**, and its
+read count."*
 
-Verification claims in `tasks.md:68` (9.2) were re-run and hold:
+`slug` is selected in the repository, grouped on, carried through the mapper, and declared in the
+contract — and the tile renders `article.title` and `article.views` only. The public path never
+reaches the screen, so the requirement is unmet and the field is dead weight in the response.
 
-- `npx tsc --noEmit -p apps/web/tsconfig.json` — exit 0.
-- `npx eslint` on all nine changed/new files — exit 0, no output.
-- `npx vitest run` — **77 files, 545 tests, all passing**; `apps/web` alone is 41.
-- `next build` was not run here either, for the same reason 7.2 gives (no live API or database).
-  That caveat is stated honestly in the task rather than glossed, which is the right call.
+**Fix.** Render it — one line, and it makes the row identifiable when two articles share a title:
 
-Also verified: `apps/web/lib/api.ts` is untouched and nothing imports the new module into it
-(task 1.7), so the public client stays caching-capable and the authenticated one stays
-caching-incapable — the module boundary the design rests on is intact.
+```tsx
+<span className="truncate text-sm text-[var(--ink)]">
+  {article.title}
+  <span className="ml-2 font-mono text-[10px] text-[var(--muted)]">/news/{article.slug}</span>
+</span>
+```
 
-## Carried over from the spec review — still open
+Dropping `slug` from the contract instead would be the wrong direction — the spec asks for the path.
 
-The implementation was reviewed against the spec, but two of the three findings from the earlier
-review of this same branch were resolved only in code, not in the artifacts they were raised
-against:
+### 4. Minor — offset paging repeats a comment when one is posted between pages
 
-- **`tasks.md:27` (3.4) still reads "Wrap `children`".** The code got this right —
-  `app/layout.tsx:31-35` wraps `<SiteHeader />`, `{children}`, and `<SiteFooter />` together, which
-  is why `ReaderControl` can read the context from inside the header. The task text that would have
-  misled was simply checked off unchanged. Cosmetic now that the code exists, but the task is the
-  document that gets archived.
-- **`docs/ARCHITECTURE.md` §8.1 is unchanged** and still reads "forwarding the incoming cookie
-  header so the server render knows whether the reader is signed in" — the approach this change
-  establishes must not be taken from the root layout. Task 9.1's note resolves the *other* doc
-  question (`COOKIE_DOMAIN` and `GOOGLE_REDIRECT_URI`, genuinely covered by §10) but not this one.
-- **Task 1.4's single-flight qualifier** now has an implementation (`authApi.ts:106-116`) and still
-  no spec requirement or concurrency test behind it. Unchanged from the earlier Nit; still not worth
-  blocking on.
+`apps/web/components/article/useArticleEngagement.ts:158-161`, with
+`apps/api/src/modules/engagement/engagement.repository.ts:162-174`
+
+`loadMoreComments` sends `offset: state.comments.length` against a listing ordered newest-first. If
+another reader posts a comment between the first page load and the reader pressing "Komentar lama",
+every row shifts down one, so `offset = 10` now points at what was row 9 — the last comment of page 1
+appears again as the first of page 2, and one comment is never reachable.
+
+The repository comment at `:168-170` claims the `desc(comments.id)` tie-break makes the sort stable
+under limit/offset paging. It does fix *equal timestamps*; it cannot fix *insertions at the head*,
+which is the drift that actually bites on a live article. The two are different problems and the
+comment currently conflates them.
+
+Self-posted comments are fine — `submitComment` prepends locally and the server's list grows by the
+same one, so the offset stays aligned. It is other readers' comments that break it.
+
+**Fix.** Keyset paging: send the last-loaded comment's `(createdAt, id)` as a `before` cursor and let
+the repository take `where (created_at, id) < ($1, $2)`, which the existing
+`comments_article_created_at_idx` already serves. Note that this changes the wire contract
+(`commentListQuerySchema`), so it is a follow-up rather than a one-line fix — the current spec
+requirement is written in terms of offset ("Further comments are reachable by offset"), and it would
+need to change with it. If you'd rather keep offset for now, at minimum correct the repository
+comment so the next reader isn't told the ordering is stable when it isn't.
+
+### 5. Minor — three redundant visibility SELECTs per article page load
+
+`apps/api/src/modules/engagement/engagement.service.ts:30-34`
+
+Every operation opens with `assertEngageable`, which is a separate round trip to `articles`. One
+article page load calls three endpoints — view, summary, comments — so the same row is fetched three
+times, on top of the summary's own three aggregates and the comment listing. Eight queries per
+article read.
+
+The gate itself is right and must stay; `specs/article-engagement/spec.md` requires it on all five
+operations, and it is what stops a uuid-guesser inflating counts on a draft. The cost is worth naming
+against `docs/ARCHITECTURE.md` §9.1, which opens: *"The one endpoint that must be cheap, since it
+fires on every article read."* The view path is now SELECT-then-transaction rather than the two
+statements §9.1 specifies.
+
+**Fix.** Fold the gate into the view transaction's first statement so the hot path loses a round trip
+while keeping the same semantics — no matching visible article inserts nothing, and the caller reads
+the affected-row count as before:
+
+```sql
+insert into app.view_seen (article_id, visitor_hash, date)
+select ${articleId}, ${visitorHash}, current_date
+from app.articles a
+where a.id = ${articleId}
+  and a.status = 'published'
+  and a.published_at is not null and a.published_at <= now()
+on conflict do nothing
+```
+
+That does duplicate the visibility rule in SQL, which `engagement.repository.ts:60-64` explicitly
+avoided on the grounds that the rule has one SQL definition and one JS definition. That reasoning is
+sound and I would not overrule it for the two read endpoints. If you keep the current shape
+everywhere, this is fine as-is at launch scale — the note is here so the §9.1 deviation on the view
+path is a recorded decision rather than an accident.
+
+### 6. Nit — comment count formatted two different ways on one page
+
+`apps/web/components/article/CommentSection.tsx:123` vs
+`apps/web/components/article/EngagementBar.tsx:10-12, 94`
+
+`EngagementBar` runs counts through `formatCount` (`toLocaleString('id-ID')`); `CommentSection`'s
+heading renders `{commentCount}` raw. At 1200 comments the bar reads "1.200 komentar" and the section
+heading immediately below reads "1200" — same number, two renderings, a few pixels apart.
+
+**Fix.** Export `formatCount` from a shared module (or lift it beside `formatCommentDate`) and use it
+in both places.
+
+### 7. Nit — migration comment names BYPASSRLS; the architecture says table ownership
+
+`supabase/migrations/0005_fast_vindicator.sql:75`
+
+> `-- policies granted to anon/authenticated; the API's Postgres role has BYPASSRLS and is the only`
+
+`docs/ARCHITECTURE.md` §6.3 says the opposite mechanism: *"The API connects as a role that owns the
+tables and is unaffected."* Owners bypass RLS implicitly unless `FORCE ROW LEVEL SECURITY` is set —
+that is not the `BYPASSRLS` role attribute, and the distinction matters the day someone sets
+`FORCE ROW LEVEL SECURITY` or moves the API onto a non-owning role, since only one of the two
+descriptions predicts what breaks.
+
+**Fix.** Match §6.3's wording: "the API connects as the role that owns these tables and is unaffected".
 
 ## Rule check
 
-| Rule / precedent | Complies? |
-|---|---|
-| `CLAUDE.md` — TypeScript strict, never `any` | Yes — no `any` in any new file; `tsc` clean |
-| `CLAUDE.md` — Testing: build, lint, tests, no TS errors before completion | Yes — verified independently; build caveat stated honestly in 7.2/9.2 |
-| `CLAUDE.md` — Composition over inheritance, small focused functions | Yes — `withRecovery` takes a `perform` thunk rather than branching per call site |
-| `CLAUDE.md` — No duplicated logic | Deliberate and argued: `ApiError`/envelope shape is duplicated from `lib/api.ts` per `design.md:73-75`, so the authenticated client can never accept caching options |
-| `CLAUDE.md` — Self-documenting code | Yes — comments explain *why* (the single-flight rationale at `authApi.ts:80-87` cites the reuse-detection spec) rather than restating the code |
-| `CLAUDE.md` — Frontend: hooks over classes, reusable components | Yes — one provider + hook, one `ReaderControl` shared by both surfaces |
-| `docs/ARCHITECTURE.md` §8.1 — "A single fetch wrapper handles the 401 → refresh → retry cycle in one place; never scatter that logic across call sites" | Yes — `withRecovery` is the only place |
-| `docs/ARCHITECTURE.md` §8.1 — Server Components forward the cookie header | No — deliberately deferred and argued in `proposal.md:33`, but §8.1 still unamended (carried over, above) |
-| Mirrors `apps/admin/src/lib/api.ts` in shape, keyed on 401 rather than 403 | Yes — and correctly keeps the CSRF branch 403-keyed (`authApi.ts:139`) |
-
----
-_Generated by [Claude Code](https://claude.ai/code)_
+| Rule | Where | Complies |
+|---|---|---|
+| `docs/ARCHITECTURE.md` §6.3 — app schema, RLS default-deny on every table | `0005_fast_vindicator.sql:74-80`, `assertDatabaseRole.ts` | Yes — all four tables enabled and added to the boot check |
+| §8.1 — reader session resolved client-side, ISR preserved | `page.tsx:89`, `EngagementBar.tsx` | Yes — `revalidate = 60` untouched, only `articleId` crosses the boundary |
+| §8.1 — one fetch wrapper owns 401→refresh→retry | `authApi.ts:162`, `engagementApi.ts` | Yes — `readerRequest` exported and reused, no second cycle |
+| §9.1 — view counting: two statements, one transaction | `engagement.repository.ts:73-95` | Yes for the transaction; the added visibility SELECT precedes it (finding 5) |
+| §9.2 — clients branch on `code`, never `message` | `CommentSection.tsx:18-26` | Yes |
+| §9.3 — views 60/h, likes 60/h, comments 10/h | `rateLimit.ts:157-201` | Yes — each namespaced, reader-keyed where reader-gated |
+| §9.4 — sanitise on write, never on render | `engagement.ts` schema, `CommentSection.tsx:166` | Yes — plain text stored, rendered as a text node, no `dangerouslySetInnerHTML` |
+| §11 — Zod validation on every body and query string | `engagement.controller.ts:71,82` | Yes — `.strict()` rejects invented `parentId`/`readerId`/`status` |
+| §11 — every route carries an explicit authorisation declaration | `engagement.routes.ts:40-50` | Yes — all five declare, boot audit passes |
+| §11 — CSRF double-submit on state-changing requests | `authApi.ts:44-49` via `readerRequest` | Yes |
+| `CLAUDE.md` — TS strict, no `any` | whole diff | Yes — `tsc --noEmit` clean, no `any` introduced |
+| `CLAUDE.md` — build, lint, tests, no TS errors before completion | — | Yes — eslint clean, typecheck clean, 680/680 passing |
+| `specs/article-engagement` — "A signed-in reader's own like state is reported" | `useArticleEngagement.ts:60` | **No** — finding 1 |
+| `specs/article-engagement` — draft article 404s, not 403 | `engagement.service.ts:20-22` | Yes — identical response for unknown and non-public |
+| `specs/article-engagement` — a muted reader may still like | `engagement.routes.ts:48` | Yes — `createsContent: false` |
+| `specs/article-engagement` — comment count matches the listing | `engagement.repository.ts:53-55` | Yes — one `visibleComments` predicate serves both |
+| `specs/web-public-site` — failed load reported, not faked | `EngagementBar.tsx:61-69` | Yes — unavailable state, never zeroes |
+| `specs/web-public-site` — neither control before the session is known | `EngagementBar.tsx:80-88`, `CommentSection.tsx:130-135` | Yes |
+| `specs/admin-dashboard` — top articles listed with title, public path, count | `DashboardPage.tsx:260-264` | **No** — finding 3 |
