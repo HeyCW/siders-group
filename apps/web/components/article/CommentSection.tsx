@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { COMMENT_MAX_LENGTH, type CommentResponse } from '@siders/contracts';
 import { ApiError } from '../../lib/authApi';
+import { formatCount } from '../../lib/formatCount';
 import { useReaderSession } from '../../lib/readerSession';
 import { SignInPrompt } from './SignInPrompt';
 
@@ -120,7 +121,7 @@ export function CommentSection({
       <div className="flex items-baseline justify-between gap-4 border-b-[3px] border-ink pb-2">
         <h2 className="font-serif text-[clamp(20px,2.6vw,28px)] font-bold uppercase tracking-[0.02em]">Komentar</h2>
         <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted tabular-nums">
-          {commentCount}
+          {formatCount(commentCount)}
         </span>
       </div>
 

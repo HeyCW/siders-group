@@ -1,15 +1,11 @@
 'use client';
 
+import { formatCount } from '../../lib/formatCount';
 import { useReaderSession } from '../../lib/readerSession';
 import { CommentSection } from './CommentSection';
 import { LikeButton } from './LikeButton';
 import { SignInPrompt } from './SignInPrompt';
 import { useArticleEngagement } from './useArticleEngagement';
-
-/** Indonesian thousands grouping, matching the article dateline's own `id-ID` formatting. */
-function formatCount(value: number): string {
-  return value.toLocaleString('id-ID');
-}
 
 /**
  * The strip's shared frame. Used by the loaded bar and by the skeleton alike, so the two occupy
@@ -53,8 +49,9 @@ function Skeleton() {
  */
 export function EngagementBar({ articleId }: { articleId: string }) {
   const { session } = useReaderSession();
+  const readerId = session.status === 'authenticated' ? session.account.id : null;
   const { state, likePending, loadingMoreComments, toggleLike, submitComment, loadMoreComments } =
-    useArticleEngagement(articleId);
+    useArticleEngagement(articleId, readerId);
 
   if (state.status === 'loading') return <Skeleton />;
 

@@ -195,6 +195,30 @@ describe('EngagementBar — signed in', () => {
     expect(screen.queryByText(/untuk menyukai artikel ini/i)).not.toBeInTheDocument();
   });
 
+  it('re-reads the summary once the session resolves, correcting a like state read anonymously', async () => {
+    // The mount load's `GET /engagement` typically races the session's own resolution and loses
+    // it — the first call here stands in for that anonymous read, reporting no like even though
+    // the reader has one, exactly as the API would if it received the request before the access
+    // cookie was refreshed. The second call is the session-aware re-read.
+    getArticleEngagement.mockResolvedValueOnce(summary({ likedByReader: false, likeCount: 3 }));
+    getArticleEngagement.mockResolvedValueOnce(summary({ likedByReader: true, likeCount: 4 }));
+
+    renderAuthenticated();
+    const button = await screen.findByRole('button', { name: /like/i });
+
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
+    expect(button.textContent).toContain('4');
+    expect(getArticleEngagement).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not re-read the summary a second time for a signed-out visitor', async () => {
+    renderAnonymous();
+
+    await screen.findByText(/kali dibaca/i);
+    // No session ever resolves to authenticated, so the session-aware effect never fires.
+    expect(getArticleEngagement).toHaveBeenCalledTimes(1);
+  });
+
   it('updates the like optimistically and then settles on the server"s count', async () => {
     let resolveToggle: ((value: { liked: boolean; likeCount: number }) => void) | undefined;
     toggleArticleLike.mockReturnValue(

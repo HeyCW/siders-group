@@ -41,8 +41,19 @@ export interface UseArticleEngagement {
  * A failing view POST — including a 429 from its own hourly budget — is swallowed: the counts
  * still load, one short (specs/article-engagement/spec.md — "Recording a view never blocks the
  * reader").
+ *
+ * `readerId` is `null` until `ReaderSessionProvider` resolves, then either a reader id or `null`
+ * again for good. The mount load above always fires anonymously — its `GET /engagement` races
+ * `ReaderSessionProvider`'s own session check and typically loses it, so `likedByReader` it
+ * receives cannot be trusted once the session turns out to be authenticated. This is not merely
+ * cosmetic: on a page load with no live access-token cookie (the ordinary case for a reader
+ * returning after the 15-minute access-cookie lifetime — see `apps/api/src/lib/cookies.ts`),
+ * `GET /engagement` succeeds anonymously with `likedByReader: false` before the session's own
+ * 401 → refresh cycle has completed, and `LikeButton` would render un-pressed on an article the
+ * reader has already liked — so pressing it *removes* the like. Once `readerId` is known, this
+ * re-reads the summary with the now-authenticated request so `likedByReader` reflects reality.
  */
-export function useArticleEngagement(articleId: string): UseArticleEngagement {
+export function useArticleEngagement(articleId: string, readerId: string | null): UseArticleEngagement {
   const [state, setState] = useState<EngagementState>({ status: 'loading' });
   const [likePending, setLikePending] = useState(false);
   const [loadingMoreComments, setLoadingMoreComments] = useState(false);
@@ -80,6 +91,26 @@ export function useArticleEngagement(articleId: string): UseArticleEngagement {
       cancelled = true;
     };
   }, [articleId]);
+
+  // Re-reads the summary once the reader session is known to be authenticated, so
+  // `likedByReader` reflects a request that actually carried the session — see the note above.
+  useEffect(() => {
+    if (readerId === null) return;
+    let cancelled = false;
+
+    getArticleEngagement(articleId)
+      .then((summary) => {
+        if (cancelled) return;
+        setState((current) => (current.status === 'ready' ? { ...current, summary } : current));
+      })
+      // The mount load above already owns reporting `unavailable`; a failure here just leaves
+      // the anonymous summary in place rather than surfacing a second error path.
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [articleId, readerId]);
 
   const toggleLike = useCallback(async (): Promise<void> => {
     if (likePending) return;

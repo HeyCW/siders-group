@@ -107,6 +107,15 @@ established limit/offset returning a bare array, and `NewsExplorer` already deri
 from `returned.length === limit`. A second pagination convention for one endpoint would be the
 odd one out.
 
+**Known limit, accepted rather than solved here.** Offset paging drifts under insertion: if
+another reader's comment lands ahead of the page boundary between one page load and the next,
+every row after it shifts down one, and the following `offset` re-serves the previous page's last
+comment instead of the next one. A self-posted comment never causes this — the composer prepends
+it locally and the next `offset` still lands correctly — so this only bites when someone *else*
+comments while the reader is mid-scroll. Fixing it properly means keyset paging on
+`(created_at, id)`, which changes the wire contract this section just established; offset is what
+was asked for here, so this is recorded rather than silently worked around.
+
 `status` is `visible | removed` rather than a hard delete, so removing a comment by SQL leaves the
 row for whoever needs to see what was said. The public listing filters on `visible`; nothing in
 this change ever writes `removed`.
