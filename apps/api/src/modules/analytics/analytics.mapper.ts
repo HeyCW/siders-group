@@ -5,6 +5,7 @@ import type {
   AnalyticsCurationIntegrity,
   AnalyticsPipelineCounts,
   AnalyticsReaderActivity,
+  AnalyticsReadership,
   AnalyticsUpNext,
 } from './analytics.repository.js';
 
@@ -15,6 +16,7 @@ export interface DashboardData {
   curationIntegrity: AnalyticsCurationIntegrity;
   upNext: AnalyticsUpNext;
   readers: AnalyticsReaderActivity;
+  readership: AnalyticsReadership;
 }
 
 /** The only formatting step between the repository's raw rows and the contract shape: each
@@ -37,5 +39,8 @@ export function toDashboardResponse(data: DashboardData): DashboardResponse {
       overdueUnpromotedCount: data.upNext.overdueUnpromotedCount,
     },
     readers: data.readers,
+    // Already contract-shaped by the time it leaves the repository — the counts are numbers and
+    // the top-article rows carry no Date to format.
+    readership: data.readership,
   };
 }

@@ -12,15 +12,16 @@ export function createAnalyticsService(repository: AnalyticsRepository): Analyti
       // One `now` shared by every tile, so the six sections describe the same instant rather
       // than six slightly different ones from staggered repository calls.
       const now = new Date();
-      const [pipeline, cadence, contentDebt, curationIntegrity, upNext, readers] = await Promise.all([
+      const [pipeline, cadence, contentDebt, curationIntegrity, upNext, readers, readership] = await Promise.all([
         repository.getPipelineCounts(),
         repository.getCadence(now),
         repository.getContentDebt(),
         repository.getCurationIntegrity(now),
         repository.getUpNext(now),
         repository.getReaderActivity(now),
+        repository.getReadership(now),
       ]);
-      return toDashboardResponse({ pipeline, cadence, contentDebt, curationIntegrity, upNext, readers });
+      return toDashboardResponse({ pipeline, cadence, contentDebt, curationIntegrity, upNext, readers, readership });
     },
   };
 }

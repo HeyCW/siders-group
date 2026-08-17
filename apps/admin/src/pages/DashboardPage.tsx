@@ -67,10 +67,10 @@ function formatDate(iso: string): string {
 }
 
 /**
- * The admin dashboard: six read-only tiles computed entirely from existing data
- * (specs/admin-dashboard/spec.md). No click-throughs and no filters in this change — every tile
- * shows counts (or, for "Up next", the due-soon rows that are its entire point) with no way to
- * drill in further (proposal.md - Non-Goals).
+ * The admin dashboard: seven read-only tiles computed entirely from existing data
+ * (specs/admin-dashboard/spec.md). No click-throughs and no filters — every tile shows counts
+ * (or, for "Up next" and "Readership", the rows that are their entire point) with no way to
+ * drill in further.
  */
 export function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
@@ -132,6 +132,13 @@ export function DashboardPage() {
   }
 
   const readersHasHistory = data.readers.newLast7d > 0 || data.readers.activeLast30d > 0;
+  // The top-articles list is checked too: its window is 30 days against the totals' 7, so an
+  // article read a fortnight ago and not since would otherwise render the tile as "no reads yet"
+  // while the list beneath it had rows.
+  const readershipHasHistory =
+    data.readership.last7dViews > 0 ||
+    data.readership.last7dUniqueViews > 0 ||
+    data.readership.topArticles.length > 0;
 
   return (
     <div className="siders-scope min-h-full bg-[var(--paper)] text-[var(--ink)]">
@@ -229,6 +236,39 @@ export function DashboardPage() {
               </div>
             ) : (
               <p className="text-sm text-[var(--muted)]">No reader sign-in activity yet.</p>
+            )}
+          </Tile>
+
+          {/* Traffic, as distinct from the "Readers" tile above it, which counts accounts. The
+              labels say "reads" rather than "views" so the two tiles cannot be read as measuring
+              the same thing. */}
+          <Tile title="Readership">
+            {readershipHasHistory ? (
+              <>
+                <div className="flex gap-6">
+                  <Stat label="Reads (7d)" value={data.readership.last7dViews} />
+                  {/* Deduplicated per visitor per day and then summed across the window — not a
+                      distinct-people count for the week (packages/contracts/src/dashboard.ts). */}
+                  <Stat label="Unique reads (7d)" value={data.readership.last7dUniqueViews} />
+                </div>
+                {data.readership.topArticles.length > 0 && (
+                  <>
+                    <p className="mb-1 mt-4 font-mono text-[10px] uppercase tracking-widest text-[var(--muted)]">
+                      Most read (30d)
+                    </p>
+                    <ul className="divide-y divide-[var(--rule)]">
+                      {data.readership.topArticles.map((article) => (
+                        <li key={article.id} className="flex justify-between gap-3 py-2">
+                          <span className="truncate text-sm text-[var(--ink)]">{article.title}</span>
+                          <span className="shrink-0 font-mono text-xs text-[var(--muted)]">{article.views}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">No article reads recorded yet.</p>
             )}
           </Tile>
         </div>

@@ -86,7 +86,11 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             dangerouslySetInnerHTML={{ __html: article.bodyHtml }}
           />
 
-          <EngagementBar />
+          {/* A Client Component island. `articleId` is the only thing it needs from the server,
+              so the route stays ISR — nothing engagement-related is fetched during server
+              rendering (specs/web-public-site/spec.md - "The route stays statically
+              regenerated"). */}
+          <EngagementBar articleId={article.id} />
         </div>
 
         <div className="min-w-0">

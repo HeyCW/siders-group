@@ -36,6 +36,13 @@
       "when": 1786900488855,
       "tag": "0004_steep_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786938723855,
+      "tag": "0005_fast_vindicator",
+      "breakpoints": true
     }
   ]
 }

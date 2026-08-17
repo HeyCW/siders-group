@@ -29,6 +29,7 @@ import { tagRoutes } from './modules/tags/tag.routes.js';
 import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
 import { reelRoutes, reelsCurationRoutes, publicReelsRoutes } from './modules/reels/reels.routes.js';
 import { partnerRoutes, publicPartnerRoutes } from './modules/partners/partner.routes.js';
+import { publicEngagementRoutes } from './modules/engagement/engagement.routes.js';
 import { analyticsRoutes } from './modules/analytics/analytics.routes.js';
 
 export function createServer(): Express {
@@ -60,6 +61,9 @@ export function createServer(): Express {
   app.use('/media-files', mediaFileRoutes(env));
   app.use('/admin/articles', articleRoutes(db, env));
   app.use('/articles', publicArticleRoutes(db, env));
+  // Also at `/articles` — every route it declares is two segments deep, so nothing it matches
+  // can collide with `publicArticleRoutes`' `/` and `/:slug` (engagement.routes.ts).
+  app.use('/articles', publicEngagementRoutes(db, env));
   app.use('/categories', categoryRoutes(db));
   app.use('/tags', tagRoutes(db));
   app.use('/admin/curation', curationRoutes(db, env));

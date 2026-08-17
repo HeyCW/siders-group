@@ -81,6 +81,35 @@ export const dashboardReadersSchema = z.object({
 });
 export type DashboardReaders = z.infer<typeof dashboardReadersSchema>;
 
+/**
+ * Cap on `readership.topArticles` — a glance tile, like `upNext.dueWithin48h`. There is no
+ * accompanying total: "the five most-read" is the whole question, and how many articles had any
+ * reads at all is not something this section is asked
+ * (specs/admin-dashboard/spec.md - "The listing is bounded").
+ */
+export const DASHBOARD_TOP_ARTICLES_LIMIT = 5;
+
+export const dashboardTopArticleSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  slug: z.string(),
+  views: z.number().int().nonnegative(),
+});
+export type DashboardTopArticle = z.infer<typeof dashboardTopArticleSchema>;
+
+/**
+ * Traffic, not sign-in activity — the complement of `dashboardReadersSchema`, which counts
+ * accounts. `last7dUniqueViews` is deduplicated per visitor per day, so a visitor returning on
+ * three days counts three times across a 7-day window; it is "unique visits per day, summed",
+ * not "distinct people this week" (design.md - "View counting").
+ */
+export const dashboardReadershipSchema = z.object({
+  last7dViews: z.number().int().nonnegative(),
+  last7dUniqueViews: z.number().int().nonnegative(),
+  topArticles: z.array(dashboardTopArticleSchema).max(DASHBOARD_TOP_ARTICLES_LIMIT),
+});
+export type DashboardReadership = z.infer<typeof dashboardReadershipSchema>;
+
 export const dashboardResponseSchema = z.object({
   pipeline: dashboardPipelineSchema,
   cadence: z.array(dashboardCadenceBucketSchema).length(DASHBOARD_CADENCE_WEEKS),
@@ -88,5 +117,6 @@ export const dashboardResponseSchema = z.object({
   curationIntegrity: dashboardCurationIntegritySchema,
   upNext: dashboardUpNextSchema,
   readers: dashboardReadersSchema,
+  readership: dashboardReadershipSchema,
 });
 export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;

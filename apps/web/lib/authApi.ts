@@ -145,12 +145,30 @@ async function withRecovery<T>(perform: () => Promise<T>, alreadyRetried = false
   }
 }
 
+/**
+ * Any API call that should travel with the reader's session, through the one recovery cycle.
+ *
+ * Exported so `engagementApi.ts` reuses this cycle rather than growing a second — the rule
+ * `docs/ARCHITECTURE.md` §8.1 states directly: "A single fetch wrapper handles the 401 → refresh
+ * → retry cycle in one place; never scatter that logic across call sites." It also carries the
+ * two things a hand-rolled `fetch` in a sibling module would have had to reimplement and would
+ * eventually have drifted on: `credentials: 'include'`, and the `x-csrf-token` header that
+ * `apps/api/src/lib/csrf.ts` demands of every state-changing request from a browser holding a
+ * session cookie.
+ *
+ * Safe for endpoints that need no session at all. An anonymous browser holds no CSRF cookie, so
+ * no header is attached, and the API's CSRF middleware passes such requests through untouched.
+ */
+export function readerRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return withRecovery(() => rawFetch<T>(path, init));
+}
+
 /** `GET /auth/me` through the recovery cycle. */
 export function getReaderAccount(): Promise<ReaderAccountResponse> {
-  return withRecovery(() => rawFetch<ReaderAccountResponse>('/auth/me'));
+  return readerRequest<ReaderAccountResponse>('/auth/me');
 }
 
 /** `POST /auth/logout` through the recovery cycle. */
 export function signOutReader(): Promise<void> {
-  return withRecovery(() => rawFetch<void>('/auth/logout', { method: 'POST' }));
+  return readerRequest<void>('/auth/logout', { method: 'POST' });
 }

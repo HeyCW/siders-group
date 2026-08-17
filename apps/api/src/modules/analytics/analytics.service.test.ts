@@ -31,12 +31,20 @@ function createFakeAnalyticsRepository(): { repository: AnalyticsRepository; cal
       calledWithNow.push(now);
       return { newLast7d: 2, activeLast30d: 20 };
     },
+    async getReadership(now) {
+      calledWithNow.push(now);
+      return {
+        last7dViews: 900,
+        last7dUniqueViews: 640,
+        topArticles: [{ id: '2', title: 'Most read', slug: 'most-read', views: 500 }],
+      };
+    },
   };
   return { repository, calledWithNow };
 }
 
 describe('AnalyticsService', () => {
-  it('composes all six repository calls into one DashboardResponse', async () => {
+  it('composes all seven repository calls into one DashboardResponse', async () => {
     const { repository } = createFakeAnalyticsRepository();
     const service = createAnalyticsService(repository);
 
@@ -48,6 +56,8 @@ describe('AnalyticsService', () => {
     expect(result.curationIntegrity.home).toEqual({ total: 1, visible: 1 });
     expect(result.upNext.dueWithin48h[0]?.publishedAt).toBe('2026-08-14T00:00:00.000Z');
     expect(result.readers).toEqual({ newLast7d: 2, activeLast30d: 20 });
+    expect(result.readership.last7dViews).toBe(900);
+    expect(result.readership.topArticles[0]?.slug).toBe('most-read');
   });
 
   it('shares one `now` across every repository call, not a separately captured instant per call', async () => {
@@ -56,7 +66,7 @@ describe('AnalyticsService', () => {
 
     await service.getDashboard();
 
-    expect(calledWithNow).toHaveLength(4);
+    expect(calledWithNow).toHaveLength(5);
     const [first, ...rest] = calledWithNow;
     expect(rest.every((instant) => instant.getTime() === first?.getTime())).toBe(true);
   });

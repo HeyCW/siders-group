@@ -2,12 +2,8 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { API_URL } from '../../lib/env';
 import { useReaderSession } from '../../lib/readerSession';
-
-function signInHref(currentLocation: string): string {
-  return `${API_URL}/auth/google?next=${encodeURIComponent(currentLocation)}`;
-}
+import { currentLocationWithQuery, signInHref } from '../../lib/signInHref';
 
 /**
  * Session-dependent masthead furniture: a sign-in link while anonymous, the reader's name,
@@ -38,12 +34,10 @@ export function ReaderControl({ className = '' }: { className?: string }) {
         href={signInHref(pathname ?? '/')}
         // `usePathname()` carries no query string, but `/news`'s category filter lives in one
         // (`docs/ARCHITECTURE.md` §8.1 - "Filters live in the URL, so results are shareable").
-        // Reading `window.location` here rather than `useSearchParams()` keeps this a plain
-        // synchronous click handler: that hook forces a Suspense boundary around every render
-        // of this component, and this component is mounted in the root layout, so it would
-        // reach `/` and `/news/[slug]` too — routes 7.2 keeps statically rendered.
+        // See `lib/signInHref.ts` for why this is read at click time rather than via
+        // `useSearchParams()`.
         onClick={(e) => {
-          e.currentTarget.href = signInHref(window.location.pathname + window.location.search);
+          e.currentTarget.href = signInHref(currentLocationWithQuery());
         }}
         className={`${base} text-muted hover:text-ink ${className}`}
       >

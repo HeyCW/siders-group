@@ -4,6 +4,7 @@ import {
   articles,
   articleCategories,
   articleTags,
+  articleViewsDaily,
   tags,
   readers,
   homeCuration,
@@ -11,7 +12,7 @@ import {
   reels,
   type Database,
 } from '@siders/db';
-import { DASHBOARD_CADENCE_WEEKS, DASHBOARD_DUE_SOON_LIMIT } from '@siders/contracts';
+import { DASHBOARD_CADENCE_WEEKS, DASHBOARD_DUE_SOON_LIMIT, DASHBOARD_TOP_ARTICLES_LIMIT } from '@siders/contracts';
 import { isPubliclyVisible } from '../articles/article.repository.js';
 import { isReelPubliclyVisible } from '../reels/reel.repository.js';
 
@@ -23,7 +24,12 @@ const NEW_READER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const ACTIVE_READER_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+/** Both readership windows are inclusive of the current Jakarta day. */
+const READERSHIP_TOTALS_DAYS = 7;
+const READERSHIP_TOP_DAYS = 30;
 
 /**
  * The start (Monday 00:00 Jakarta time, expressed as the real UTC instant) of the Jakarta
@@ -107,6 +113,19 @@ export interface AnalyticsReaderActivity {
   activeLast30d: number;
 }
 
+export interface AnalyticsTopArticle {
+  id: string;
+  title: string;
+  slug: string;
+  views: number;
+}
+
+export interface AnalyticsReadership {
+  last7dViews: number;
+  last7dUniqueViews: number;
+  topArticles: AnalyticsTopArticle[];
+}
+
 /** Drizzle queries only — no Express or contract types here, mirroring `article.repository.ts`. */
 export interface AnalyticsRepository {
   getPipelineCounts(): Promise<AnalyticsPipelineCounts>;
@@ -115,6 +134,7 @@ export interface AnalyticsRepository {
   getCurationIntegrity(now: Date): Promise<AnalyticsCurationIntegrity>;
   getUpNext(now: Date): Promise<AnalyticsUpNext>;
   getReaderActivity(now: Date): Promise<AnalyticsReaderActivity>;
+  getReadership(now: Date): Promise<AnalyticsReadership>;
 }
 
 export function createAnalyticsRepository(db: Database): AnalyticsRepository {
@@ -258,6 +278,50 @@ export function createAnalyticsRepository(db: Database): AnalyticsRepository {
         .from(readers);
 
       return { newLast7d: row?.newLast7d ?? 0, activeLast30d: row?.activeLast30d ?? 0 };
+    },
+
+    async getReadership(now) {
+      // Both windows are inclusive of today, so "trailing 7 days" spans today and the six Jakarta
+      // calendar dates before it. `jakartaDateLabel` is the same helper the cadence buckets use,
+      // so the readership section and the rest of the board agree on where a day begins
+      // (spec.md - "Readership shares the dashboard's instant and timezone").
+      const sevenDayCutoff = jakartaDateLabel(new Date(now.getTime() - (READERSHIP_TOTALS_DAYS - 1) * DAY_MS));
+      const thirtyDayCutoff = jakartaDateLabel(new Date(now.getTime() - (READERSHIP_TOP_DAYS - 1) * DAY_MS));
+
+      const totalViews = sql<number>`coalesce(sum(${articleViewsDaily.views}), 0)`;
+
+      const [totals, topArticles] = await Promise.all([
+        db
+          .select({
+            last7dViews: totalViews.mapWith(Number),
+            last7dUniqueViews: sql<number>`coalesce(sum(${articleViewsDaily.uniqueViews}), 0)`.mapWith(Number),
+          })
+          .from(articleViewsDaily)
+          .where(gte(articleViewsDaily.date, sevenDayCutoff)),
+        db
+          .select({
+            id: articles.id,
+            title: articles.title,
+            slug: articles.slug,
+            views: totalViews.mapWith(Number),
+          })
+          .from(articleViewsDaily)
+          // Inner join, so an article deleted between the view and this read simply drops out.
+          // `article_views_daily` cascades on delete, so in practice its rows are gone too — the
+          // join is what makes that true rather than assumed.
+          .innerJoin(articles, eq(articles.id, articleViewsDaily.articleId))
+          .where(gte(articleViewsDaily.date, thirtyDayCutoff))
+          .groupBy(articles.id, articles.title, articles.slug)
+          // `id` breaks ties so two articles on the same count don't swap places between requests.
+          .orderBy(sql`sum(${articleViewsDaily.views}) desc`, asc(articles.id))
+          .limit(DASHBOARD_TOP_ARTICLES_LIMIT),
+      ]);
+
+      return {
+        last7dViews: totals[0]?.last7dViews ?? 0,
+        last7dUniqueViews: totals[0]?.last7dUniqueViews ?? 0,
+        topArticles,
+      };
     },
   };
 }
