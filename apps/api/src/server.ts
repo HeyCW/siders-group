@@ -30,6 +30,11 @@ import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.ro
 import { reelRoutes, reelsCurationRoutes, publicReelsRoutes } from './modules/reels/reels.routes.js';
 import { partnerRoutes, publicPartnerRoutes } from './modules/partners/partner.routes.js';
 import { publicEngagementRoutes } from './modules/engagement/engagement.routes.js';
+import {
+  commentModerationRoutes,
+  commentReportRoutes,
+  readerModerationRoutes,
+} from './modules/moderation/moderation.routes.js';
 import { analyticsRoutes } from './modules/analytics/analytics.routes.js';
 
 export function createServer(): Express {
@@ -74,6 +79,9 @@ export function createServer(): Express {
   app.use('/admin/partners', partnerRoutes(db, env));
   app.use('/partners', publicPartnerRoutes(db, env));
   app.use('/admin/dashboard', analyticsRoutes(db));
+  app.use('/admin/comments', commentModerationRoutes(db));
+  app.use('/admin/readers', readerModerationRoutes(db));
+  app.use('/comments', commentReportRoutes(db));
 
   app.use(createErrorHandler(logger));
 

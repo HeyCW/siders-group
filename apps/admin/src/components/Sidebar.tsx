@@ -100,6 +100,25 @@ function IconPartners(props: IconProps) {
   );
 }
 
+function IconComments(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <path d="M3 4h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8l-4 3v-3H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
+    </IconShell>
+  );
+}
+
+function IconReaders(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <circle cx="7" cy="6.5" r="2.7" />
+      <circle cx="14" cy="8" r="2" />
+      <path d="M2.5 16v-1a4.5 4.5 0 0 1 4.5-4.5h0a4.5 4.5 0 0 1 4.5 4.5v1" />
+      <path d="M12.5 12.2a3.3 3.3 0 0 1 4.5 3.1v0.7" />
+    </IconShell>
+  );
+}
+
 function IconChevron(props: IconProps) {
   return (
     <IconShell {...props}>
@@ -147,6 +166,13 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Site',
     items: [{ to: '/partners', label: 'Partners', icon: IconPartners, permission: 'settings.manage' }],
+  },
+  {
+    label: 'Community',
+    items: [
+      { to: '/moderation/comments', label: 'Comments', icon: IconComments, permission: 'moderation.manage' },
+      { to: '/moderation/readers', label: 'Readers', icon: IconReaders, permission: 'moderation.manage' },
+    ],
   },
 ];
 

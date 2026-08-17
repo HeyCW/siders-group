@@ -158,6 +158,11 @@ const ENGAGEMENT_RATE_LIMITS = {
   view: { name: 'engagement-view', windowMs: HOUR_MS, max: 60 },
   like: { name: 'engagement-like', windowMs: HOUR_MS, max: 60 },
   comment: { name: 'engagement-comment', windowMs: HOUR_MS, max: 10 },
+  // Not one of the four §9.3 originally listed (comments, likes, views, login, contact) — added
+  // by `add-community-moderation` alongside the report feature itself, in its own namespace
+  // rather than reused, for the same reason every entry above already has one (design.md -
+  // Decision 8, `openspec/changes/add-community-moderation`).
+  report: { name: 'engagement-report', windowMs: HOUR_MS, max: 20 },
 } as const;
 
 /**
@@ -198,4 +203,9 @@ export function likeRateLimiter() {
 /** 10/hour per reader — `docs/ARCHITECTURE.md` §9.3. */
 export function commentRateLimiter() {
   return engagementLimiter(ENGAGEMENT_RATE_LIMITS.comment, readerKey);
+}
+
+/** 20/hour per reader — design.md - Decision 8, `openspec/changes/add-community-moderation`. */
+export function reportRateLimiter() {
+  return engagementLimiter(ENGAGEMENT_RATE_LIMITS.report, readerKey);
 }

@@ -90,8 +90,12 @@ async function resolveReaderAccess(sessionId: string): Promise<ReaderAccess | nu
 
 export interface RequireReaderOptions {
   /**
-   * Whether this endpoint creates reader-authored content, which is what a mute actually
-   * restricts (specs/authorization/spec.md - "Muted reader cannot author content").
+   * Whether this endpoint creates reader-authored content — the one thing both a mute and a ban
+   * restrict, as two flavours of the same "cannot author" sanction differing only in duration
+   * (specs/authorization/spec.md - "Muted reader cannot author content"; design.md - Decision 7,
+   * `openspec/changes/add-community-moderation`). Every other reader-only endpoint — reading,
+   * liking, reporting, the reader's own account — requires only an authenticated reader identity,
+   * regardless of mute or ban state.
    *
    * Defaults to the request's method being mutating. That heuristic is the safe default for a
    * route nobody thought about — a new POST is assumed to author content — but it is only a
@@ -103,9 +107,18 @@ export interface RequireReaderOptions {
 }
 
 /**
- * Reachable only by an authenticated reader whose account is active. A muted reader keeps read
- * access but is rejected at content-creating endpoints
- * (specs/authorization/spec.md - "Reader-only authorization").
+ * Reachable only by an authenticated reader — read, like, and report access require only that
+ * identity, regardless of `status`. Ban and mute are two flavours of the same "cannot author"
+ * sanction, differing only in duration (mute is time-boxed, ban is indefinite until unbanned),
+ * and both are enforced only where `createsContent` is true
+ * (specs/authorization/spec.md - "Reader-only authorization"; design.md - Decision 7,
+ * `openspec/changes/add-community-moderation`).
+ *
+ * Before this, `status !== 'active'` was checked unconditionally, which made a banned reader
+ * indistinguishable from one holding no session at all — rejected at every reader-only endpoint,
+ * including their own read access. That was account termination in effect, which is more than a
+ * comment-authoring sanction ever asked for; a banned reader stays signed in and keeps reading,
+ * liking, and reporting, and only loses the ability to comment.
  */
 export function requireReader(options: RequireReaderOptions = {}) {
   return markDeclaration(async (req: Request, _res: Response, next: NextFunction) => {
@@ -114,12 +127,17 @@ export function requireReader(options: RequireReaderOptions = {}) {
         throw new AppError('Reader session required', 401, 'unauthenticated');
       }
       const access = await resolveReaderAccess(req.auth.sessionId);
-      if (!access || access.subjectId !== req.auth.subjectId || access.status !== 'active') {
+      if (!access || access.subjectId !== req.auth.subjectId) {
         throw new AppError('Reader session required', 401, 'unauthenticated');
       }
       const createsContent = options.createsContent ?? MUTATING_METHODS.has(req.method);
-      if (createsContent && access.mutedUntil && access.mutedUntil.getTime() > Date.now()) {
-        throw new AppError('Reader is muted', 403, 'reader_muted');
+      if (createsContent) {
+        if (access.status === 'banned') {
+          throw new AppError('Reader is banned from commenting', 403, 'reader_banned');
+        }
+        if (access.mutedUntil && access.mutedUntil.getTime() > Date.now()) {
+          throw new AppError('Reader is muted', 403, 'reader_muted');
+        }
       }
       next();
     } catch (err) {

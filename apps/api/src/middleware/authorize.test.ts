@@ -126,19 +126,49 @@ describe('requireReader', () => {
   });
 
   /**
-   * The subject-status half of the gated path, as distinct from the session-status half the
-   * revoked/expired tests cover: the session is perfectly valid, the account is not
-   * (specs/authorization/spec.md - "Deactivated reader is rejected and loses existing
-   * sessions").
+   * Ban is a comment-authoring sanction, not account termination (design.md - Decision 7,
+   * `openspec/changes/add-community-moderation`): a banned reader's session stays usable
+   * throughout, and a read-method request never even reaches the `createsContent` branch that
+   * would reject them.
    */
-  it('rejects a banned reader holding an otherwise-valid session', async () => {
+  it('allows a banned reader through a read request', async () => {
     vi.mocked(getDatabase).mockReturnValue(
       fakeDbReturning([{ subjectId: 'reader-1', ...liveSession(), status: 'banned', mutedUntil: null }]) as never,
     );
     const next = vi.fn();
     const req = makeReq({ subjectId: 'reader-1', subjectType: 'reader', sessionId: 'sess-1' });
     await requireReader()(req, {} as Response, next as NextFunction);
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 401, code: 'unauthenticated' }));
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('allows a banned reader to like — declared createsContent: false, since a like authors no reader text', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([{ subjectId: 'reader-1', ...liveSession(), status: 'banned', mutedUntil: null }]) as never,
+    );
+    const req = { ...makeReq({ subjectId: 'reader-1', subjectType: 'reader', sessionId: 'sess-1' }), method: 'POST' } as Request;
+    const next = vi.fn();
+    await requireReader({ createsContent: false })(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a banned reader at a content-creating endpoint', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([{ subjectId: 'reader-1', ...liveSession(), status: 'banned', mutedUntil: null }]) as never,
+    );
+    const req = { ...makeReq({ subjectId: 'reader-1', subjectType: 'reader', sessionId: 'sess-1' }), method: 'POST' } as Request;
+    const next = vi.fn();
+    await requireReader()(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'reader_banned' }));
+  });
+
+  it('rejects a banned reader at a read-method route explicitly declared to create content', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([{ subjectId: 'reader-1', ...liveSession(), status: 'banned', mutedUntil: null }]) as never,
+    );
+    const next = vi.fn();
+    const req = makeReq({ subjectId: 'reader-1', subjectType: 'reader', sessionId: 'sess-1' });
+    await requireReader({ createsContent: true })(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'reader_banned' }));
   });
 });
 
