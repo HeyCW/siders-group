@@ -1,5 +1,5 @@
 import type { RoleDetailResponse, RoleResponse, RoleSummaryResponse } from '@siders/contracts';
-import type { RoleSummaryRow, RoleWithPermissions } from './role.repository.js';
+import type { RoleDetail, RoleSummaryRow, RoleWithPermissions } from './role.repository.js';
 
 export function toRoleResponse(row: RoleWithPermissions): RoleResponse {
   return {
@@ -21,6 +21,6 @@ export function toRoleSummaryResponse(row: RoleSummaryRow): RoleSummaryResponse 
   };
 }
 
-export function toRoleDetailResponse(row: RoleWithPermissions & { holderCount: number }): RoleDetailResponse {
+export function toRoleDetailResponse(row: RoleDetail): RoleDetailResponse {
   return { ...toRoleResponse(row), holderCount: row.holderCount };
 }

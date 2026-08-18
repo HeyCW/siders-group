@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PermissionKey, RoleResponse, RoleSummaryResponse } from '@siders/contracts';
 import { ApiError } from '../lib/api.js';
 import { rolesApi, type PermissionCatalogEntry } from '../lib/rolesApi.js';
@@ -16,12 +16,21 @@ function togglePermission(set: ReadonlySet<PermissionKey>, key: PermissionKey): 
   return next;
 }
 
+/** Module-scope, not a closure — it captures nothing from `RolesPage` and would otherwise be
+ *  re-created on every render for no reason (the file's other pure helper, `togglePermission`,
+ *  is at module scope for the same reason). */
+function toSummary(role: RoleResponse): Omit<RoleSummaryResponse, 'holderCount'> {
+  return { id: role.id, name: role.name, slug: role.slug, isSystem: role.isSystem };
+}
+
 interface PermissionEditorProps {
   catalog: PermissionCatalogEntry[];
   selected: ReadonlySet<PermissionKey>;
   onChange: (next: Set<PermissionKey>) => void;
-  /** The reserved system role's `role.manage` entry cannot be cleared here — it stays checked
-   *  and disabled, matching what the server would reject anyway
+  /** The reserved system role's `role.manage` entry cannot be cleared here — the checkbox
+   *  renders disabled, and its checked state simply follows whatever the fetched detail already
+   *  reported (the system role always holds `role.manage`, so in practice it renders checked and
+   *  locked together), matching what the server would reject anyway
    *  (specs/rbac-management/spec.md - "The system role is protected in the console"). */
   lockedKeys?: ReadonlySet<PermissionKey> | undefined;
   idPrefix: string;
@@ -79,6 +88,11 @@ export function RolesPage() {
   const [editOriginalPermissions, setEditOriginalPermissions] = useState<Set<PermissionKey>>(new Set());
   const [editDetailError, setEditDetailError] = useState<string | null>(null);
   const [editDetailLoading, setEditDetailLoading] = useState(false);
+  /** The id `startEdit` most recently requested a detail fetch for. A response is applied only
+   *  if it still matches — otherwise a slower first fetch (Edit clicked on A, then B before A's
+   *  response lands) would land after B's and silently overwrite B's editor with A's permission
+   *  set, which a whole-set `PATCH` would then persist. */
+  const editRequestRef = useRef<string | null>(null);
 
   const [createState, runCreate] = useAsyncAction(rolesApi.create);
   const [updateState, runUpdate] = useAsyncAction((id: string, input: Parameters<typeof rolesApi.update>[1]) =>
@@ -86,21 +100,23 @@ export function RolesPage() {
   );
   const [removeState, runRemove] = useAsyncAction(rolesApi.remove);
 
+  // One `load()`, matching `HomeCurationPage`/`ReelsCurationPage`/`StaffPage`'s
+  // `Promise.all` + single `loadError` pattern — the permission catalog is as load-bearing as
+  // the role list itself (neither create nor edit works without it), so a failure to fetch it
+  // is surfaced the same way a failure to fetch roles is, rather than silently rendering an
+  // empty checkbox grid.
   function load() {
     setLoading(true);
-    rolesApi
-      .list()
-      .then(setRoles)
+    Promise.all([rolesApi.list(), rolesApi.permissionCatalog()])
+      .then(([roleList, catalogList]) => {
+        setRoles(roleList);
+        setCatalog(catalogList);
+      })
       .catch((err: unknown) => setLoadError(err instanceof ApiError ? err.message : 'Could not load'))
       .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
-  useEffect(() => {
-    rolesApi.permissionCatalog().then(setCatalog).catch(() => {
-      /* the create/edit forms simply show an empty catalog */
-    });
-  }, []);
 
   const canCreate = name.trim().length > 0 && !createState.loading;
 
@@ -116,27 +132,31 @@ export function RolesPage() {
     }
   }
 
-  function toSummary(role: RoleResponse): Omit<RoleSummaryResponse, 'holderCount'> {
-    return { id: role.id, name: role.name, slug: role.slug, isSystem: role.isSystem };
-  }
-
   function startEdit(role: RoleSummaryResponse) {
     setEditingId(role.id);
     setEditName(role.name);
     setEditDetailError(null);
     setEditDetailLoading(true);
+    editRequestRef.current = role.id;
     rolesApi
       .detail(role.id)
       .then((detail) => {
+        if (editRequestRef.current !== role.id) return;
         const current = new Set(detail.permissions);
         setEditPermissions(current);
         setEditOriginalPermissions(current);
       })
-      .catch((err: unknown) => setEditDetailError(err instanceof ApiError ? err.message : 'Could not load role'))
-      .finally(() => setEditDetailLoading(false));
+      .catch((err: unknown) => {
+        if (editRequestRef.current !== role.id) return;
+        setEditDetailError(err instanceof ApiError ? err.message : 'Could not load role');
+      })
+      .finally(() => {
+        if (editRequestRef.current === role.id) setEditDetailLoading(false);
+      });
   }
 
   function cancelEdit() {
+    editRequestRef.current = null;
     setEditingId(null);
     setEditName('');
     setEditPermissions(new Set());
@@ -250,7 +270,21 @@ export function RolesPage() {
               {editingId === role.id ? (
                 <div className="space-y-3 p-4">
                   {editDetailLoading && <p className="font-mono text-xs text-[var(--muted)]">Loading permissions…</p>}
-                  {editDetailError && <p className="text-sm text-red-600 dark:text-red-400">{editDetailError}</p>}
+                  {editDetailError && (
+                    <div className="space-y-3">
+                      <p className="text-sm text-red-600 dark:text-red-400">{editDetailError}</p>
+                      {/* Save has nothing valid to submit here — no permission set ever loaded —
+                          but Cancel must stay reachable, or a failed fetch leaves this row with
+                          no way back to its normal Edit/Delete controls until the page reloads. */}
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                   {!editDetailLoading && !editDetailError && (
                     <>
                       <div>

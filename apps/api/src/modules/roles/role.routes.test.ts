@@ -4,25 +4,11 @@ import request from 'supertest';
 import { createErrorHandler } from '../../middleware/errorHandler.js';
 import type { Logger } from '../../lib/logger.js';
 import type { Database } from '@siders/db';
+import { fakeStaffAccessDbReturning as fakeAuthDbReturning } from '../../testing/fakeStaffAccessDb.js';
 
 vi.mock('../../lib/db.js', () => ({ getDatabase: vi.fn() }));
 vi.mock('../../config/env.js', () => ({ loadEnv: vi.fn().mockReturnValue({}) }));
 vi.mock('../../lib/ownerRole.js', () => ({ getOwnerRoleId: vi.fn().mockResolvedValue('owner-role-id') }));
-
-// Matches `authorize.test.ts`'s own fake for the internal `resolveStaffAccess` chain
-// (.select().from().innerJoin().leftJoin().where()) used by `requirePermission`.
-function fakeAuthDbReturning(rows: unknown[]) {
-  const builder = {
-    select: () => builder,
-    from: () => builder,
-    innerJoin: () => builder,
-    leftJoin: () => builder,
-    where: () => builder,
-    limit: () => Promise.resolve(rows),
-    then: (resolve: (v: unknown[]) => void) => resolve(rows),
-  };
-  return builder;
-}
 
 /**
  * A minimal stand-in for the repository's own `Database` handle — every chain method returns

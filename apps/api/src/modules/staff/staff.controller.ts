@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { staffCreateRequestSchema, staffPasswordChangeRequestSchema } from '@siders/contracts';
 import type { StaffService } from './staff.service.js';
-import { toStaffCreateResponse, toStaffResetResponse } from './staff.mapper.js';
+import { toStaffAccountResponse, toStaffCreateResponse, toStaffResetResponse } from './staff.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { requireUuidParam } from '../../lib/requireParam.js';
 
@@ -21,8 +21,8 @@ export function createStaffController(service: StaffService) {
   return {
     async list(_req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        const accounts = await service.list();
-        res.json({ success: true, data: accounts });
+        const rows = await service.list();
+        res.json({ success: true, data: rows.map(toStaffAccountResponse) });
       } catch (err) {
         next(err);
       }

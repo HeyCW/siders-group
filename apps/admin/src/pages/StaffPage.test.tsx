@@ -4,7 +4,7 @@ import type { RoleSummaryResponse, StaffListItemResponse } from '@siders/contrac
 import { StaffPage } from './StaffPage.js';
 import { staffApi } from '../lib/staffApi.js';
 import { rolesApi } from '../lib/rolesApi.js';
-import { useSession } from '../session/SessionContext.js';
+import { mockAuthenticatedSession } from '../testing/mockSession.js';
 
 vi.mock('../lib/staffApi.js', () => ({
   staffApi: { list: vi.fn(), create: vi.fn(), disable: vi.fn(), reset: vi.fn() },
@@ -32,26 +32,15 @@ function staffEntry(overrides: Partial<StaffListItemResponse> & Pick<StaffListIt
   };
 }
 
+/** Every StaffPage test defaults to holding both permissions unless a test is specifically
+ *  exercising per-permission control visibility, which is why (unlike `RolesPage.test.tsx`'s
+ *  wrapper) `permissionKeys` stays overridable here. */
 function mockAccount(overrides: { id?: string; permissionKeys?: string[]; isOwner?: boolean } = {}) {
-  vi.mocked(useSession).mockReturnValue({
-    session: {
-      status: 'authenticated',
-      account: {
-        id: overrides.id ?? 'caller-1',
-        email: 'caller@example.com',
-        name: 'Caller',
-        roleId: 'editor-role-id',
-        roleName: 'Editor',
-        status: 'active',
-        mustChangePassword: false,
-        createdAt: '2026-01-01T00:00:00.000Z',
-        permissionKeys: overrides.permissionKeys ?? ['user.manage', 'role.manage'],
-        isOwner: overrides.isOwner ?? false,
-      },
-    },
-    refreshAccount: vi.fn(),
-    signIn: vi.fn(),
-    signOut: vi.fn(),
+  mockAuthenticatedSession({
+    id: overrides.id,
+    roleId: 'editor-role-id',
+    permissionKeys: overrides.permissionKeys ?? ['user.manage', 'role.manage'],
+    isOwner: overrides.isOwner,
   });
 }
 
@@ -64,9 +53,13 @@ async function renderPage(staff: StaffListItemResponse[] = [], roles: RoleSummar
 
 describe('StaffPage — list', () => {
   // specs/staff-account-management/spec.md - "Accounts are listed by name with disabled ones de-emphasized".
-  it('lists accounts ordered by name', async () => {
+  it('renders accounts in the order the server returned them', async () => {
     mockAccount();
-    await renderPage([staffEntry({ id: 'z', name: 'Zed' }), staffEntry({ id: 'a', name: 'Alice' })]);
+    // The page trusts `GET /staff`'s own name-ordering (`staff.repository.ts`'s
+    // `orderBy(asc(users.name))`) rather than re-sorting client-side — a JS `localeCompare`
+    // could otherwise disagree with the Postgres collation and reorder a correct response. So
+    // this mock is pre-sorted, exactly as the real endpoint's contract promises.
+    await renderPage([staffEntry({ id: 'a', name: 'Alice' }), staffEntry({ id: 'z', name: 'Zed' })]);
 
     const names = screen.getAllByText(/^(Alice|Zed)$/).map((el) => el.textContent);
     expect(names).toEqual(['Alice', 'Zed']);
@@ -182,5 +175,39 @@ describe('StaffPage — temporary password disclosure', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText('reset-pw-456')).toBeNull();
+  });
+});
+
+describe('StaffPage — Owner is not a selectable option for a non-Owner', () => {
+  // The server rejects assigning or granting Owner to anyone but an Owner caller
+  // unconditionally (`role.service.ts` assign, `staff.service.ts` create) — this asserts the
+  // option itself is withheld rather than offered and then rejected with an unpredictable 403.
+  it('omits Owner from the create-account role picker for a non-Owner', async () => {
+    mockAccount({ permissionKeys: ['user.manage', 'role.manage'], isOwner: false });
+    await renderPage([]);
+
+    const roleSelect = screen.getByLabelText('Role') as HTMLSelectElement;
+    const optionLabels = [...roleSelect.options].map((o) => o.textContent);
+    expect(optionLabels).not.toContain('Owner');
+    expect(optionLabels).toContain('Editor');
+  });
+
+  it('includes Owner in the create-account role picker for an Owner caller', async () => {
+    mockAccount({ permissionKeys: ['user.manage', 'role.manage'], isOwner: true });
+    await renderPage([]);
+
+    const roleSelect = screen.getByLabelText('Role') as HTMLSelectElement;
+    const optionLabels = [...roleSelect.options].map((o) => o.textContent);
+    expect(optionLabels).toContain('Owner');
+  });
+
+  it('omits Owner from a per-row role-change picker for a non-Owner', async () => {
+    mockAccount({ permissionKeys: ['user.manage', 'role.manage'], isOwner: false });
+    // A non-Owner-held target, so the role-change control is offered at all.
+    await renderPage([staffEntry({ id: 'other', name: 'Other', roleId: 'editor-role-id', roleName: 'Editor' })]);
+
+    const roleSelect = screen.getByLabelText('Role for Other') as HTMLSelectElement;
+    const optionLabels = [...roleSelect.options].map((o) => o.textContent);
+    expect(optionLabels).not.toContain('Owner');
   });
 });

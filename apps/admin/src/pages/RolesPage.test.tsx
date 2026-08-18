@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import type { RoleDetailResponse, RoleSummaryResponse } from '@siders/contracts';
 import { RolesPage } from './RolesPage.js';
 import { rolesApi } from '../lib/rolesApi.js';
-import { useSession } from '../session/SessionContext.js';
+import { mockAuthenticatedSession } from '../testing/mockSession.js';
 
 vi.mock('../lib/rolesApi.js', () => ({
   rolesApi: {
@@ -24,27 +24,10 @@ function role(overrides: Partial<RoleSummaryResponse> & Pick<RoleSummaryResponse
   return { name: 'Editor', slug: 'editor', isSystem: false, holderCount: 0, ...overrides };
 }
 
+/** Every RolesPage test reaches the page as a `role.manage` holder — that permission is what
+ *  the page requires, so it is the one default this suite never overrides. */
 function mockAccount(overrides: { roleId?: string; isOwner?: boolean } = {}) {
-  vi.mocked(useSession).mockReturnValue({
-    session: {
-      status: 'authenticated',
-      account: {
-        id: 'caller-1',
-        email: 'caller@example.com',
-        name: 'Caller',
-        roleId: overrides.roleId ?? 'caller-role-id',
-        roleName: 'Caller Role',
-        status: 'active',
-        mustChangePassword: false,
-        createdAt: '2026-01-01T00:00:00.000Z',
-        permissionKeys: ['role.manage'],
-        isOwner: overrides.isOwner ?? false,
-      },
-    },
-    refreshAccount: vi.fn(),
-    signIn: vi.fn(),
-    signOut: vi.fn(),
-  });
+  mockAuthenticatedSession({ ...overrides, permissionKeys: ['role.manage'] });
 }
 
 /** Both the "New role" create form and an open edit row render a checkbox labeled with the
@@ -254,5 +237,88 @@ describe('RolesPage — save renders the server response', () => {
     });
 
     await waitFor(() => expect(screen.getByText('Editor (renamed)')).toBeTruthy());
+  });
+});
+
+describe('RolesPage — stale detail response', () => {
+  // The bug this guards: role A's detail fetch is slow, role B's is fast. Without the
+  // `editRequestRef` guard, A's response landing after B's would silently overwrite B's editor
+  // with A's permission set, and a whole-set `PATCH` on save would persist it.
+  it('a slower response for a previously-edited role does not overwrite the currently-edited role', async () => {
+    mockAccount();
+    await renderPage([
+      role({ id: 'role-a', name: 'Role A', holderCount: 0 }),
+      role({ id: 'role-b', name: 'Role B', holderCount: 0 }),
+    ]);
+
+    let resolveA!: (detail: RoleDetailResponse) => void;
+    const pendingA = new Promise<RoleDetailResponse>((resolve) => {
+      resolveA = resolve;
+    });
+    vi.mocked(rolesApi.detail).mockImplementation((id: string) => {
+      if (id === 'role-a') return pendingA;
+      return Promise.resolve({
+        id: 'role-b',
+        name: 'Role B',
+        slug: 'role-b',
+        isSystem: false,
+        holderCount: 0,
+        permissions: ['news.manage'],
+      });
+    });
+
+    const editButtons = screen.getAllByRole('button', { name: 'Edit' });
+    await act(async () => {
+      editButtons[0]!.click(); // Role A — its detail() call hangs on `pendingA`.
+    });
+    await act(async () => {
+      editButtons[1]!.click(); // Role B — resolves immediately, replacing the open editor.
+    });
+    await screen.findByRole('button', { name: 'Save' });
+
+    // Role A's slow response finally lands, after Role B is already the open editor.
+    await act(async () => {
+      resolveA({
+        id: 'role-a',
+        name: 'Role A',
+        slug: 'role-a',
+        isSystem: false,
+        holderCount: 0,
+        permissions: ['contact.manage'],
+      });
+    });
+
+    // Still Role B's checkboxes — A's stale response must not have overwritten them.
+    const roleBCheckbox = screen
+      .getAllByLabelText('news.manage')
+      .find((el) => el.id === 'edit-role-role-b-news.manage') as HTMLInputElement;
+    expect(roleBCheckbox.checked).toBe(true);
+    expect(screen.queryByText(/contact\.manage/)).toBeNull();
+  });
+});
+
+describe('RolesPage — failed detail fetch recovers', () => {
+  // Before the fix, Save/Cancel lived only inside the success branch, so a rejected detail
+  // fetch left the row with no control that could clear `editingId` — a permanent dead end
+  // until the page reloaded.
+  it('offers Cancel when the detail fetch fails, returning the row to its normal controls', async () => {
+    mockAccount();
+    await renderPage([role({ id: 'a', name: 'Editor', holderCount: 0 })]);
+    // A plain (non-`ApiError`) rejection — `startEdit` falls back to a generic message for it.
+    vi.mocked(rolesApi.detail).mockRejectedValue(new Error('network error'));
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Edit' }).click();
+    });
+    await screen.findByText('Could not load role');
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+    await act(async () => {
+      screen.getByRole('button', { name: 'Cancel' }).click();
+    });
+
+    // Back to the row's normal state: Edit is offered again, the error is gone.
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
+    expect(screen.queryByText('Could not load role')).toBeNull();
   });
 });

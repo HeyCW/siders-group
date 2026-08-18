@@ -332,6 +332,10 @@ describe('StaffService', () => {
   });
 
   describe('list', () => {
+    // `service.list()` returns repository rows, like every other method on this service — the
+    // controller maps to a response, so the no-password-hash guarantee is exercised at that
+    // boundary (`staff.mapper.test.ts`), not here. This test covers only what the service
+    // itself owns: ordering and disabled-inclusion, delegated straight from the repository.
     it('returns every account name-ordered, disabled accounts included', async () => {
       await staff.repository.create({ email: 'zed@example.com', name: 'Zed', roleId: 'author-role-id', passwordHash: 'x' });
       const alice = await staff.repository.create({
@@ -346,17 +350,6 @@ describe('StaffService', () => {
 
       expect(list.map((a) => a.name)).toEqual(['Alice', 'Zed']);
       expect(list.find((a) => a.id === alice.id)).toMatchObject({ status: 'disabled' });
-    });
-
-    // specs/staff-account-management/spec.md - "No password hash is disclosed".
-    it('discloses no password hash on any entry', async () => {
-      await staff.repository.create({ email: 'a@example.com', name: 'A', roleId: 'author-role-id', passwordHash: 'secret-hash' });
-
-      const list = await service.list();
-
-      for (const entry of list) {
-        expect(entry).not.toHaveProperty('passwordHash');
-      }
     });
   });
 });

@@ -5,21 +5,10 @@ vi.mock('../lib/db.js', () => ({ getDatabase: vi.fn() }));
 vi.mock('../config/env.js', () => ({ loadEnv: vi.fn().mockReturnValue({}) }));
 vi.mock('../lib/ownerRole.js', () => ({ getOwnerRoleId: vi.fn().mockResolvedValue('owner-role-id') }));
 
-// A tiny fake query builder mimicking the shape `resolveStaffAccess`/`resolveReaderAccess`
-// chain against: .select().from().innerJoin().leftJoin().leftJoin().where() / .limit().
-function fakeDbReturning(rows: unknown[]) {
-  const builder = {
-    select: () => builder,
-    from: () => builder,
-    innerJoin: () => builder,
-    leftJoin: () => builder,
-    where: () => builder,
-    limit: () => Promise.resolve(rows),
-    // when awaited directly without .limit() (staff query has no .limit()) — resolve to rows.
-    then: (resolve: (v: unknown[]) => void) => resolve(rows),
-  };
-  return builder;
-}
+// Shared with `role.routes.test.ts`, which mocks the same internal `getDatabase()` call while
+// testing route handlers rather than the guards themselves — kept under its original local name
+// here since every call site in this file already uses it.
+import { fakeStaffAccessDbReturning as fakeDbReturning } from '../testing/fakeStaffAccessDb.js';
 
 import {
   auditAuthorizationDeclarations,

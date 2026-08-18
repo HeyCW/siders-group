@@ -4,6 +4,7 @@ import type { PermissionKey } from '@siders/contracts';
 import { useDarkMode } from '../hooks/useDarkMode.js';
 import { useSession } from '../session/SessionContext.js';
 import { contactApi } from '../lib/contactApi.js';
+import { hasPermission } from '../lib/permissions.js';
 
 interface IconProps {
   className?: string;
@@ -264,14 +265,12 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseT
     return () => clearInterval(id);
   }, []);
 
+  // The Owner-bypass / any-of rule itself lives in `hasPermission`, shared with `StaffPage.tsx`
+  // — this wrapper only adds the "no permission listed" shortcut, which is specific to nav items
+  // like Dashboard that every signed-in account may see.
   function canSee(permission: PermissionKey | readonly PermissionKey[] | undefined): boolean {
     if (!permission) return true;
-    if (!account) return false;
-    // The Owner role satisfies every permission check (specs/authorization/spec.md - "Owner
-    // sees every permission-gated affordance").
-    if (account.isOwner) return true;
-    const keys = Array.isArray(permission) ? permission : [permission];
-    return keys.some((key) => account.permissionKeys.includes(key));
+    return hasPermission(account, permission);
   }
 
   const canSeeMessages = canSee('contact.manage');

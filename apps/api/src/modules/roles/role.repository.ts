@@ -16,6 +16,13 @@ export interface RoleSummaryRow extends RoleRow {
   holderCount: number;
 }
 
+/** `GET /roles/:id`'s row shape — the summary's sibling, named here alongside `RoleRow` and
+ *  `RoleWithPermissions` rather than spelled out as an inline intersection at each of its two
+ *  call sites (`role.service.ts`, `role.mapper.ts`). */
+export interface RoleDetail extends RoleWithPermissions {
+  holderCount: number;
+}
+
 export interface CreateRoleInput {
   name: string;
   slug: string;
@@ -163,8 +170,8 @@ export function createRoleRepository(db: Database): RoleRepository {
     },
 
     async countStaffWithRole(id) {
-      const rows = await db.select({ id: users.id }).from(users).where(eq(users.roleId, id));
-      return rows.length;
+      const [row] = await db.select({ value: count() }).from(users).where(eq(users.roleId, id));
+      return row?.value ?? 0;
     },
 
     async findAssignedRoleId(staffId) {

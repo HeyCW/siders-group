@@ -5,6 +5,7 @@ import { rolesApi } from '../lib/rolesApi.js';
 import { staffApi } from '../lib/staffApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
 import { useSession } from '../session/SessionContext.js';
+import { hasPermission } from '../lib/permissions.js';
 import { TemporaryPasswordPanel } from '../components/TemporaryPasswordPanel.js';
 
 const FIELD_LABEL = 'mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
@@ -51,7 +52,11 @@ export function StaffPage() {
     setLoading(true);
     Promise.all([staffApi.list(), rolesApi.list()])
       .then(([staffList, roleList]) => {
-        setStaff([...staffList].sort((a, b) => a.name.localeCompare(b.name)));
+        // The server already returns `staffList` name-ordered (`staff.repository.ts`'s
+        // `orderBy(asc(users.name))`) — no client-side re-sort here, since a JS `localeCompare`
+        // and the Postgres collation can disagree on accents and case, and re-sorting a
+        // correctly-ordered response can only make it wrong.
+        setStaff(staffList);
         setRoles(roleList);
       })
       .catch((err: unknown) => setLoadError(err instanceof ApiError ? err.message : 'Could not load'))
@@ -60,8 +65,8 @@ export function StaffPage() {
 
   useEffect(load, []);
 
-  const canCreateOrManageAccounts = account !== null && (account.isOwner || account.permissionKeys.includes('user.manage'));
-  const canChangeRoles = account !== null && (account.isOwner || account.permissionKeys.includes('role.manage'));
+  const canCreateOrManageAccounts = hasPermission(account, 'user.manage');
+  const canChangeRoles = hasPermission(account, 'role.manage');
 
   const canCreate = email.trim().length > 0 && name.trim().length > 0 && roleId !== '' && !createState.loading;
 
@@ -69,12 +74,23 @@ export function StaffPage() {
     return roles.find((r) => r.id === id)?.isSystem ?? false;
   }
 
+  // The Owner role is never a legitimate choice for a non-Owner caller — `role.service.ts`'s
+  // `create`/`assign` both reject it unconditionally — so it is left out of both role pickers
+  // below rather than offered and then rejected with a 403 the caller could not have predicted.
+  const assignableRoles = account?.isOwner ? roles : roles.filter((r) => !r.isSystem);
+
   async function handleCreate() {
     if (!canCreate) return;
     try {
       const created = await runCreate({ email: email.trim(), name: name.trim(), roleId });
-      setStaff((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-      setDisclosed({ accountLabel: created.name, temporaryPassword: created.temporaryPassword });
+      // `created` is a `StaffCreateResponse` and carries the plaintext `temporaryPassword` —
+      // destructured out here so it never enters `staff`'s long-lived list state, where it
+      // would survive past its one-time disclosure and be re-spread by every later row update
+      // (specs/staff-account-management/spec.md - "The temporary password is not retrievable
+      // later").
+      const { temporaryPassword, ...listEntry } = created;
+      setStaff((prev) => [...prev, listEntry].sort((a, b) => a.name.localeCompare(b.name)));
+      setDisclosed({ accountLabel: listEntry.name, temporaryPassword });
       setEmail('');
       setName('');
       setRoleId('');
@@ -94,7 +110,15 @@ export function StaffPage() {
   }
 
   async function handleReset(entry: StaffListItemResponse) {
-    if (!window.confirm(`Reset ${entry.name}'s credentials? Their current sessions will be signed out.`)) return;
+    // Reset is deliberately offered on the caller's own row (the spec's own-row suppression
+    // names only role-change and disable) — but the server's `revokeSessions` call kills every
+    // session for the target, including the one making this request, so the confirm copy says
+    // so plainly rather than reading as if this only concerns someone else.
+    const isOwnRow = account !== null && entry.id === account.id;
+    const confirmText = isOwnRow
+      ? `Reset your own credentials? You will be signed out immediately, along with any other active sessions.`
+      : `Reset ${entry.name}'s credentials? Their current sessions will be signed out.`;
+    if (!window.confirm(confirmText)) return;
     try {
       const { temporaryPassword } = await runReset(entry.id);
       setDisclosed({ accountLabel: entry.name, temporaryPassword });
@@ -181,7 +205,7 @@ export function StaffPage() {
               </label>
               <select id="staff-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} className={TEXT_INPUT}>
                 <option value="">Select a role…</option>
-                {roles.map((r) => (
+                {assignableRoles.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
                   </option>
@@ -216,9 +240,14 @@ export function StaffPage() {
           {staff.map((entry, index) => {
             const isOwnRow = account !== null && entry.id === account.id;
             const targetHoldsOwner = roleIsSystem(entry.roleId);
-            const showRoleChange = canChangeRoles && !isOwnRow && (!targetHoldsOwner || (account?.isOwner ?? false));
-            const showDisable = canCreateOrManageAccounts && !isOwnRow && (!targetHoldsOwner || (account?.isOwner ?? false));
-            const showReset = canCreateOrManageAccounts && (!targetHoldsOwner || (account?.isOwner ?? false));
+            // "A non-Owner is offered no controls over an Owner account" — named once rather
+            // than repeated at each of the three call sites below, so a future correction to
+            // the rule can't land in only one or two of them
+            // (specs/staff-account-management/spec.md - "Staff administration console").
+            const targetIsUsableByCaller = !targetHoldsOwner || (account?.isOwner ?? false);
+            const showRoleChange = canChangeRoles && !isOwnRow && targetIsUsableByCaller;
+            const showDisable = canCreateOrManageAccounts && !isOwnRow && targetIsUsableByCaller;
+            const showReset = canCreateOrManageAccounts && targetIsUsableByCaller;
 
             return (
               <li
@@ -252,7 +281,10 @@ export function StaffPage() {
                     onChange={(e) => handleAssign(entry, e.target.value)}
                     className="shrink-0 rounded-md border border-[var(--rule)] bg-transparent px-2 py-1 text-xs"
                   >
-                    {roles.map((r) => (
+                    {/* This row is never shown for an Owner-held target to a non-Owner caller
+                        (`showRoleChange` above), so `entry.roleId` is always present in
+                        `assignableRoles` here — nothing to fall back to. */}
+                    {assignableRoles.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
                       </option>

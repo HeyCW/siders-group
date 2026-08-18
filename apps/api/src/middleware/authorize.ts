@@ -225,51 +225,22 @@ export function requireStaff(options: RequireStaffOptions = {}) {
 }
 
 /**
- * Reachable only by a staff member whose role includes `key` — evaluated fresh on every
- * request (never from the access credential), so a role change or permission edit takes
- * effect on the caller's very next request. The Owner role always passes, recognized by
- * the seeded role's immutable id, never by name or slug
- * (specs/authorization/spec.md - "Permission-based authorization", "The Owner role
- * satisfies every permission check"). A pending password change rejects before the
- * permission is even evaluated, and the Owner bypass below does not cover it — an Owner
- * holding an admin-issued temporary password is exactly the case that check exists for.
- */
-export function requirePermission(key: PermissionKey) {
-  return markDeclaration(async (req: Request, _res: Response, next: NextFunction) => {
-    try {
-      if (!req.auth || req.auth.subjectType !== 'staff') {
-        throw new AppError('Staff session required', 403, 'forbidden');
-      }
-      const access = await resolveStaffAccess(req.auth.sessionId);
-      if (!access || access.subjectId !== req.auth.subjectId || access.status !== 'active') {
-        throw new AppError('Staff session required', 403, 'forbidden');
-      }
-      if (access.mustChangePassword) {
-        throw passwordChangeRequiredError();
-      }
-      const ownerRoleId = await getOwnerRoleId(db());
-      const isOwner = access.roleId === ownerRoleId;
-      if (!isOwner && !access.permissionKeys.includes(key)) {
-        throw new AppError('Insufficient permission', 403, 'forbidden');
-      }
-      req.staffRole = { roleId: access.roleId, isOwner, permissionKeys: access.permissionKeys };
-      next();
-    } catch (err) {
-      next(err);
-    }
-  });
-}
-
-/**
- * Reachable by a staff member whose role includes **any** of the given permissions — for the
- * two read endpoints (`GET /roles`, `GET /staff`) that two mutually dependent administration
- * flows both need: assigning a role requires the staff list, and creating a staff account
- * requires the role list. Gating either list on only its "own" permission leaves the other
- * flow's holder unable to complete it (specs/rbac-management/spec.md - "Enumerating roles";
- * specs/staff-account-management/spec.md - "Enumerating staff accounts").
+ * Reachable by a staff member whose role includes **any** of the given permissions — evaluated
+ * fresh on every request (never from the access credential), so a role change or permission edit
+ * takes effect on the caller's very next request. The Owner role always passes, recognized by
+ * the seeded role's immutable id, never by name or slug (specs/authorization/spec.md -
+ * "Permission-based authorization", "The Owner role satisfies every permission check"). A
+ * pending password change rejects before the permission is even evaluated, and the Owner bypass
+ * below does not cover it — an Owner holding an admin-issued temporary password is exactly the
+ * case that check exists for.
  *
- * Otherwise identical to `requirePermission`: same Owner bypass, same pending-password-change
- * rejection evaluated first.
+ * A single permission is the common case (`requirePermission` below is `requireAnyPermission`
+ * with one key); the any-of form exists for the two read endpoints (`GET /roles`, `GET /staff`)
+ * that two mutually dependent administration flows both need: assigning a role requires the
+ * staff list, and creating a staff account requires the role list. Gating either list on only
+ * its "own" permission leaves the other flow's holder unable to complete it
+ * (specs/rbac-management/spec.md - "Enumerating roles"; specs/staff-account-management/spec.md -
+ * "Enumerating staff accounts").
  */
 export function requireAnyPermission(...keys: PermissionKey[]) {
   return markDeclaration(async (req: Request, _res: Response, next: NextFunction) => {
@@ -295,6 +266,12 @@ export function requireAnyPermission(...keys: PermissionKey[]) {
       next(err);
     }
   });
+}
+
+/** The single-permission case of `requireAnyPermission` — kept as its own name since it is the
+ *  overwhelming majority of routes and reads better at the call site than a one-element spread. */
+export function requirePermission(key: PermissionKey) {
+  return requireAnyPermission(key);
 }
 
 function isDeclared(handle: unknown): boolean {

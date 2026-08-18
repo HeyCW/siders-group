@@ -1,11 +1,9 @@
 import type { Database } from '@siders/db';
-import type { StaffAccountResponse } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { generateTemporaryPassword, hashPassword, verifyPassword } from '../../lib/password.js';
 import { getOwnerRoleId } from '../../lib/ownerRole.js';
 import type { CallerContext } from '../../lib/callerContext.js';
 import type { StaffRepository, StaffRow } from './staff.repository.js';
-import { toStaffAccountResponse } from './staff.mapper.js';
 
 export type RevokeStaffSessions = (subjectType: 'staff', subjectId: string) => Promise<void>;
 export type RevokeStaffSessionsExcept = (
@@ -21,10 +19,13 @@ export interface CreatedStaff {
 }
 
 export interface StaffService {
-  /** Mapped through `toStaffAccountResponse` here, not left to the controller — `StaffRow`
-   *  carries `passwordHash` from `SELECT_COLUMNS`, and this is the one boundary that must never
-   *  let a raw row escape (design.md - "Password hash leakage"). */
-  list(): Promise<StaffAccountResponse[]>;
+  /** Returns repository rows, like every other method on this service — the controller maps to
+   *  a response via `toStaffAccountResponse`, exactly as it already does for `create`'s
+   *  `CreatedStaff.account` and `triggerReset`'s `temporaryPassword`. `StaffRow` carries
+   *  `passwordHash` from `SELECT_COLUMNS`, so that mapping step is not optional: it is the one
+   *  boundary that must never let a raw row escape (design.md - "Password hash leakage") — it
+   *  simply lives in the controller here rather than in the service. */
+  list(): Promise<StaffRow[]>;
   create(input: { email: string; name: string; roleId: string }, caller: CallerContext): Promise<CreatedStaff>;
   disable(targetId: string, caller: CallerContext): Promise<void>;
   triggerReset(targetId: string, caller: CallerContext): Promise<{ temporaryPassword: string }>;
@@ -59,9 +60,8 @@ export function createStaffService(
   }
 
   return {
-    async list() {
-      const rows = await staffRepository.list();
-      return rows.map(toStaffAccountResponse);
+    list() {
+      return staffRepository.list();
     },
 
     async create(input, caller) {
