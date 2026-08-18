@@ -17,3 +17,4 @@ export * from './dashboard.js';
 export * from './partner.js';
 export * from './engagement.js';
 export * from './moderation.js';
+export * from './contact.js';

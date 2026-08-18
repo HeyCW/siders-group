@@ -12,3 +12,4 @@ export * from './reelsCuration';
 export * from './partners';
 export * from './engagement';
 export * from './moderation';
+export * from './contact';
