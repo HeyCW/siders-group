@@ -5,6 +5,12 @@ import { AppShell } from './AppShell.js';
 import { useSession } from '../session/SessionContext.js';
 
 vi.mock('../session/SessionContext.js', () => ({ useSession: vi.fn() }));
+// Sidebar polls this on mount for the unread-messages badge — mocked so these shell tests stay
+// hermetic (no real `fetch`, no live interval left running after `cleanup()`), matching how
+// SessionContext.test.tsx mocks `sessionApi.js` for the same reason.
+vi.mock('../lib/contactApi.js', () => ({
+  contactApi: { unreadCount: vi.fn().mockResolvedValue({ count: 0 }) },
+}));
 
 afterEach(() => cleanup());
 
