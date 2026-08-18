@@ -17,6 +17,13 @@ function createFakeRoleRepository() {
     isSystem: true,
     permissions: ['role.manage', 'user.manage', 'news.manage'],
   });
+  rows.set('unheld-role-id', {
+    id: 'unheld-role-id',
+    name: 'Unheld',
+    slug: 'unheld',
+    isSystem: false,
+    permissions: [],
+  });
 
   const staffRoleCounts = new Map<string, number>();
   /** Stands in for the staff table: staff id -> the role that staff member currently holds. */
@@ -36,6 +43,15 @@ function createFakeRoleRepository() {
     },
     async findById(id) {
       return rows.get(id) ?? null;
+    },
+    async listWithHolderCounts() {
+      return [...rows.values()].map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        isSystem: row.isSystem,
+        holderCount: [...staffRoles.values()].filter((roleId) => roleId === row.id).length,
+      }));
     },
     async listCatalogPermissions() {
       return [
@@ -67,7 +83,10 @@ function createFakeRoleRepository() {
       rows.delete(id);
     },
     async countStaffWithRole(id) {
-      return staffRoleCounts.get(id) ?? 0;
+      // An explicit override (used by the "role still in use" tests) wins; otherwise derive
+      // from `staffRoles`, the same source `listWithHolderCounts` reads, so the two stay
+      // consistent for roles nobody set an override for.
+      return staffRoleCounts.get(id) ?? [...staffRoles.values()].filter((roleId) => roleId === id).length;
     },
     async findAssignedRoleId(staffId) {
       return staffRoles.get(staffId) ?? null;
@@ -253,5 +272,32 @@ describe('RoleService', () => {
       status: 409,
       code: 'role_name_exists',
     });
+  });
+
+  // specs/rbac-management/spec.md - "A role with no holders still appears".
+  it('includes a role no staff member holds, with a holder count of zero', async () => {
+    const list = await service.list();
+    const unheld = list.find((r) => r.id === 'unheld-role-id');
+    expect(unheld).toMatchObject({ holderCount: 0 });
+  });
+
+  it('reports a non-zero holder count for a role staff members currently hold', async () => {
+    const list = await service.list();
+    const owner = list.find((r) => r.id === 'owner-role-id');
+    // `target-1` and `owner-target` both hold roles in `staffRoles`; only `owner-target` holds Owner.
+    expect(owner).toMatchObject({ holderCount: 1 });
+  });
+
+  it('reads a role together with its permissions and holder count', async () => {
+    const detail = await service.findDetail('owner-role-id');
+    expect(detail).toMatchObject({
+      id: 'owner-role-id',
+      permissions: ['role.manage', 'user.manage', 'news.manage'],
+      holderCount: 1,
+    });
+  });
+
+  it('rejects reading a role that does not exist', async () => {
+    await expect(service.findDetail('does-not-exist')).rejects.toMatchObject({ status: 404, code: 'not_found' });
   });
 });

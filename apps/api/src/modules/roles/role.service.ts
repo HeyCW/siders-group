@@ -2,7 +2,7 @@ import type { Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
 import { getOwnerRoleId } from '../../lib/ownerRole.js';
 import type { CallerContext } from '../../lib/callerContext.js';
-import type { PermissionCatalogEntry, RoleRepository, RoleWithPermissions } from './role.repository.js';
+import type { PermissionCatalogEntry, RoleRepository, RoleSummaryRow, RoleWithPermissions } from './role.repository.js';
 
 const RESERVED_OWNER_SLUG = 'owner';
 
@@ -19,6 +19,8 @@ function reservedIdentityError(): AppError {
 }
 
 export interface RoleService {
+  list(): Promise<RoleSummaryRow[]>;
+  findDetail(id: string): Promise<RoleWithPermissions & { holderCount: number }>;
   listPermissionCatalog(): Promise<PermissionCatalogEntry[]>;
   create(input: { name: string; permissions: string[] }): Promise<RoleWithPermissions>;
   update(
@@ -51,6 +53,21 @@ export function createRoleService(db: Database, repository: RoleRepository): Rol
   }
 
   return {
+    list() {
+      return repository.listWithHolderCounts();
+    },
+
+    async findDetail(id) {
+      const role = await repository.findById(id);
+      if (!role) {
+        throw new AppError('Role not found', 404, 'not_found');
+      }
+      // Single row, so a direct count here is not the N+1 `listWithHolderCounts` exists to
+      // avoid (design.md - "Summary list, detail on demand").
+      const holderCount = await repository.countStaffWithRole(id);
+      return { ...role, holderCount };
+    },
+
     listPermissionCatalog() {
       return repository.listCatalogPermissions();
     },

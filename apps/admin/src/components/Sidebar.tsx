@@ -118,6 +118,24 @@ function IconComments(props: IconProps) {
   );
 }
 
+function IconRoles(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <path d="M10 2.5 3.5 5.2v4.3c0 4 2.8 6.6 6.5 8 3.7-1.4 6.5-4 6.5-8V5.2L10 2.5Z" />
+      <path d="M7.3 9.8 9 11.5l3.7-3.9" />
+    </IconShell>
+  );
+}
+
+function IconStaff(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <circle cx="10" cy="6.5" r="3" />
+      <path d="M3.5 16.5v-1a6.5 6.5 0 0 1 13 0v1" />
+    </IconShell>
+  );
+}
+
 function IconReaders(props: IconProps) {
   return (
     <IconShell {...props}>
@@ -142,12 +160,14 @@ interface NavItem {
   label: string;
   icon: ComponentType<IconProps>;
   /** Omitted for items every signed-in account may see (just Dashboard today) — everything
-   *  else is gated on the same permission the server enforces, matching `PermissionKey`
-   *  (specs/authorization/spec.md). Rendering here is cosmetic only; a 403 from the server is
-   *  still authoritative regardless of what this shows
-   *  (specs/admin-session/spec.md - "Permission-aware rendering is cosmetic, never
+   *  else is gated on the same permission(s) the server enforces, matching `PermissionKey`
+   *  (specs/authorization/spec.md). A set is any-of: `Staff` is reachable by either
+   *  `user.manage` or `role.manage`, mirroring the server's `requireAnyPermission` gate
+   *  (specs/staff-account-management/spec.md - "Staff administration console"). Rendering here
+   *  is cosmetic only; a 403 from the server is still authoritative regardless of what this
+   *  shows (specs/admin-session/spec.md - "Permission-aware rendering is cosmetic, never
    *  authoritative"). */
-  permission?: PermissionKey;
+  permission?: PermissionKey | readonly PermissionKey[];
 }
 
 interface NavGroup {
@@ -185,6 +205,13 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/moderation/comments', label: 'Comments', icon: IconComments, permission: 'moderation.manage' },
       { to: '/moderation/readers', label: 'Readers', icon: IconReaders, permission: 'moderation.manage' },
+    ],
+  },
+  {
+    label: 'Access',
+    items: [
+      { to: '/roles', label: 'Roles', icon: IconRoles, permission: 'role.manage' },
+      { to: '/staff', label: 'Staff', icon: IconStaff, permission: ['user.manage', 'role.manage'] },
     ],
   },
 ];
@@ -237,12 +264,14 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseT
     return () => clearInterval(id);
   }, []);
 
-  function canSee(permission: PermissionKey | undefined): boolean {
+  function canSee(permission: PermissionKey | readonly PermissionKey[] | undefined): boolean {
     if (!permission) return true;
     if (!account) return false;
     // The Owner role satisfies every permission check (specs/authorization/spec.md - "Owner
     // sees every permission-gated affordance").
-    return account.isOwner || account.permissionKeys.includes(permission);
+    if (account.isOwner) return true;
+    const keys = Array.isArray(permission) ? permission : [permission];
+    return keys.some((key) => account.permissionKeys.includes(key));
   }
 
   const canSeeMessages = canSee('contact.manage');

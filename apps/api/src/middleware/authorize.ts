@@ -260,6 +260,43 @@ export function requirePermission(key: PermissionKey) {
   });
 }
 
+/**
+ * Reachable by a staff member whose role includes **any** of the given permissions — for the
+ * two read endpoints (`GET /roles`, `GET /staff`) that two mutually dependent administration
+ * flows both need: assigning a role requires the staff list, and creating a staff account
+ * requires the role list. Gating either list on only its "own" permission leaves the other
+ * flow's holder unable to complete it (specs/rbac-management/spec.md - "Enumerating roles";
+ * specs/staff-account-management/spec.md - "Enumerating staff accounts").
+ *
+ * Otherwise identical to `requirePermission`: same Owner bypass, same pending-password-change
+ * rejection evaluated first.
+ */
+export function requireAnyPermission(...keys: PermissionKey[]) {
+  return markDeclaration(async (req: Request, _res: Response, next: NextFunction) => {
+    try {
+      if (!req.auth || req.auth.subjectType !== 'staff') {
+        throw new AppError('Staff session required', 403, 'forbidden');
+      }
+      const access = await resolveStaffAccess(req.auth.sessionId);
+      if (!access || access.subjectId !== req.auth.subjectId || access.status !== 'active') {
+        throw new AppError('Staff session required', 403, 'forbidden');
+      }
+      if (access.mustChangePassword) {
+        throw passwordChangeRequiredError();
+      }
+      const ownerRoleId = await getOwnerRoleId(db());
+      const isOwner = access.roleId === ownerRoleId;
+      if (!isOwner && !keys.some((key) => access.permissionKeys.includes(key))) {
+        throw new AppError('Insufficient permission', 403, 'forbidden');
+      }
+      req.staffRole = { roleId: access.roleId, isOwner, permissionKeys: access.permissionKeys };
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
+}
+
 function isDeclared(handle: unknown): boolean {
   return typeof handle === 'function' && Boolean((handle as unknown as Record<symbol, boolean>)[DECLARATION_MARKER]);
 }

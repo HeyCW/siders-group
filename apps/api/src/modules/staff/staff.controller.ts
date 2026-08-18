@@ -19,6 +19,15 @@ function requireSession(req: Request): { subjectId: string; sessionId: string } 
 /** Parse, delegate, respond. No `if` about business meaning lives here. */
 export function createStaffController(service: StaffService) {
   return {
+    async list(_req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const accounts = await service.list();
+        res.json({ success: true, data: accounts });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     async create(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const body = staffCreateRequestSchema.parse(req.body);

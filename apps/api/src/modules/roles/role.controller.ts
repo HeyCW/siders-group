@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { roleAssignmentRequestSchema, roleCreateRequestSchema, roleUpdateRequestSchema } from '@siders/contracts';
 import type { RoleService } from './role.service.js';
-import { toRoleResponse } from './role.mapper.js';
+import { toRoleDetailResponse, toRoleResponse, toRoleSummaryResponse } from './role.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { requireUuidParam } from '../../lib/requireParam.js';
 
@@ -14,6 +14,25 @@ function requireCaller(req: Request): { subjectId: string; isOwner: boolean } {
 /** Parse, delegate, respond. No `if` about business meaning lives here. */
 export function createRoleController(service: RoleService) {
   return {
+    async list(_req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const roles = await service.list();
+        res.json({ success: true, data: roles.map(toRoleSummaryResponse) });
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    async detail(req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const id = requireUuidParam(req, 'id');
+        const role = await service.findDetail(id);
+        res.json({ success: true, data: toRoleDetailResponse(role) });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     async listPermissionCatalog(_req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const catalog = await service.listPermissionCatalog();

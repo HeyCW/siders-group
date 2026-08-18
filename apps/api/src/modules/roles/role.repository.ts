@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import { permissions, roles, rolePermissions, users, type Database } from '@siders/db';
 
 export interface RoleRow {
@@ -10,6 +10,10 @@ export interface RoleRow {
 
 export interface RoleWithPermissions extends RoleRow {
   permissions: string[];
+}
+
+export interface RoleSummaryRow extends RoleRow {
+  holderCount: number;
 }
 
 export interface CreateRoleInput {
@@ -35,6 +39,12 @@ export interface RoleRepository {
   findByName(name: string): Promise<RoleRow | null>;
   findBySlug(slug: string): Promise<RoleRow | null>;
   findById(id: string): Promise<RoleWithPermissions | null>;
+  /**
+   * Every role with its current holder count, roles with zero holders included. One grouped
+   * query rather than `countStaffWithRole` called per row, which would be N+1
+   * (design.md - "`holderCount` is one grouped query").
+   */
+  listWithHolderCounts(): Promise<RoleSummaryRow[]>;
   listCatalogPermissions(): Promise<PermissionCatalogEntry[]>;
   create(input: CreateRoleInput): Promise<RoleWithPermissions>;
   update(id: string, input: UpdateRoleInput): Promise<RoleWithPermissions>;
@@ -97,6 +107,23 @@ export function createRoleRepository(db: Database): RoleRepository {
     },
 
     findById,
+
+    async listWithHolderCounts() {
+      // LEFT JOIN so a role with no holders still produces a row; count(users.id) counts only
+      // the non-null (i.e. matched) side of that join, so an unmatched role reads as 0 rather
+      // than being dropped.
+      return db
+        .select({
+          id: roles.id,
+          name: roles.name,
+          slug: roles.slug,
+          isSystem: roles.isSystem,
+          holderCount: count(users.id),
+        })
+        .from(roles)
+        .leftJoin(users, eq(users.roleId, roles.id))
+        .groupBy(roles.id);
+    },
 
     async listCatalogPermissions() {
       return db.select({ key: permissions.key, description: permissions.description }).from(permissions);

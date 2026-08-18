@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { staffSignInRequestSchema } from './auth.js';
-import { staffCreateRequestSchema } from './staff.js';
+import { staffCreateRequestSchema, staffListItemResponseSchema } from './staff.js';
 
 describe('staffCreateRequestSchema', () => {
   const valid = {
@@ -44,5 +44,29 @@ describe('staffSignInRequestSchema', () => {
   it('normalizes the email the same way creation does, so either casing signs in', () => {
     const parsed = staffSignInRequestSchema.parse({ email: 'Editor@Example.COM', password: 'pw' });
     expect(parsed.email).toBe('editor@example.com');
+  });
+});
+
+describe('staffListItemResponseSchema', () => {
+  const valid = {
+    id: '3f1c1b6e-6f0e-4a1e-9f0a-2b7a5c9d1e33',
+    email: 'editor@example.com',
+    name: 'Editor One',
+    roleId: '7a1e2b6e-6f0e-4a1e-9f0a-2b7a5c9d1e44',
+    roleName: 'Editor',
+    status: 'active' as const,
+    mustChangePassword: false,
+    createdAt: '2026-08-18T00:00:00.000Z',
+  };
+
+  it('accepts a well-formed entry', () => {
+    expect(staffListItemResponseSchema.safeParse(valid).success).toBe(true);
+  });
+
+  // specs/staff-account-management/spec.md - "No password hash is disclosed".
+  it('carries no credential field', () => {
+    const keys = Object.keys(staffListItemResponseSchema.shape);
+    expect(keys).not.toContain('passwordHash');
+    expect(keys).not.toContain('password');
   });
 });

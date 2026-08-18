@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { roleCreateRequestSchema, roleUpdateRequestSchema } from './role.js';
+import { roleCreateRequestSchema, roleDetailResponseSchema, roleSummaryResponseSchema, roleUpdateRequestSchema } from './role.js';
 
 /**
  * `MANUAL_QA.md` credited `role.service.test.ts` with covering these rules, but that file only
@@ -43,5 +43,49 @@ describe('roleUpdateRequestSchema', () => {
   it('rejects an off-catalog permission on update', () => {
     const result = roleUpdateRequestSchema.safeParse({ permissions: ['everything.manage'] });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('roleSummaryResponseSchema', () => {
+  it('accepts a role summary with a zero holder count', () => {
+    const result = roleSummaryResponseSchema.safeParse({
+      id: '3f1c1b6e-6f0e-4a1e-9f0a-2b7a5c9d1e33',
+      name: 'Editor',
+      slug: 'editor',
+      isSystem: false,
+      holderCount: 0,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a negative holder count', () => {
+    const result = roleSummaryResponseSchema.safeParse({
+      id: '3f1c1b6e-6f0e-4a1e-9f0a-2b7a5c9d1e33',
+      name: 'Editor',
+      slug: 'editor',
+      isSystem: false,
+      holderCount: -1,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // The list drives the assignment dropdown and must never carry permission data
+  // (specs/rbac-management/spec.md - "Reading one role's permissions").
+  it('carries no permissions field', () => {
+    expect(Object.keys(roleSummaryResponseSchema.shape)).not.toContain('permissions');
+  });
+});
+
+describe('roleDetailResponseSchema', () => {
+  it('accepts the summary shape plus permissions', () => {
+    const result = roleDetailResponseSchema.safeParse({
+      id: '3f1c1b6e-6f0e-4a1e-9f0a-2b7a5c9d1e33',
+      name: 'Editor',
+      slug: 'editor',
+      isSystem: false,
+      holderCount: 2,
+      permissions: ['news.manage'],
+    });
+    expect(result.success).toBe(true);
   });
 });

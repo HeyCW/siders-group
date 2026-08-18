@@ -1,9 +1,11 @@
 import type { Database } from '@siders/db';
+import type { StaffAccountResponse } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { generateTemporaryPassword, hashPassword, verifyPassword } from '../../lib/password.js';
 import { getOwnerRoleId } from '../../lib/ownerRole.js';
 import type { CallerContext } from '../../lib/callerContext.js';
 import type { StaffRepository, StaffRow } from './staff.repository.js';
+import { toStaffAccountResponse } from './staff.mapper.js';
 
 export type RevokeStaffSessions = (subjectType: 'staff', subjectId: string) => Promise<void>;
 export type RevokeStaffSessionsExcept = (
@@ -19,6 +21,10 @@ export interface CreatedStaff {
 }
 
 export interface StaffService {
+  /** Mapped through `toStaffAccountResponse` here, not left to the controller — `StaffRow`
+   *  carries `passwordHash` from `SELECT_COLUMNS`, and this is the one boundary that must never
+   *  let a raw row escape (design.md - "Password hash leakage"). */
+  list(): Promise<StaffAccountResponse[]>;
   create(input: { email: string; name: string; roleId: string }, caller: CallerContext): Promise<CreatedStaff>;
   disable(targetId: string, caller: CallerContext): Promise<void>;
   triggerReset(targetId: string, caller: CallerContext): Promise<{ temporaryPassword: string }>;
@@ -53,6 +59,11 @@ export function createStaffService(
   }
 
   return {
+    async list() {
+      const rows = await staffRepository.list();
+      return rows.map(toStaffAccountResponse);
+    },
+
     async create(input, caller) {
       // Rejects an email that already belongs to any staff account in any status — an
       // upsert here would let a user.manage holder take over an existing (e.g. Owner)

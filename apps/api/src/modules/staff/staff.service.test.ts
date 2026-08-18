@@ -77,6 +77,9 @@ function createFakeStaffRepository() {
       const row = rows.get(id);
       if (row) row.roleId = roleId;
     },
+    async list() {
+      return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
+    },
   };
 
   return { repository, rows };
@@ -326,5 +329,34 @@ describe('StaffService', () => {
     await expect(
       service.disable('does-not-exist', { subjectId: 'caller-1', isOwner: true }),
     ).rejects.toMatchObject({ status: 404 });
+  });
+
+  describe('list', () => {
+    it('returns every account name-ordered, disabled accounts included', async () => {
+      await staff.repository.create({ email: 'zed@example.com', name: 'Zed', roleId: 'author-role-id', passwordHash: 'x' });
+      const alice = await staff.repository.create({
+        email: 'alice@example.com',
+        name: 'Alice',
+        roleId: 'author-role-id',
+        passwordHash: 'x',
+      });
+      await staff.repository.setStatus(alice.id, 'disabled');
+
+      const list = await service.list();
+
+      expect(list.map((a) => a.name)).toEqual(['Alice', 'Zed']);
+      expect(list.find((a) => a.id === alice.id)).toMatchObject({ status: 'disabled' });
+    });
+
+    // specs/staff-account-management/spec.md - "No password hash is disclosed".
+    it('discloses no password hash on any entry', async () => {
+      await staff.repository.create({ email: 'a@example.com', name: 'A', roleId: 'author-role-id', passwordHash: 'secret-hash' });
+
+      const list = await service.list();
+
+      for (const entry of list) {
+        expect(entry).not.toHaveProperty('passwordHash');
+      }
+    });
   });
 });
