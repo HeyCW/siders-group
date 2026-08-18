@@ -212,16 +212,20 @@ and SHALL retain what the reader typed.
 - **WHEN** a comment submission is rejected
 - **THEN** the reason is shown and the reader's text remains in the composer
 
-### Requirement: Contact form validates client-side and does not fabricate submission success
-The Contact page's message form SHALL validate required fields and email format before allowing submission, and SHALL NOT report a successful submission or silently discard input, since no backend endpoint accepts a contact submission.
+### Requirement: Contact form validates client-side and submits to a real endpoint
+The Contact page's message form SHALL validate required fields and email format before allowing submission, and SHALL submit valid input to the contact-message intake endpoint, reporting the genuine outcome of that submission rather than fabricating or suppressing it.
 
 #### Scenario: Invalid input blocks submission
 - **WHEN** a visitor attempts to submit the contact form with a missing required field or a malformed email
 - **THEN** submission is blocked and the invalid field is indicated
 
-#### Scenario: Valid submission is honestly reported as not yet available
+#### Scenario: Valid submission succeeds
 - **WHEN** a visitor submits the contact form with all fields valid
-- **THEN** the page shows that sending is not yet available and provides a direct email address as an alternative, rather than indicating the message was sent
+- **THEN** the message is sent to the contact-message intake endpoint and the page shows that the message was received
+
+#### Scenario: Submission fails
+- **WHEN** a visitor submits the contact form with all fields valid but the intake endpoint request fails (network error, server error, or rate limit)
+- **THEN** the page reports that sending failed rather than indicating success, and does not silently discard the visitor's input
 
 ### Requirement: Contact page renders the office location as a map sourced from static site content
 The Contact page's "Find us" section SHALL render a map of the office location, built from a hardcoded location string maintained alongside the page's other static contact details, rather than from any backend-provided data. The map SHALL replace the unfilled placeholder previously shown in this section.
