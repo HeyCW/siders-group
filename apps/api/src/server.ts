@@ -36,7 +36,6 @@ import {
   readerModerationRoutes,
 } from './modules/moderation/moderation.routes.js';
 import { analyticsRoutes } from './modules/analytics/analytics.routes.js';
-import { contactMessageRoutes, publicContactRoutes } from './modules/contact/contact.routes.js';
 
 export function createServer(): Express {
   const env = loadEnv();
@@ -83,8 +82,6 @@ export function createServer(): Express {
   app.use('/admin/comments', commentModerationRoutes(db));
   app.use('/admin/readers', readerModerationRoutes(db));
   app.use('/comments', commentReportRoutes(db));
-  app.use('/admin/contact-messages', contactMessageRoutes(db));
-  app.use('/contact-messages', publicContactRoutes(db));
 
   app.use(createErrorHandler(logger));
 

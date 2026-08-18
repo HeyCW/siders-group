@@ -17,7 +17,7 @@ The public web app's fetch wrapper (`apps/web/lib/api.ts`) is deliberately minim
 
 **Non-Goals:**
 - No in-app reply/send capability — replying is a manual, out-of-band action using the sender's email address.
-- No archive/delete state for messages — `new`/`read` is the entire lifecycle.
+- No archive/delete state for messages — `NEW`/`READ` is the entire lifecycle.
 - No general-purpose notification system. The unread count is specific to contact messages; a future capability (e.g. moderation) that wants a similar badge builds its own count and its own nav entry, not a shared bus.
 - No real-time push (websocket/SSE). Polling is sufficient and consistent with the rest of the app.
 
@@ -25,11 +25,11 @@ The public web app's fetch wrapper (`apps/web/lib/api.ts`) is deliberately minim
 
 **New `contact.manage` permission, not reuse of `settings.manage`.** Reading a stranger's submitted name, email, and message is a materially different privilege than editing site settings (e.g. partner ordering, which currently sits behind `settings.manage`). A dedicated permission keeps that separation explicit and lets it be granted independently of settings access. Cost: one migration adding the enum value and a `role_permissions` seed row for the Owner role.
 
-**Read state lives on the message row (`status: 'new' | 'read'`), global rather than per-admin.** Mirrors how `community-moderation` models comment status directly on the comment rather than per-staff-member state. For a small staff, "someone already looked at this" is the useful signal; a per-admin read-state table would add real complexity (a join table, per-viewer queries) for a distinction this team doesn't need. If that changes later, it's an additive migration, not a rewrite.
+**Read state lives on the message row (`status: 'NEW' | 'READ'`), global rather than per-admin.** Mirrors how `community-moderation` models comment status directly on the comment rather than per-staff-member state. For a small staff, "someone already looked at this" is the useful signal; a per-admin read-state table would add real complexity (a join table, per-viewer queries) for a distinction this team doesn't need. If that changes later, it's an additive migration, not a rewrite.
 
-**Read state is a toggle (`new ⇄ read`), not one-way.** A one-way "mark read" makes an accidental click on a nav badge/preview unrecoverable — the message silently disappears from the unread count with no way to flag it again. The toggle costs one extra endpoint and is worth it.
+**Read state is a toggle (`NEW ⇄ READ`), not one-way.** A one-way "mark read" makes an accidental click on a nav badge/preview unrecoverable — the message silently disappears from the unread count with no way to flag it again. The toggle costs one extra endpoint and is worth it.
 
-**Unread count is its own endpoint, not derived by the client from the full list.** The moderation queue's poll (`CommentModerationPage.tsx`) reloads its paginated list every 30s and, by its own documented trade-off, resets pagination to page one when it does. A dedicated `GET .../unread-count` avoids inheriting that problem: the badge polls a cheap, pagination-free count, independent of whatever the inbox list itself does. The inbox list has no pagination requirement in this change's spec (unlike the comment queue) and is unpaginated as shipped — see `packages/contracts/src/contact.ts`'s note on `contactMessageListResponseSchema`.
+**Unread count is its own endpoint, not derived by the client from the full list.** The moderation queue's poll (`CommentModerationPage.tsx`) reloads its paginated list every 30s and, by its own documented trade-off, resets pagination to page one when it does. A dedicated `GET .../unread-count` avoids inheriting that problem: the badge polls a cheap, pagination-free count, and the inbox list is fetched (and paginated) only when an admin actually opens the page.
 
 **Rate limit keyed by caller address (`clientIp`), 3/hour, own namespace.** Follows `reportRateLimiter`'s pattern exactly — a new entry in `ENGAGEMENT_RATE_LIMITS` named `contact`, so it can never share or steal budget from another endpoint's limiter. Unlike the reader-engagement limiters, this one cannot key by reader/staff id (the caller is anonymous by definition), so it uses `clientIp` the same way `publicReadRateLimiter` and `viewRateLimiter` do.
 

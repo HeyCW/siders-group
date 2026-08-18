@@ -10,7 +10,6 @@ export const PERMISSION_KEYS = [
   'dashboard.view',
   'settings.manage',
   'moderation.manage',
-  'contact.manage',
 ] as const;
 
 export const permissionKeySchema = z.enum(PERMISSION_KEYS);

@@ -14,7 +14,3 @@ The Contact page's message form SHALL validate required fields and email format 
 #### Scenario: Submission fails
 - **WHEN** a visitor submits the contact form with all fields valid but the intake endpoint request fails (network error, server error, or rate limit)
 - **THEN** the page reports that sending failed rather than indicating success, and does not silently discard the visitor's input
-
-## RENAMED Requirements
-- FROM: `### Requirement: Contact form validates client-side and does not fabricate submission success`
-- TO: `### Requirement: Contact form validates client-side and submits to a real endpoint`

@@ -37,14 +37,14 @@ Every endpoint that lists, reads, or changes the read state of contact messages 
 - **THEN** the request is rejected
 
 ### Requirement: The inbox lists messages filterable by read status, newest first
-A permitted caller SHALL be able to list contact messages ordered newest-first, optionally filtered to only unread (`new`) or only read (`read`) messages.
+A permitted caller SHALL be able to list contact messages ordered newest-first, optionally filtered to only unread (`NEW`) or only read (`READ`) messages.
 
 #### Scenario: Listing without a filter returns all messages
 - **WHEN** a permitted caller lists contact messages with no status filter
 - **THEN** all messages are returned newest-first, regardless of read state
 
 #### Scenario: Listing with a status filter returns only matching messages
-- **WHEN** a permitted caller lists contact messages filtered to `new`
+- **WHEN** a permitted caller lists contact messages filtered to `NEW`
 - **THEN** only messages that have not been marked read are returned
 
 ### Requirement: A message body is rendered as plain text in the admin inbox
@@ -55,26 +55,26 @@ The admin inbox SHALL render a message's body as literal text and SHALL NOT inte
 - **THEN** it is shown as literal text rather than rendered as markup
 
 ### Requirement: A permitted caller can mark a message read or unread
-A permitted caller SHALL be able to set a specific message's state to `read` or back to `new`. There is no third state and no removal — a message persists in the inbox indefinitely.
+A permitted caller SHALL be able to set a specific message's state to `READ` or back to `NEW`. There is no third state and no removal — a message persists in the inbox indefinitely.
 
 #### Scenario: Marking a message read
-- **WHEN** a permitted caller marks a `new` message as read
-- **THEN** the message's state becomes `read`
+- **WHEN** a permitted caller marks a `NEW` message as read
+- **THEN** the message's state becomes `READ`
 
 #### Scenario: Marking a message unread again
-- **WHEN** a permitted caller marks a `read` message as unread
-- **THEN** the message's state becomes `new`
+- **WHEN** a permitted caller marks a `READ` message as unread
+- **THEN** the message's state becomes `NEW`
 
 #### Scenario: An unknown message is rejected
 - **WHEN** a permitted caller attempts to change the read state of a message id that does not exist
 - **THEN** the request is rejected
 
 ### Requirement: A permitted caller can retrieve the current unread count
-A permitted caller SHALL be able to retrieve the number of contact messages currently in the `new` state, independent of retrieving the message list itself.
+A permitted caller SHALL be able to retrieve the number of contact messages currently in the `NEW` state, independent of retrieving the message list itself.
 
-#### Scenario: Unread count reflects only new messages
-- **WHEN** a permitted caller retrieves the unread count while some messages are `new` and others are `read`
-- **THEN** the count returned equals the number of `new` messages only
+#### Scenario: Unread count reflects only NEW messages
+- **WHEN** a permitted caller retrieves the unread count while some messages are `NEW` and others are `READ`
+- **THEN** the count returned equals the number of `NEW` messages only
 
 ### Requirement: The admin panel is not itself the reply channel
 The admin inbox SHALL surface a message's sender email for reference, and SHALL NOT provide any mechanism to send a reply from within the admin panel.
