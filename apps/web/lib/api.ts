@@ -2,8 +2,6 @@ import type {
   ArticlePublicCard,
   ArticlePublicDetail,
   CategoryResponse,
-  ContactMessageSubmitRequest,
-  ContactMessageSubmitResponse,
   PublicPartner,
   PublicReelItem,
 } from '@siders/contracts';
@@ -111,20 +109,4 @@ export function getReels(init?: RequestInit): Promise<PublicReelItem[]> {
 
 export function getPartners(init?: RequestInit): Promise<PublicPartner[]> {
   return apiFetch<PublicPartner[]>('/partners', init);
-}
-
-/**
- * The one write this client makes — every other function here reads. Still `requirePublic()` on
- * the server, so the same no-credentials, no-CSRF `apiFetch` above handles it unchanged
- * (specs/contact-messages/spec.md - "Any visitor can submit a contact message without
- * authentication").
- */
-export function submitContactMessage(
-  input: ContactMessageSubmitRequest,
-): Promise<ContactMessageSubmitResponse> {
-  return apiFetch<ContactMessageSubmitResponse>('/contact-messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
 }
