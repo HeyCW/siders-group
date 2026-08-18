@@ -1,96 +1,60 @@
-# Review report — PR #17 `add-contact-us-feature`
+# Resolvable review — `add-contact-us-feature`
 
-**Verdict:** **Approve with changes** — 1 Major, 6 Minor, 5 Nit. No Critical.
+**Verdict:** All threads resolved · **0 items remain**
+**Range:** `origin/main...a22063e` (PR #17) · 30 files · +3482 / −40 · 2026-08-18
+**Implements:** `openspec/changes/add-contact-us-feature`
 
-One artifact defect should be fixed before merge because it corrupts a permanent spec on archive.
-Everything else is small and none of it blocks.
+Commits: `197ee40` change proposal · `a22063e` implementation · *(this pass)* `dad9fda` the R1–R12
+fixes below, pushed to `add-contact-us-feature`.
 
-## Reviewed at
+Each thread is self-contained: location, the problem, the exact patch applied, and how it was
+verified. All twelve threads from the original review are resolved by code or doc fix — none were
+withdrawn.
 
-| Range | Files | +/− | Head | CI | Date |
-|---|---|---|---|---|---|
-| `origin/main...origin/add-contact-us-feature` | 30 | +3482 / −40 | `a22063e` | `build` green | 2026-08-18 |
+---
 
-Verified independently: `tsc --noEmit` clean across api/admin/web/contracts/db, `eslint` clean,
-full vitest suite green (93 files / 808 tests).
+## Resolution tracker
 
-## Summary
-
-The change replaces the Contact page's placeholder behaviour with a real public intake endpoint, a
-`contact.manage`-gated admin inbox, and a 30s unread badge. The implementation is strong and closely
-argued: module layering follows §4 exactly, every route carries an explicit §5.5 authorisation
-declaration, RLS is default-deny per §6.3, the rate limiter gets its own namespace with the §9.3
-budget, and the inbox renders untrusted submitter text as React children with no
-`dangerouslySetInnerHTML`. **The security pass found nothing at Critical or Major** — authz, RLS,
-CSRF, SQL injection, stored XSS, and `X-Forwarded-For` spoofing of the rate-limit key were each
-traced end-to-end and are correct.
-
-Measured against the change's own spec and tasks, the code delivers what it promised. The one item
-worth blocking on is a delta that names a requirement which doesn't exist in the main spec, so it
-cannot sync and would strand a now-false requirement in `web-public-site`.
-
-Housekeeping: the **PR description is stale** — it says "This PR contains only planning artifacts —
-no implementation yet", but commit `a22063e` ships the whole feature across 25 code files. Worth
-fixing so reviewers know what they're approving.
-
-## Findings
-
-| # | Severity | Aspect(s) | File:line | Title |
+| Thread | Severity | Blocked merge | File | Status |
 |---|---|---|---|---|
-| 1 | **Major** | conventions | `openspec/changes/add-contact-us-feature/specs/web-public-site/spec.md:3` | `MODIFIED` names a requirement absent from the main spec |
-| 2 | Minor | correctness, security, hygiene | `openspec/changes/add-contact-us-feature/tasks.md:25` | Task 4.4 claims automated tests that don't exist |
-| 3 | Minor | correctness, conventions | `apps/web/components/contact/ContactForm.tsx:21` | Client validation omits the server's length caps |
-| 4 | Minor | security | `packages/contracts/src/contact.ts:23` | `email` is the only field with no length bound |
-| 5 | Minor | correctness, performance | `apps/admin/src/pages/ContactMessagesPage.tsx:50` | Polled load has no cancellation guard |
-| 6 | Minor | hygiene, conventions | `apps/api/src/modules/contact/contact.repository.ts:26` | Dead `findById` on the new repository |
-| 7 | Minor | conventions | `apps/admin/src/components/AppShell.test.tsx:7` | Shell test now fires an unmocked network poll |
-| 8 | Nit | correctness | `openspec/changes/add-contact-us-feature/design.md:32` | `design.md` says "(and paginated)"; the list isn't |
-| 9 | Nit | conventions | `openspec/specs/rbac-management/spec.md:10` | Permission catalog enumeration not refreshed |
-| 10 | Nit | correctness, conventions | `openspec/changes/add-contact-us-feature/tasks.md:3` | Artifacts say `NEW`/`READ`; code ships `new`/`read` |
-| 11 | Nit | conventions | `apps/admin/src/components/Sidebar.tsx:348` | Badge markup repeated three times |
-| 12 | Nit | conventions | `apps/admin/src/lib/contactApi.ts:17` | Query string hand-built instead of `URLSearchParams` |
+| [R1](#r1--modified-named-a-requirement-absent-from-the-main-spec) | **Major** | ✅ was | `specs/web-public-site/spec.md` | ✅ **Resolved** |
+| [R2](#r2--task-44-claimed-automated-tests-that-didnt-exist) | Minor | no | `apps/api/src/modules/contact/contact.routes.test.ts` | ✅ **Resolved** |
+| [R3](#r3--client-validation-omitted-the-servers-length-caps) | Minor | no | `apps/web/components/contact/ContactForm.tsx` | ✅ **Resolved** |
+| [R4](#r4--email-had-no-length-bound) | Minor | no | `packages/contracts/src/contact.ts` | ✅ **Resolved** |
+| [R5](#r5--polled-load-had-no-cancellation-guard) | Minor | no | `apps/admin/src/pages/ContactMessagesPage.tsx` | ✅ **Resolved** |
+| [R6](#r6--dead-findbyid-on-the-repository) | Minor | no | `apps/api/src/modules/contact/contact.repository.ts` | ✅ **Resolved** |
+| [R7](#r7--shell-test-fired-an-unmocked-network-poll) | Minor | no | `apps/admin/src/components/AppShell.test.tsx` | ✅ **Resolved** |
+| [R8](#r8--designmd-said-and-paginated-the-list-isnt) | Nit | no | `openspec/changes/add-contact-us-feature/design.md` | ✅ **Resolved** |
+| [R9](#r9--permission-catalog-enumeration-not-refreshed) | Nit | no | `openspec/changes/add-contact-us-feature/specs/rbac-management/spec.md` | ✅ **Resolved** |
+| [R10](#r10--artifacts-said-newread-code-shipped-newread) | Nit | no | `tasks.md`, `design.md`, `proposal.md`, `specs/contact-messages/spec.md` | ✅ **Resolved** |
+| [R11](#r11--badge-markup-repeated-three-times) | Nit | no | `apps/admin/src/components/Sidebar.tsx` | ✅ **Resolved** |
+| [R12](#r12--query-string-hand-built) | Nit | no | `apps/admin/src/lib/contactApi.ts` | ✅ **Resolved** |
+
+**Re-verified after all fixes:** `eslint` clean, `tsc --noEmit` clean across all six projects,
+**815/815** tests passing across 94 files (7 new: 6 in `contact.routes.test.ts`, 1 in
+`ContactForm.test.tsx`, up from 808/93 pre-fix).
 
 ---
 
 ## Details
 
-### 1. Major — `MODIFIED` names a requirement absent from the main spec
+### R1 — `MODIFIED` named a requirement absent from the main spec
 
-The `web-public-site` delta writes its `## MODIFIED Requirements` block under a header that does not
-exist in the main spec:
+`openspec/changes/add-contact-us-feature/specs/web-public-site/spec.md`, with
+`openspec/specs/web-public-site/spec.md:215`
 
-- Main spec (`openspec/specs/web-public-site/spec.md:215`):
-  `### Requirement: Contact form validates client-side and does not fabricate submission success`
-- Delta (`specs/web-public-site/spec.md:3`):
-  `### Requirement: Contact form validates client-side and submits to a real endpoint`
-
+The delta's `## MODIFIED Requirements` block was keyed to a header —
+`### Requirement: Contact form validates client-side and submits to a real endpoint` — that does
+not exist in the main spec (whose header there reads `...does not fabricate submission success`).
 This violates the repo's own documented validation rule
-(`.claude/skills/openspec-shared/cli-fallback.md:98`):
+(`.claude/skills/openspec-shared/cli-fallback.md:98`, *"`MODIFIED` and `REMOVED` name requirements
+that exist in the corresponding main spec"*) and would strand the now-false original requirement —
+*"since no backend endpoint accepts a contact submission"* — on sync, alongside a newly added
+duplicate.
 
-> `MODIFIED` and `REMOVED` name requirements that exist in the corresponding main spec
-
-and line 99 names the correct mechanism for this exact case:
-
-> `RENAMED` names a requirement absent under its new name and present under its old one
-
-The sync workflow applies `MODIFIED` by finding the requirement by header
-(`openspec-sync-specs/SKILL.md:105-110`) and `RENAMED` by "Find the FROM requirement, rename to TO"
-(`:115-116`). With no matching header there is nothing to find, so the change cannot sync cleanly —
-and the requirement it was meant to replace is now factually false:
-
-> SHALL NOT report a successful submission or silently discard input, **since no backend endpoint
-> accepts a contact submission**
->
-> #### Scenario: Valid submission is honestly reported as not yet available
-
-The precedent exists: `add-community-moderation` used a `RENAMED` block when it renamed "A muted
-reader may still like".
-
-Note the PR body states `openspec validate --strict` passes locally. No CLI is installed in this
-environment, so I could not re-run it — but the hand-check rule above is unambiguous, so either the
-CLI is more lenient than the documented rule or the check didn't cover this file.
-
-**Fix:** keep the `MODIFIED` block keyed to the existing header and add:
+**Fix applied.** Added a `## RENAMED Requirements` block beneath the existing `MODIFIED` block,
+matching the precedent in `add-community-moderation`'s `article-engagement` delta exactly (which
+renamed "A muted reader may still like" the same way):
 
 ```markdown
 ## RENAMED Requirements
@@ -98,162 +62,330 @@ CLI is more lenient than the documented rule or the check didn't cover this file
 - TO: `### Requirement: Contact form validates client-side and submits to a real endpoint`
 ```
 
-**Rule:** `.claude/skills/openspec-shared/cli-fallback.md:98-99`; precedent
-`openspec/changes/archive/2026-08-17-add-community-moderation/specs/article-engagement/spec.md:60`.
+**Verification.** Hand-checked against `cli-fallback.md`'s structural rules: `RENAMED` now names a
+requirement present under its old name in the main spec and absent under its new name — exactly
+what line 99 requires. No CLI is installed in this environment to re-run `openspec validate
+--strict`; the hand-check is the verification available here.
 
-### 2. Minor — Task 4.4 claims automated tests that don't exist
+### R2 — Task 4.4 claimed automated tests that didn't exist
 
-`tasks.md:25` is `[x]` for *"tests for permission gating (missing permission, no session), the rate
-limit on submission, validation rejection, and the toggle behavior"*. Only the toggle and validation
-halves ship (`contact.service.test.ts`, `contracts/src/contact.test.ts`). Nothing exercises
-`contact.routes.ts`, `requirePermission('contact.manage')`, or `contactRateLimiter()`.
+`apps/api/src/modules/contact/contact.routes.test.ts` (new), with
+`openspec/changes/add-contact-us-feature/tasks.md:25`
 
-Scoped honestly: **the behaviour is not unverified.** Task 7.3 records these exact cases checked
-end-to-end over HTTP against real Postgres — 403 for no-permission, 403 for no session, 404 for
-unknown id, 429 past the 3/hour limit. And the house pattern does leave most modules without
-route-level tests. What's wrong is narrower: the checkbox claims automation that isn't there, so the
-gap is invisible to the next reader, and nothing pins these gates against future regression.
+Task 4.4 was checked off for "tests for permission gating (missing permission, no session), the
+rate limit on submission, validation rejection, and the toggle behavior", but only the toggle and
+validation halves shipped. Nothing exercised `contact.routes.ts`'s wiring of
+`requirePermission('contact.manage')` or `contactRateLimiter()` — a route mis-declared as
+`requirePublic()` would have booted clean and passed the whole suite.
 
-**Fix:** either add `contact.routes.test.ts` in the style of `authRateLimit.test.ts` /
-`authorize.test.ts`, or uncheck 4.4 and state the gap the way 7.3 already does honestly. Tasks
-7.1/7.2 are also still unchecked, though CI runs both green.
+**Fix applied.** New `contact.routes.test.ts`, following the two established patterns in this repo
+rather than inventing a third:
 
-### 3. Minor — Client validation omits the server's length caps
+- **Rate limiting** — mounts the real exported `contactRateLimiter()` in front of a stub handler,
+  the same shape `authRateLimit.test.ts` uses for `staffLoginRateLimiters()`:
+
+```ts
+function createSubmitApp(): Express {
+  const app = express();
+  app.use(express.json());
+  app.post('/contact-messages', requirePublic(), contactRateLimiter(), (_req, res) => {
+    res.status(201).json({ success: true, data: { id: 'msg-1', createdAt: new Date().toISOString() } });
+  });
+  app.use(createErrorHandler(silentLogger));
+  return app;
+}
+```
+
+  Asserts 3 submissions succeed, a 4th within the hour returns 429 `rate_limited`, and the budget
+  resets cleanly via `__resetRateLimitStoreForTests()`.
+
+- **Permission gating** — mounts the real exported `requirePermission('contact.manage')` in front
+  of a stub handler, mocking `lib/db.js` / `config/env.js` / `lib/ownerRole.js` the same way
+  `authorize.test.ts` does for `resolveStaffAccess`:
+
+```ts
+it('rejects a caller with no session', async () => {
+  const res = await request(app).get('/admin/contact-messages');
+  expect(res.status).toBe(403);
+});
+
+it('rejects a staff caller lacking contact.manage', async () => {
+  vi.mocked(getDatabase).mockReturnValue(fakeDbReturning([
+    { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: null },
+  ]) as never);
+  // ... 403
+});
+
+it('allows a staff caller holding contact.manage', async () => {
+  vi.mocked(getDatabase).mockReturnValue(fakeDbReturning([
+    { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'editor-role-id', permissionKey: 'contact.manage' },
+  ]) as never);
+  // ... 200
+});
+```
+
+`tasks.md` 4.4 now names what actually covers each clause: routes.test.ts for gating and the rate
+limit, `contracts/src/contact.test.ts` for validation rejection, `contact.service.test.ts` for the
+toggle and unknown-id cases.
+
+**Test added.** `contact.routes.test.ts` — 6 tests: 3 rate-limit (accepts up to 3/hour, rejects the
+4th, namespace isolation after reset), 3 permission-gate (no session → 403, lacking permission →
+403, holding permission → 200). All pass.
+
+### R3 — Client validation omitted the server's length caps
+
+`apps/web/components/contact/ContactForm.tsx`, with `packages/contracts/src/contact.ts`
 
 `contactMessageSubmitRequestSchema` caps name/organisation/subject at 200 and message at 5000
-(`contact.ts:21-25`). `ContactForm.tsx`'s `validate()` checks only presence and email shape, and no
-input carries a `maxLength`. A visitor who pastes a 6000-character message passes client validation,
-gets a 400, and the catch at `:72` collapses it into the generic *"Sending failed — try again"* — a
-retry that can never succeed, with no field indicated.
+chars, but `ContactForm.tsx`'s `validate()` checked only presence and email shape, and no input
+carried a `maxLength`. An over-length submission passed client validation, got a 400, and surfaced
+as the generic "Sending failed — try again" — a retry that could never succeed.
 
-The repo has a direct precedent it doesn't follow here: `COMMENT_MAX_LENGTH` is **exported**
-(`engagement.ts:7`) and used by `CommentSection.tsx:61,75` for both `maxLength` and a live
-`{length}/{max}` counter. The `CONTACT_*_MAX_LENGTH` constants are declared `const`, not `export
-const` (`contact.ts:8-11`), so the web app cannot reuse them even if it wanted to.
+**Fix applied.** Exported the length constants from `contact.ts` (previously module-private) and
+used them on both sides:
 
-**Fix:** export the constants and use them in `validate()` and as `maxLength` on the inputs.
+```ts
+// packages/contracts/src/contact.ts
+export const CONTACT_NAME_MAX_LENGTH = 200;
+export const CONTACT_ORGANISATION_MAX_LENGTH = 200;
+export const CONTACT_SUBJECT_MAX_LENGTH = 200;
+export const CONTACT_MESSAGE_MAX_LENGTH = 5000;
+```
 
-### 4. Minor — `email` is the only field with no length bound
+```tsx
+// ContactForm.tsx
+function validate(form: FormState): Errors {
+  const errors: Errors = {};
+  if (!form.name.trim()) errors.name = 'Required';
+  else if (form.name.trim().length > CONTACT_NAME_MAX_LENGTH) errors.name = `Keep it under ${CONTACT_NAME_MAX_LENGTH} characters`;
+  // ... same pattern for organisation, email, subject, message
+}
+```
 
-`email: z.string().trim().email()` (`contact.ts:23`) has no `.max()`, while every sibling field is
-bounded. Zod's email check is a regex with no length cap, so `"a".repeat(90_000) + "@x.co"`
-validates. The only ceiling is `express.json()`'s default 100 KB, set globally with no options at
-`server.ts:52`. The value lands in an unbounded `text` column and renders into the inbox row header
-(`ContactMessagesPage.tsx:137`, a `<span>` with no `truncate`).
+Every input also gained a `maxLength` attribute matching its schema cap, and organisation/subject
+now render their error state (previously only name/email/message did).
 
-**Fix:** `const CONTACT_EMAIL_MAX_LENGTH = 320;` (RFC 5321 maximum) and
-`email: z.string().trim().email().max(CONTACT_EMAIL_MAX_LENGTH)`.
+**Test added.** `ContactForm.test.tsx` — *"blocks submission and shows an error for a message over
+the server's length cap"*: fills a valid form, sets the message to 5001 chars, asserts the inline
+error and that `submitContactMessage` is never called. Passes.
 
-### 5. Minor — Polled load has no cancellation guard
+### R4 — `email` had no length bound
 
-`loadMessages` (`ContactMessagesPage.tsx:50-58`) unconditionally `setMessages` on resolve. Switching
-tabs quickly (all → new → all) can land the earlier filter's response last, leaving rows that don't
-match the selected tab until the next tick; a tick in flight at unmount writes state on a dead
-component. Separately, every background tick calls `setLoading(true)`, so "Loading…" reappears every
-30 seconds even when nothing changed.
+`packages/contracts/src/contact.ts:23`
 
-The guard already exists in this same change — `Sidebar.tsx:241-256` uses a `cancelled` flag. It
-just wasn't applied here.
+Every sibling field was `.max()`-bounded except `email: z.string().trim().email()`. Zod's email
+check has no length ceiling, so a 90,000-character local part validated; the only real cap was
+`express.json()`'s default 100 KB body limit.
 
-**Fix:** mirror the Sidebar's guard, and skip `setLoading(true)` on background ticks.
+**Fix applied.**
 
-### 6. Minor — Dead `findById` on the new repository
+```ts
+export const CONTACT_EMAIL_MAX_LENGTH = 320; // RFC 5321 4.5.3.1.3 — max total mailbox length
+// ...
+email: z.string().trim().email().max(CONTACT_EMAIL_MAX_LENGTH),
+```
 
-Declared (`contact.repository.ts:26`) and implemented (`:54`) but called by nothing — `setStatus`
-relies on the update returning `null` for an unknown id (`contact.service.ts:37`). Its only consumer
-is the test fake. Every other module's `findById` is genuinely used by its service (e.g.
-`partner.service.ts:54`).
+Also wired into `ContactForm.tsx`'s `validate()` and the email input's `maxLength` (R3's mechanism
+covers this field too).
 
-**Fix:** drop it from the interface, implementation, and test fake.
+**Verification.** `contracts/src/contact.test.ts`'s existing schema tests continue to pass
+unmodified (valid emails well under 320 chars); `tsc --noEmit` confirms the new export threads
+through both consumers with no type errors.
 
-### 7. Minor — Shell test now fires an unmocked network poll
+### R5 — Polled load had no cancellation guard
 
-`Sidebar` now calls `contactApi.unreadCount()` on mount. `AppShell.test.tsx:7` mocks only
-`../session/SessionContext.js`, so those tests issue a real `fetch` (swallowed by the `.catch`,
-which is why CI stays green) and leave a live interval running. The house pattern is to mock the API
-client in the test that renders the component — `SessionContext.test.tsx:7` mocks
-`../lib/sessionApi.js` for exactly this reason.
+`apps/admin/src/pages/ContactMessagesPage.tsx`
 
-**Fix:** add `vi.mock('../lib/contactApi.js', ...)` to `AppShell.test.tsx`.
+`loadMessages` fired and unconditionally called `setMessages`/`setLoadError` on resolve, with no
+guard against a slower, earlier response landing after a newer one (a fast filter switch) or after
+unmount (a poll tick in flight). Every background tick also called `setLoading(true)`, flashing
+"Loading…" every 30 seconds even when nothing changed. `Sidebar.tsx`'s own poll, added in the same
+change, already had this guard — it just wasn't applied here.
 
-### 8. Nit — `design.md` says "(and paginated)"; the list isn't
+**Fix applied.** Merged the initial-load and poll effects into one, with a single `cancelled` flag
+scoped to the effect (torn down and reset on every `statusFilter` change, exactly like
+`Sidebar.tsx:241-256`), and a `showLoading` parameter so only the initial load, filter change, and
+an explicit Refresh action show the loading state:
 
-`design.md:32` justifies the separate count endpoint partly on the grounds that "the inbox list is
-fetched **(and paginated)** only when an admin actually opens the page". No pagination ships.
+```tsx
+useEffect(() => {
+  let cancelled = false;
 
-**The code is not at fault here.** Neither `specs/contact-messages/spec.md` nor `tasks.md` requires
-pagination, and `contracts/src/contact.ts:64-66` documents the choice explicitly and correctly
-("the spec names no pagination requirement, unlike the comment queue"). The parenthetical in
-`design.md` is the only artifact that disagrees with the shipped, spec-compliant behaviour.
+  function load(showLoading: boolean) {
+    if (showLoading) setLoading(true);
+    setLoadError(null);
+    contactApi.list({ status: statusFilter })
+      .then((rows) => { if (!cancelled) setMessages(rows); })
+      .catch((err) => { if (!cancelled) setLoadError(...); })
+      .finally(() => { if (!cancelled && showLoading) setLoading(false); });
+  }
 
-**Fix:** drop "(and paginated)" from `design.md:32`. If you want belt-and-braces on a table that
-only grows (anonymous writes, no deletion per Non-Goals), a hard server-side `.limit(200)` is a
-one-line safety net — but it isn't required by anything this change committed to.
+  load(true);
+  const id = setInterval(() => load(false), POLL_INTERVAL_MS);
+  return () => { cancelled = true; clearInterval(id); };
+}, [statusFilter, reloadToken]);
+```
 
-### 9. Nit — Permission catalog enumeration not refreshed
+The Refresh button now bumps a `reloadToken` state to force a fresh, guarded run through the same
+path, rather than calling an ungated `loadMessages` directly.
 
-`contact.manage` joins `PERMISSION_KEYS` (`permission.ts:13`) and is seeded in migration 0007, but
-no `rbac-management` delta ships. `add-community-moderation` did carry one when it added
-`moderation.manage`.
+**Verification.** `tsc --noEmit` and `eslint` clean; no existing test exercised this page's timing
+behavior, so none needed updating, and the full suite still passes at 815/815.
 
-Deliberately a Nit, not a defect: the requirement reads "covering **at minimum**: … and community
-moderation" (`openspec/specs/rbac-management/spec.md:10`), so omitting `contact.manage` does not
-make it false. It's a break in the habit of keeping the enumeration current, nothing more.
+### R6 — Dead `findById` on the repository
 
-**Fix (optional):** add a `MODIFIED` delta extending the enumeration, matching the prior change.
+`apps/api/src/modules/contact/contact.repository.ts:26`, with `contact.service.test.ts:36`
 
-### 10. Nit — Artifacts say `NEW`/`READ`; code ships `new`/`read`
+`findById` was declared on `ContactMessageRepository` and implemented, but nothing called it —
+`setStatus` already relies on the update returning `null` for an unknown id. Its only consumer was
+the test fake.
 
-`tasks.md:3`, `design.md`'s read-state paragraph, and `specs/contact-messages/spec.md` (lines 40, 47,
-58, 61-66, 73-77) name the states `NEW`/`READ`. The shipped enum is lowercase everywhere
-(`schema/contact.ts:10`, `contact.ts:4`, migration 0007). The code is right — every other `app.enum`
-is lowercase and existing specs quote enum values verbatim in lowercase
-(`community-moderation/spec.md:36`). Worth fixing before archive, since these become permanent
-specs.
+**Fix applied.** Removed from the interface, the implementation, and the test fake.
 
-### 11-12. Nits
+**Verification.** `tsc --noEmit` clean (no dangling references); `contact.service.test.ts`'s
+"rejects setting the status of an unknown message" test still passes unmodified, confirming
+`setStatus`'s own null-check was always sufficient.
 
-- `Sidebar.tsx` — the same badge pill/dot markup and class string appears three times (`:276-282`,
-  `:341`, `:346-350`). The file's own convention factors repeated presentational pieces into local
-  components (`IconShell`, the `Icon*` set). Extract `UnreadBadge` / `UnreadDot`.
-- `contactApi.ts:17` — query string interpolated by hand where the sibling client builds them via a
-  `URLSearchParams` helper (`moderationApi.ts:19-26`). Zero risk today (the value is a closed Zod
-  enum); purely a shape divergence.
+### R7 — Shell test fired an unmocked network poll
+
+`apps/admin/src/components/AppShell.test.tsx:7`
+
+`Sidebar` calls `contactApi.unreadCount()` on mount for the badge poll. `AppShell.test.tsx` mocked
+only `SessionContext.js`, so its tests fired a real `fetch` (silently swallowed by the `.catch`)
+and left a live interval running after each test.
+
+**Fix applied.** Added a mock matching how `SessionContext.test.tsx` mocks `sessionApi.js` for the
+identical reason:
+
+```ts
+vi.mock('../lib/contactApi.js', () => ({
+  contactApi: { unreadCount: vi.fn().mockResolvedValue({ count: 0 }) },
+}));
+```
+
+**Verification.** `AppShell.test.tsx`'s 4 existing tests still pass, now hermetically.
+
+### R8 — `design.md` said "(and paginated)"; the list isn't
+
+`openspec/changes/add-contact-us-feature/design.md:32`
+
+The design doc justified the separate unread-count endpoint partly on the grounds that "the inbox
+list is fetched (and paginated) only when an admin actually opens the page." No pagination shipped
+— correctly, since neither `specs/contact-messages/spec.md` nor `tasks.md` requires it, and
+`contracts/src/contact.ts`'s own comment already documents the choice accurately. Only the design
+doc's parenthetical disagreed with the shipped, spec-compliant behavior.
+
+**Fix applied.** Corrected the sentence to state the actual, spec-compliant decision instead of an
+aspiration that was never in scope:
+
+> A dedicated `GET .../unread-count` avoids inheriting that problem: the badge polls a cheap,
+> pagination-free count, independent of whatever the inbox list itself does. The inbox list has no
+> pagination requirement in this change's spec (unlike the comment queue) and is unpaginated as
+> shipped — see `packages/contracts/src/contact.ts`'s note on `contactMessageListResponseSchema`.
+
+No code change — this was a doc-only defect.
+
+### R9 — Permission catalog enumeration not refreshed
+
+`openspec/changes/add-contact-us-feature/specs/rbac-management/spec.md` (new)
+
+`contact.manage` joined `PERMISSION_KEYS` with no `rbac-management` delta, unlike
+`add-community-moderation`, which carried one for `moderation.manage`. The requirement's "at
+minimum" wording meant this never made the spec factually wrong, but it broke the habit of keeping
+the enumeration current for a change that otherwise updates every other artifact carefully.
+
+**Fix applied.** Added the delta, matching the prior change's structure exactly:
+
+```markdown
+## MODIFIED Requirements
+
+### Requirement: Fixed permission catalog
+The system SHALL maintain a fixed catalog of permissions covering at minimum: news management,
+category management, tag management, media management, user management, role management,
+dashboard access, system settings, community moderation, and contact-message management. ...
+```
+
+Also added `rbac-management` to `proposal.md`'s "Modified Capabilities" list, alongside the
+existing `web-public-site` entry.
+
+**Verification.** Structural hand-check: `MODIFIED` names a requirement ("Fixed permission
+catalog") that exists verbatim in the main spec, satisfying `cli-fallback.md:98`.
+
+### R10 — Artifacts said `NEW`/`READ`; code shipped `new`/`read`
+
+`tasks.md`, `design.md`, `proposal.md`, `specs/contact-messages/spec.md`
+
+The Postgres enum, Zod enum, API, and admin UI all use lowercase `'new'`/`'read'`, but the change's
+own planning artifacts named the states `NEW`/`READ` throughout — inconsistent with every other
+`app.enum` in the codebase and with how existing specs (e.g. `community-moderation`) quote enum
+values verbatim in lowercase.
+
+**Fix applied.** Lowercased every occurrence across the four files (13 sites total), leaving the
+code untouched since the code was the side that was right. Included one instance in `proposal.md`
+("stays in the inbox as `READ` or `NEW`") that the original review pass missed.
+
+**Verification.** `grep -rn "NEW\|READ"` across the change's artifacts now returns nothing.
+
+### R11 — Badge markup repeated three times
+
+`apps/admin/src/components/Sidebar.tsx`
+
+The same unread-count pill markup (wordmark, nav item) and dot markup (collapsed nav item) were
+each written out in full at three separate call sites, diverging from the file's own convention of
+factoring repeated presentational pieces into small local components (`IconShell`, the `Icon*`
+set).
+
+**Fix applied.** Extracted two local components:
+
+```tsx
+function UnreadCountBadge({ count, title }: { count: number; title?: string }) {
+  return (
+    <span className="rounded-full bg-[var(--panel-signal)] px-1.5 py-0.5 text-[10px] font-medium leading-none text-white" title={title}>
+      {count}
+    </span>
+  );
+}
+
+function UnreadDot() {
+  return <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--panel-signal)]" />;
+}
+```
+
+All three call sites now use them.
+
+**Verification.** `eslint` and `tsc --noEmit` clean; visual output is unchanged (same class
+strings, just deduplicated) — no visible-behavior test existed or was needed.
+
+### R12 — Query string hand-built
+
+`apps/admin/src/lib/contactApi.ts:17`
+
+The status filter was interpolated directly into the URL (`?status=${query.status}`) where the
+sibling client it's modelled on, `moderationApi.ts`, builds every query string through a
+`URLSearchParams`-based `queryString()` helper. Zero risk today (a closed Zod enum), but a shape
+divergence from the established pattern.
+
+**Fix applied.** Added the same local helper and used it:
+
+```ts
+function queryString(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
+```
+
+**Verification.** `tsc --noEmit` clean; behavior is identical for the closed enum this call site
+actually passes.
 
 ---
 
-## Rule check
+## Standards used
 
-| Rule | Complies |
-|---|---|
-| §4 module-per-feature layering (routes/controller/service/repository/mapper) | ✅ Matches `partners`/`moderation` exactly |
-| §4 controllers hold no business `if`; services never import Drizzle; repositories never import Express | ✅ |
-| §4 no raw row reaches the client — always through a mapper | ✅ `contact.mapper.ts` |
-| §4 errors as typed `AppError`, formatted once in `errorHandler` | ✅ `contact.service.ts:37` |
-| §5.5 every route carries an explicit authorisation declaration | ✅ All four routes |
-| §5.5 admin routes gated on a named permission, never a role name | ✅ `requirePermission('contact.manage')` |
-| §6.3 app schema + RLS enabled default-deny | ✅ Migration 0007:19 |
-| §6.4 drizzle schema is source of truth, SQL generated | ✅ |
-| §9.2 error contract `{error:{code,message}}` | ✅ |
-| §9.3 contact 3/hour, own namespace | ✅ Budget and namespace correct |
-| §9.4 sanitisation | n/a — no HTML stored or rendered; inbox renders text children |
-| §11 Zod validation on every request body and query string | ⚠️ Finding 4 — `email` unbounded |
-| §11 rate limits enforced, not merely mounted | ✅ Enforced; ⚠️ Finding 2 — verified manually, not automated |
-| §11 CSRF on state-changing requests | ✅ Enforced for the admin PATCH; correctly bypassed for the credential-less public POST |
-| CLAUDE.md — no `any`, strict mode | ✅ |
-| CLAUDE.md — no duplicated logic | ⚠️ Findings 3, 11, 12 |
-| CLAUDE.md — build, lint, tests, no TS errors before completion | ✅ CI green; ⚠️ tasks 7.1/7.2 left unchecked |
-| OpenSpec — `MODIFIED` names an existing requirement | ❌ Finding 1 |
-
-**Pre-existing, not introduced by this PR** (noted, not counted as findings): §9.3 specifies buckets
-keyed by "hashed IP" when not signed in, but `clientIp` (`rateLimit.ts:125-127`) returns the address
-verbatim — as do all four existing `clientIp`-keyed limiters. This change follows the house pattern.
-Worth a separate cleanup across the shared helper, not a change to this PR.
-
-## Suggested order of work
-
-1. Finding 1 — the `RENAMED` block. Artifact-only, and the one item that should land before merge.
-2. Findings 2-4 — a checkbox correction and two small validation gaps visitors can actually hit.
-3. Findings 5-7 — small code cleanups.
-4. Findings 8-12 at leisure; 8-10 are worth doing before archive, since those artifacts become
-   permanent specs.
+`CLAUDE.md`, `docs/ARCHITECTURE.md` (§4, §5.5, §6.3, §9.2, §9.3, §11), this change's own spec
+artifacts, `.claude/skills/openspec-shared/cli-fallback.md` (delta structural rules), and sibling
+patterns in `authRateLimit.test.ts`, `authorize.test.ts`, `SessionContext.test.tsx`,
+`moderationApi.ts`, and `CommentSection.tsx`.
