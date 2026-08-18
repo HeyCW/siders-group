@@ -12,9 +12,20 @@ interface Envelope<T> {
   data: T;
 }
 
+// Matches `moderationApi.ts`'s own `queryString` helper shape rather than interpolating the
+// status value directly.
+function queryString(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const contactApi = {
   list(query: ContactMessageQuery = { status: 'all' }): Promise<ContactMessageListResponse> {
-    const qs = query.status && query.status !== 'all' ? `?status=${query.status}` : '';
+    const qs = queryString({ status: query.status && query.status !== 'all' ? query.status : undefined });
     return apiFetch<Envelope<ContactMessageListResponse>>(`/admin/contact-messages${qs}`).then((r) => r.data);
   },
 

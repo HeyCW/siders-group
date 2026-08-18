@@ -46,24 +46,42 @@ export function ContactMessagesPage() {
   const [toggleState, runToggle] = useAsyncAction((id: string, status: 'new' | 'read') =>
     contactApi.setStatus(id, { status }),
   );
+  // Bumped by the Refresh button to force an immediate reload through the same guarded path as
+  // the poll below, rather than a second, unguarded fetch.
+  const [reloadToken, setReloadToken] = useState(0);
 
-  function loadMessages() {
-    setLoading(true);
-    setLoadError(null);
-    contactApi
-      .list({ status: statusFilter })
-      .then(setMessages)
-      .catch((err: unknown) => setLoadError(err instanceof ApiError ? err.message : 'Could not load'))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(loadMessages, [statusFilter]);
-
+  // One effect owns both the initial/filter-change load and the 30s poll, with a single
+  // `cancelled` flag — mirroring Sidebar.tsx's own poll guard. Switching `statusFilter` (or
+  // bumping `reloadToken`) tears down this effect first, which sets `cancelled` before the new
+  // one starts, so a slower, earlier response can never overwrite a newer one or fire after
+  // unmount. `showLoading` is false for background poll ticks, so the list doesn't flash back to
+  // "Loading…" every 30 seconds when nothing changed.
   useEffect(() => {
-    const id = setInterval(loadMessages, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+    let cancelled = false;
+
+    function load(showLoading: boolean) {
+      if (showLoading) setLoading(true);
+      setLoadError(null);
+      contactApi
+        .list({ status: statusFilter })
+        .then((rows) => {
+          if (!cancelled) setMessages(rows);
+        })
+        .catch((err: unknown) => {
+          if (!cancelled) setLoadError(err instanceof ApiError ? err.message : 'Could not load');
+        })
+        .finally(() => {
+          if (!cancelled && showLoading) setLoading(false);
+        });
+    }
+
+    load(true);
+    const id = setInterval(() => load(false), POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [statusFilter, reloadToken]);
 
   async function toggleStatus(message: ContactMessageRow) {
     const nextStatus = message.status === 'new' ? 'read' : 'new';
@@ -85,7 +103,7 @@ export function ContactMessagesPage() {
           </div>
           <button
             type="button"
-            onClick={loadMessages}
+            onClick={() => setReloadToken((t) => t + 1)}
             className="rounded-md border border-[var(--rule)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:border-[var(--ink)]/30 hover:text-[var(--ink)]"
           >
             Refresh

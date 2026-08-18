@@ -33,9 +33,6 @@ function createFakeRepository(initial: ContactMessageRow[] = []) {
       stored.push(created);
       return created;
     },
-    async findById(id) {
-      return stored.find((r) => r.id === id) ?? null;
-    },
     async list(filter) {
       const filtered = filter === 'all' ? stored : stored.filter((r) => r.status === filter);
       return [...filtered].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

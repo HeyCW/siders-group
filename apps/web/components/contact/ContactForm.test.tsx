@@ -27,6 +27,16 @@ describe('ContactForm', () => {
     expect(submitContactMessageMock).not.toHaveBeenCalled();
   });
 
+  it('blocks submission and shows an error for a message over the server\'s length cap', () => {
+    render(<ContactForm />);
+    fillValidForm();
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'a'.repeat(5001) } });
+    fireEvent.click(screen.getByRole('button', { name: /send message/i }));
+
+    expect(screen.getByText(/keep it under 5000 characters/i)).toBeInTheDocument();
+    expect(submitContactMessageMock).not.toHaveBeenCalled();
+  });
+
   it('blocks submission and shows an error for a malformed email', () => {
     render(<ContactForm />);
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Rina' } });

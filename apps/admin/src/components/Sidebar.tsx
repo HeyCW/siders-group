@@ -193,6 +193,25 @@ function jakartaClock(): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }).format(new Date());
 }
 
+/** The unread-count pill, shared verbatim by the wordmark and the `Messages` nav item — one
+ *  definition instead of two copies of the same markup and class string. */
+function UnreadCountBadge({ count, title }: { count: number; title?: string }) {
+  return (
+    <span
+      className="rounded-full bg-[var(--panel-signal)] px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
+      title={title}
+    >
+      {count}
+    </span>
+  );
+}
+
+/** The collapsed-sidebar equivalent of `UnreadCountBadge` — a bare dot, since a collapsed nav
+ *  item has no room for a count. */
+function UnreadDot() {
+  return <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--panel-signal)]" />;
+}
+
 /** Matches `CommentModerationPage`'s own poll interval and `docs/ARCHITECTURE.md` §8.2's
  *  reasoning — this is the house convention for "staff should notice new X soon-ish", not a new
  *  cadence (design.md - "Poll interval: 30 seconds"). */
@@ -274,12 +293,10 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseT
           <span className="flex items-center gap-1.5">
             <span className="font-display text-lg tracking-tight">Siders</span>
             {unreadMessages > 0 && (
-              <span
-                className="rounded-full bg-[var(--panel-signal)] px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
+              <UnreadCountBadge
+                count={unreadMessages}
                 title={`${unreadMessages} unread message${unreadMessages === 1 ? '' : 's'}`}
-              >
-                {unreadMessages}
-              </span>
+              />
             )}
           </span>
         )}
@@ -337,18 +354,12 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseT
                             Messages nav item... the wordmark mirrors it only when the wordmark
                             is actually rendered"). Collapsed: a bare dot. Expanded: the count
                             renders inline below instead. */}
-                        {showUnreadBadge && collapsed && (
-                          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--panel-signal)]" />
-                        )}
+                        {showUnreadBadge && collapsed && <UnreadDot />}
                       </span>
                       {!collapsed && (
                         <span className="flex flex-1 items-center justify-between gap-2">
                           <span className="truncate font-medium">{item.label}</span>
-                          {showUnreadBadge && (
-                            <span className="rounded-full bg-[var(--panel-signal)] px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
-                              {unreadMessages}
-                            </span>
-                          )}
+                          {showUnreadBadge && <UnreadCountBadge count={unreadMessages} />}
                         </span>
                       )}
                     </>

@@ -23,7 +23,6 @@ export interface SubmitContactMessageInput {
 
 export interface ContactMessageRepository {
   submit(input: SubmitContactMessageInput): Promise<ContactMessageRow>;
-  findById(id: string): Promise<ContactMessageRow | null>;
   /** Every message, newest first, optionally filtered by status
    *  (specs/contact-messages/spec.md - "The inbox lists messages filterable by read status,
    *  newest first"). */
@@ -49,11 +48,6 @@ export function createContactMessageRepository(db: Database): ContactMessageRepo
         .returning();
       if (!row) throw new Error('contact message insert returned no row');
       return row;
-    },
-
-    async findById(id) {
-      const [row] = await db.select().from(contactMessages).where(eq(contactMessages.id, id)).limit(1);
-      return row ?? null;
     },
 
     async list(filter) {

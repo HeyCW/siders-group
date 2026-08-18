@@ -7,7 +7,7 @@ The Contact page's message form currently validates input but cannot submit it a
 - Add a public, unauthenticated endpoint that accepts contact form submissions (name, organisation, email, subject, message) and stores them.
 - Add a permission-gated admin inbox that lists submitted messages, newest first, filterable by read status.
 - Add an unread-message count endpoint that the admin sidebar polls (30s, matching the existing moderation-queue and clock polls) to badge the nav item and the wordmark.
-- Add a "mark as read" action; a message may also be marked unread again (no accidental-click dead end). There is no archive/delete state — a message stays in the inbox as `READ` or `NEW` indefinitely.
+- Add a "mark as read" action; a message may also be marked unread again (no accidental-click dead end). There is no archive/delete state — a message stays in the inbox as `read` or `new` indefinitely.
 - Add a `contact.manage` permission, required by every admin contact-message endpoint.
 - Add a per-IP rate limit on the public submission endpoint (3/hour), per the budget already named in `docs/ARCHITECTURE.md` §9.3.
 - The public Contact page form now performs a real submission and shows genuine success/error feedback instead of the "sending isn't wired up yet" message.
@@ -21,6 +21,7 @@ The Contact page's message form currently validates input but cannot submit it a
 
 ### Modified Capabilities
 - `web-public-site`: The "Contact form validates client-side and does not fabricate submission success" requirement changes — the form now performs a real submission and reports genuine success or failure, since a backend endpoint now accepts contact submissions.
+- `rbac-management`: The "Fixed permission catalog" requirement's enumeration extends to include contact-message management, matching the new `contact.manage` permission.
 
 ## Impact
 

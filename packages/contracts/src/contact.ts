@@ -5,10 +5,14 @@ export const CONTACT_MESSAGE_STATUSES = ['new', 'read'] as const;
 export const contactMessageStatusSchema = z.enum(CONTACT_MESSAGE_STATUSES);
 export type ContactMessageStatus = z.infer<typeof contactMessageStatusSchema>;
 
-const CONTACT_NAME_MAX_LENGTH = 200;
-const CONTACT_ORGANISATION_MAX_LENGTH = 200;
-const CONTACT_SUBJECT_MAX_LENGTH = 200;
-const CONTACT_MESSAGE_MAX_LENGTH = 5000;
+// Exported (not module-private) so `apps/web/components/contact/ContactForm.tsx` can enforce the
+// same caps client-side instead of guessing at them, matching how `COMMENT_MAX_LENGTH`
+// (`engagement.ts`) is shared between its Zod schema and `CommentSection.tsx`.
+export const CONTACT_NAME_MAX_LENGTH = 200;
+export const CONTACT_ORGANISATION_MAX_LENGTH = 200;
+export const CONTACT_EMAIL_MAX_LENGTH = 320; // RFC 5321 4.5.3.1.3 — max total mailbox length
+export const CONTACT_SUBJECT_MAX_LENGTH = 200;
+export const CONTACT_MESSAGE_MAX_LENGTH = 5000;
 
 /**
  * `.strict()` — the submitter is anonymous, so there is no session-derived field (an actor id, a
@@ -20,7 +24,7 @@ export const contactMessageSubmitRequestSchema = z
   .object({
     name: z.string().trim().min(1).max(CONTACT_NAME_MAX_LENGTH),
     organisation: z.string().trim().min(1).max(CONTACT_ORGANISATION_MAX_LENGTH).optional(),
-    email: z.string().trim().email(),
+    email: z.string().trim().email().max(CONTACT_EMAIL_MAX_LENGTH),
     subject: z.string().trim().min(1).max(CONTACT_SUBJECT_MAX_LENGTH).optional(),
     message: z.string().trim().min(1).max(CONTACT_MESSAGE_MAX_LENGTH),
   })

@@ -1,6 +1,13 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import {
+  CONTACT_EMAIL_MAX_LENGTH,
+  CONTACT_MESSAGE_MAX_LENGTH,
+  CONTACT_NAME_MAX_LENGTH,
+  CONTACT_ORGANISATION_MAX_LENGTH,
+  CONTACT_SUBJECT_MAX_LENGTH,
+} from '@siders/contracts';
 import { CONTACT_INFO } from '../../lib/content';
 import { submitContactMessage } from '../../lib/api';
 
@@ -18,12 +25,24 @@ const EMPTY: FormState = { name: '', organisation: '', email: '', subject: '', m
 
 type Errors = Partial<Record<keyof FormState, string>>;
 
+/**
+ * Mirrors `contactMessageSubmitRequestSchema` (`@siders/contracts`) field-for-field, including its
+ * length caps, so an over-long submission is caught here rather than round-tripping to a 400 the
+ * visitor can't act on.
+ */
 function validate(form: FormState): Errors {
   const errors: Errors = {};
   if (!form.name.trim()) errors.name = 'Required';
+  else if (form.name.trim().length > CONTACT_NAME_MAX_LENGTH) errors.name = `Keep it under ${CONTACT_NAME_MAX_LENGTH} characters`;
+  if (form.organisation.trim().length > CONTACT_ORGANISATION_MAX_LENGTH) {
+    errors.organisation = `Keep it under ${CONTACT_ORGANISATION_MAX_LENGTH} characters`;
+  }
   if (!form.email.trim()) errors.email = 'Required';
   else if (!EMAIL_PATTERN.test(form.email)) errors.email = 'Enter a valid email';
+  else if (form.email.trim().length > CONTACT_EMAIL_MAX_LENGTH) errors.email = `Keep it under ${CONTACT_EMAIL_MAX_LENGTH} characters`;
+  if (form.subject.trim().length > CONTACT_SUBJECT_MAX_LENGTH) errors.subject = `Keep it under ${CONTACT_SUBJECT_MAX_LENGTH} characters`;
   if (!form.message.trim()) errors.message = 'Required';
+  else if (form.message.trim().length > CONTACT_MESSAGE_MAX_LENGTH) errors.message = `Keep it under ${CONTACT_MESSAGE_MAX_LENGTH} characters`;
   return errors;
 }
 
@@ -82,25 +101,31 @@ export function ContactForm() {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[clamp(16px,2.5vw,24px)] pt-5">
         <label className="block">
           <span className={labelClass}>Name</span>
-          <input type="text" className={inputClass} {...field('name')} />
+          <input type="text" maxLength={CONTACT_NAME_MAX_LENGTH} className={inputClass} {...field('name')} />
           {touched.name && errors.name && (
             <span className="mt-1 block text-xs text-red-700">{errors.name}</span>
           )}
         </label>
         <label className="block">
           <span className={labelClass}>Organisation</span>
-          <input type="text" className={inputClass} {...field('organisation')} />
+          <input type="text" maxLength={CONTACT_ORGANISATION_MAX_LENGTH} className={inputClass} {...field('organisation')} />
+          {touched.organisation && errors.organisation && (
+            <span className="mt-1 block text-xs text-red-700">{errors.organisation}</span>
+          )}
         </label>
         <label className="block">
           <span className={labelClass}>Email</span>
-          <input type="email" className={inputClass} {...field('email')} />
+          <input type="email" maxLength={CONTACT_EMAIL_MAX_LENGTH} className={inputClass} {...field('email')} />
           {touched.email && errors.email && (
             <span className="mt-1 block text-xs text-red-700">{errors.email}</span>
           )}
         </label>
         <label className="block">
           <span className={labelClass}>Subject</span>
-          <input type="text" className={inputClass} {...field('subject')} />
+          <input type="text" maxLength={CONTACT_SUBJECT_MAX_LENGTH} className={inputClass} {...field('subject')} />
+          {touched.subject && errors.subject && (
+            <span className="mt-1 block text-xs text-red-700">{errors.subject}</span>
+          )}
         </label>
       </div>
 
@@ -108,6 +133,7 @@ export function ContactForm() {
         <span className={labelClass}>Message</span>
         <textarea
           rows={6}
+          maxLength={CONTACT_MESSAGE_MAX_LENGTH}
           className="mt-2 w-full resize-y border border-ink bg-white p-3 text-[15px] leading-[1.6] outline-none"
           {...field('message')}
         />
