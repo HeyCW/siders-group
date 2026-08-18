@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { CONTACT_INFO } from '../../lib/content';
+import { submitContactMessage } from '../../lib/api';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -30,15 +31,18 @@ const inputClass =
   'w-full border-0 border-b-2 border-ink bg-transparent py-2 text-[15px] outline-none placeholder:text-muted';
 const labelClass = 'block font-sans text-[11px] font-bold uppercase tracking-widest text-muted';
 
+type SubmitStatus = 'idle' | 'submitting' | 'sent' | 'failed';
+
 /**
- * No endpoint accepts a contact submission anywhere in this codebase
- * (`add-web-news-pages/proposal.md` — Non-Goals: "Contact form submission"). This validates for
- * real but never claims a successful send.
+ * Submits to the contact-message intake endpoint and reports the genuine outcome
+ * (specs/web-public-site/spec.md - "Contact form validates client-side and submits to a real
+ * endpoint"). A failed request leaves the form's contents in place — nothing the visitor typed
+ * is discarded — so a retry doesn't mean retyping everything.
  */
 export function ContactForm() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<SubmitStatus>('idle');
   const errors = validate(form);
 
   function field(name: keyof FormState) {
@@ -50,11 +54,27 @@ export function ContactForm() {
     };
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setTouched({ name: true, email: true, message: true });
     if (Object.keys(validate(form)).length > 0) return;
-    setSubmitted(true);
+
+    setStatus('submitting');
+    try {
+      await submitContactMessage({
+        name: form.name.trim(),
+        organisation: form.organisation.trim() || undefined,
+        email: form.email.trim(),
+        subject: form.subject.trim() || undefined,
+        message: form.message.trim(),
+      });
+      setStatus('sent');
+    } catch {
+      // Network error, server error, or a 429 rate limit all read the same to the visitor —
+      // there is no action that differs by cause (specs/web-public-site/spec.md - "Submission
+      // fails").
+      setStatus('failed');
+    }
   }
 
   return (
@@ -97,24 +117,32 @@ export function ContactForm() {
       </label>
 
       <div className="pt-5">
-        {submitted ? (
+        {status === 'sent' ? (
           <p className="max-w-[46ch] text-sm leading-[1.6] text-muted">
-            Sending isn&rsquo;t wired up yet — email{' '}
-            <a
-              href={`mailto:${CONTACT_INFO.emails[0]}`}
-              className="mark-hover text-ink underline"
-            >
-              {CONTACT_INFO.emails[0]}
-            </a>{' '}
-            directly and we&rsquo;ll get your message.
+            Message received — we&rsquo;ll get back to you soon.
           </p>
         ) : (
-          <button
-            type="submit"
-            className="inline-block bg-ink px-[22px] py-3.5 font-sans text-[11px] font-bold uppercase tracking-widest text-paper transition-colors duration-hover ease-hover hover:bg-black hover:text-signal focus-visible:bg-black focus-visible:text-signal"
-          >
-            Send message
-          </button>
+          <>
+            <button
+              type="submit"
+              disabled={status === 'submitting'}
+              className="inline-block bg-ink px-[22px] py-3.5 font-sans text-[11px] font-bold uppercase tracking-widest text-paper transition-colors duration-hover ease-hover hover:bg-black hover:text-signal focus-visible:bg-black focus-visible:text-signal disabled:opacity-50"
+            >
+              {status === 'submitting' ? 'Sending…' : 'Send message'}
+            </button>
+            {status === 'failed' && (
+              <p className="mt-3 max-w-[46ch] text-sm leading-[1.6] text-muted">
+                Sending failed — try again, or email{' '}
+                <a
+                  href={`mailto:${CONTACT_INFO.emails[0]}`}
+                  className="mark-hover text-ink underline"
+                >
+                  {CONTACT_INFO.emails[0]}
+                </a>{' '}
+                directly.
+              </p>
+            )}
+          </>
         )}
       </div>
     </form>

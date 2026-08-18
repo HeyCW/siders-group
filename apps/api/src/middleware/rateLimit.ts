@@ -163,6 +163,9 @@ const ENGAGEMENT_RATE_LIMITS = {
   // rather than reused, for the same reason every entry above already has one (design.md -
   // Decision 8, `openspec/changes/add-community-moderation`).
   report: { name: 'engagement-report', windowMs: HOUR_MS, max: 20 },
+  // The fifth §9.3 budget, previously unimplemented — the contact form had no backend endpoint
+  // until `add-contact-us-feature`. 3/hour, per docs/ARCHITECTURE.md §9.3.
+  contact: { name: 'engagement-contact', windowMs: HOUR_MS, max: 3 },
 } as const;
 
 /**
@@ -208,4 +211,14 @@ export function commentRateLimiter() {
 /** 20/hour per reader — design.md - Decision 8, `openspec/changes/add-community-moderation`. */
 export function reportRateLimiter() {
   return engagementLimiter(ENGAGEMENT_RATE_LIMITS.report, readerKey);
+}
+
+/**
+ * 3/hour per client address — docs/ARCHITECTURE.md §9.3. Keyed by `clientIp` rather than
+ * `readerKey`: the submitter carries no session at all
+ * (specs/contact-messages/spec.md - "Any visitor can submit a contact message without
+ * authentication"), so there is no reader or staff identity to key on.
+ */
+export function contactRateLimiter() {
+  return engagementLimiter(ENGAGEMENT_RATE_LIMITS.contact, clientIp);
 }
