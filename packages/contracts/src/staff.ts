@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { staffAccountResponseSchema } from './session.js';
 
 /**
  * Every staff email address enters the system through this schema, lowercased and trimmed.
@@ -46,3 +47,15 @@ export const staffPasswordChangeRequestSchema = z
   })
   .strict();
 export type StaffPasswordChangeRequest = z.infer<typeof staffPasswordChangeRequestSchema>;
+
+/**
+ * `GET /staff` — one entry per account, identical in shape to `staffAccountResponseSchema`
+ * (id, email, name, roleId, roleName, status, mustChangePassword, createdAt) and reused rather
+ * than redefined, so the two can never drift. Carries no credential field — `staff.mapper.ts`'s
+ * `toStaffAccountResponse` is the only place a `StaffRow` (which carries `passwordHash`)
+ * becomes a response, and every list entry goes through it
+ * (specs/staff-account-management/spec.md - "Enumerating staff accounts" - "No password hash is
+ * disclosed").
+ */
+export const staffListItemResponseSchema = staffAccountResponseSchema;
+export type StaffListItemResponse = z.infer<typeof staffListItemResponseSchema>;

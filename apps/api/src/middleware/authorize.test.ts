@@ -5,23 +5,19 @@ vi.mock('../lib/db.js', () => ({ getDatabase: vi.fn() }));
 vi.mock('../config/env.js', () => ({ loadEnv: vi.fn().mockReturnValue({}) }));
 vi.mock('../lib/ownerRole.js', () => ({ getOwnerRoleId: vi.fn().mockResolvedValue('owner-role-id') }));
 
-// A tiny fake query builder mimicking the shape `resolveStaffAccess`/`resolveReaderAccess`
-// chain against: .select().from().innerJoin().leftJoin().leftJoin().where() / .limit().
-function fakeDbReturning(rows: unknown[]) {
-  const builder = {
-    select: () => builder,
-    from: () => builder,
-    innerJoin: () => builder,
-    leftJoin: () => builder,
-    where: () => builder,
-    limit: () => Promise.resolve(rows),
-    // when awaited directly without .limit() (staff query has no .limit()) — resolve to rows.
-    then: (resolve: (v: unknown[]) => void) => resolve(rows),
-  };
-  return builder;
-}
+// Shared with `role.routes.test.ts`, which mocks the same internal `getDatabase()` call while
+// testing route handlers rather than the guards themselves — kept under its original local name
+// here since every call site in this file already uses it.
+import { fakeStaffAccessDbReturning as fakeDbReturning } from '../testing/fakeStaffAccessDb.js';
 
-import { auditAuthorizationDeclarations, requirePermission, requirePublic, requireReader, requireStaff } from './authorize.js';
+import {
+  auditAuthorizationDeclarations,
+  requireAnyPermission,
+  requirePermission,
+  requirePublic,
+  requireReader,
+  requireStaff,
+} from './authorize.js';
 import { getDatabase } from '../lib/db.js';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -474,6 +470,75 @@ describe('requirePermission', () => {
     const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
     const next = vi.fn();
     await requirePermission('settings.manage')(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'password_change_required' }));
+  });
+});
+
+describe('requireAnyPermission', () => {
+  it('allows a staff member holding the first listed permission', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'admin-role-id', permissionKey: 'user.manage' },
+      ]) as never,
+    );
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const next = vi.fn();
+    await requireAnyPermission('user.manage', 'role.manage')(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('allows a staff member holding only the second listed permission', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'admin-role-id', permissionKey: 'role.manage' },
+      ]) as never,
+    );
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const next = vi.fn();
+    await requireAnyPermission('user.manage', 'role.manage')(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a staff member holding neither listed permission', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'author-role-id', permissionKey: 'news.manage' },
+      ]) as never,
+    );
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const next = vi.fn();
+    await requireAnyPermission('user.manage', 'role.manage')(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403 }));
+  });
+
+  it('lets the Owner role through even without either permission explicitly assigned', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        { subjectId: 'staff-1', ...liveSession(), status: 'active', roleId: 'owner-role-id', permissionKey: null },
+      ]) as never,
+    );
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const next = vi.fn();
+    await requireAnyPermission('user.manage', 'role.manage')(req, {} as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects before evaluating permissions when a password change is pending', async () => {
+    vi.mocked(getDatabase).mockReturnValue(
+      fakeDbReturning([
+        {
+          subjectId: 'staff-1',
+          ...liveSession(),
+          status: 'active',
+          roleId: 'admin-role-id',
+          mustChangePassword: true,
+          permissionKey: 'user.manage',
+        },
+      ]) as never,
+    );
+    const req = makeReq({ subjectId: 'staff-1', subjectType: 'staff', sessionId: 'sess-1' });
+    const next = vi.fn();
+    await requireAnyPermission('user.manage', 'role.manage')(req, {} as Response, next as NextFunction);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'password_change_required' }));
   });
 });

@@ -13,6 +13,8 @@ import { PartnersPage } from './pages/PartnersPage.js';
 import { ContactMessagesPage } from './pages/ContactMessagesPage.js';
 import { CommentModerationPage } from './pages/CommentModerationPage.js';
 import { ReaderModerationPage } from './pages/ReaderModerationPage.js';
+import { RolesPage } from './pages/RolesPage.js';
+import { StaffPage } from './pages/StaffPage.js';
 import { categoriesApi, tagsApi } from './lib/taxonomyApi.js';
 import { SessionProvider } from './session/SessionContext.js';
 import { RedirectIfAuthenticated, RequireSession } from './session/RouteGuards.js';
@@ -72,6 +74,8 @@ export default function App() {
             <Route path="/messages" element={<ContactMessagesPage />} />
             <Route path="/moderation/comments" element={<CommentModerationPage />} />
             <Route path="/moderation/readers" element={<ReaderModerationPage />} />
+            <Route path="/roles" element={<RolesPage />} />
+            <Route path="/staff" element={<StaffPage />} />
           </Route>
         </Route>
       </Routes>

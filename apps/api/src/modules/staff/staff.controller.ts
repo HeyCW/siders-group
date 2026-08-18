@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { staffCreateRequestSchema, staffPasswordChangeRequestSchema } from '@siders/contracts';
 import type { StaffService } from './staff.service.js';
-import { toStaffCreateResponse, toStaffResetResponse } from './staff.mapper.js';
+import { toStaffAccountResponse, toStaffCreateResponse, toStaffResetResponse } from './staff.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { requireUuidParam } from '../../lib/requireParam.js';
 
@@ -19,6 +19,15 @@ function requireSession(req: Request): { subjectId: string; sessionId: string } 
 /** Parse, delegate, respond. No `if` about business meaning lives here. */
 export function createStaffController(service: StaffService) {
   return {
+    async list(_req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const rows = await service.list();
+        res.json({ success: true, data: rows.map(toStaffAccountResponse) });
+      } catch (err) {
+        next(err);
+      }
+    },
+
     async create(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const body = staffCreateRequestSchema.parse(req.body);

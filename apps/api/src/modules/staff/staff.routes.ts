@@ -4,7 +4,7 @@ import { AppError } from '../../middleware/errorHandler.js';
 import { createStaffRepository } from './staff.repository.js';
 import { createStaffService } from './staff.service.js';
 import { createStaffController } from './staff.controller.js';
-import { requirePermission, requireStaff } from '../../middleware/authorize.js';
+import { requireAnyPermission, requirePermission, requireStaff } from '../../middleware/authorize.js';
 import { rateLimit } from '../../middleware/rateLimit.js';
 import { createSessionRepository } from '../auth/session.repository.js';
 import { createAuthService } from '../auth/auth.service.js';
@@ -58,6 +58,7 @@ export function staffRoutes(db: Database, env: Env) {
   );
   const controller = createStaffController(service);
 
+  router.get('/', requireAnyPermission('user.manage', 'role.manage'), controller.list);
   router.post('/', requirePermission('user.manage'), controller.create);
   router.post('/:id/disable', requirePermission('user.manage'), controller.disable);
   router.post('/:id/reset', requirePermission('user.manage'), controller.triggerReset);

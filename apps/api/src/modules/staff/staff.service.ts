@@ -19,6 +19,13 @@ export interface CreatedStaff {
 }
 
 export interface StaffService {
+  /** Returns repository rows, like every other method on this service — the controller maps to
+   *  a response via `toStaffAccountResponse`, exactly as it already does for `create`'s
+   *  `CreatedStaff.account` and `triggerReset`'s `temporaryPassword`. `StaffRow` carries
+   *  `passwordHash` from `SELECT_COLUMNS`, so that mapping step is not optional: it is the one
+   *  boundary that must never let a raw row escape (design.md - "Password hash leakage") — it
+   *  simply lives in the controller here rather than in the service. */
+  list(): Promise<StaffRow[]>;
   create(input: { email: string; name: string; roleId: string }, caller: CallerContext): Promise<CreatedStaff>;
   disable(targetId: string, caller: CallerContext): Promise<void>;
   triggerReset(targetId: string, caller: CallerContext): Promise<{ temporaryPassword: string }>;
@@ -53,6 +60,10 @@ export function createStaffService(
   }
 
   return {
+    list() {
+      return staffRepository.list();
+    },
+
     async create(input, caller) {
       // Rejects an email that already belongs to any staff account in any status — an
       // upsert here would let a user.manage holder take over an existing (e.g. Owner)

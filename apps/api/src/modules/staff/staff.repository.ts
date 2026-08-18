@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { roles, users, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
 
@@ -25,6 +25,8 @@ export interface CreateStaffInput {
 export interface StaffRepository {
   findByEmail(email: string): Promise<StaffRow | null>;
   findById(id: string): Promise<StaffRow | null>;
+  /** Every staff account, name-ordered, disabled accounts included. */
+  list(): Promise<StaffRow[]>;
   create(input: CreateStaffInput): Promise<StaffRow>;
   /** Self-service change: sets the hash and clears the forced-change flag in one statement. */
   setPassword(id: string, passwordHash: string): Promise<void>;
@@ -88,6 +90,10 @@ export function createStaffRepository(db: Database): StaffRepository {
     },
 
     findById,
+
+    async list() {
+      return baseQuery().orderBy(asc(users.name));
+    },
 
     async create(input) {
       // Created active with must_change_password true by column default — creation never

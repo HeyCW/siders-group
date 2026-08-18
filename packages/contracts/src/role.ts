@@ -33,3 +33,28 @@ export const roleResponseSchema = z.object({
   permissions: z.array(permissionKeySchema),
 });
 export type RoleResponse = z.infer<typeof roleResponseSchema>;
+
+/**
+ * `GET /roles` — no `permissions` field, so this stays readable under the `requireAnyPermission
+ * ('user.manage', 'role.manage')` gate without disclosing role-administration data to a
+ * `user.manage`-only caller (specs/rbac-management/spec.md - "Enumerating roles").
+ * `holderCount` is a computed aggregate, never a stored column.
+ */
+export const roleSummaryResponseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  slug: z.string(),
+  isSystem: z.boolean(),
+  holderCount: z.number().int().nonnegative(),
+});
+export type RoleSummaryResponse = z.infer<typeof roleSummaryResponseSchema>;
+
+/**
+ * `GET /roles/:id` — the summary plus the role's assigned permissions, gated on `role.manage`
+ * alone since a permission set is role-administration data
+ * (specs/rbac-management/spec.md - "Reading one role's permissions").
+ */
+export const roleDetailResponseSchema = roleSummaryResponseSchema.extend({
+  permissions: z.array(permissionKeySchema),
+});
+export type RoleDetailResponse = z.infer<typeof roleDetailResponseSchema>;

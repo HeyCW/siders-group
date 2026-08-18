@@ -77,6 +77,9 @@ function createFakeStaffRepository() {
       const row = rows.get(id);
       if (row) row.roleId = roleId;
     },
+    async list() {
+      return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
+    },
   };
 
   return { repository, rows };
@@ -326,5 +329,27 @@ describe('StaffService', () => {
     await expect(
       service.disable('does-not-exist', { subjectId: 'caller-1', isOwner: true }),
     ).rejects.toMatchObject({ status: 404 });
+  });
+
+  describe('list', () => {
+    // `service.list()` returns repository rows, like every other method on this service — the
+    // controller maps to a response, so the no-password-hash guarantee is exercised at that
+    // boundary (`staff.mapper.test.ts`), not here. This test covers only what the service
+    // itself owns: ordering and disabled-inclusion, delegated straight from the repository.
+    it('returns every account name-ordered, disabled accounts included', async () => {
+      await staff.repository.create({ email: 'zed@example.com', name: 'Zed', roleId: 'author-role-id', passwordHash: 'x' });
+      const alice = await staff.repository.create({
+        email: 'alice@example.com',
+        name: 'Alice',
+        roleId: 'author-role-id',
+        passwordHash: 'x',
+      });
+      await staff.repository.setStatus(alice.id, 'disabled');
+
+      const list = await service.list();
+
+      expect(list.map((a) => a.name)).toEqual(['Alice', 'Zed']);
+      expect(list.find((a) => a.id === alice.id)).toMatchObject({ status: 'disabled' });
+    });
   });
 });
