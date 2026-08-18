@@ -1,6 +1,6 @@
 ## 1. Data layer
 
-- [x] 1.1 Add `contact_messages` table to `packages/db/src/schema/` (id, name, organisation nullable, email, subject nullable, message, status enum `'NEW' | 'READ'` defaulting to `NEW`, created_at) under the `app` schema
+- [x] 1.1 Add `contact_messages` table to `packages/db/src/schema/` (id, name, organisation nullable, email, subject nullable, message, status enum `'new' | 'read'` defaulting to `new`, created_at) under the `app` schema
 - [x] 1.2 Generate the Drizzle migration (`db:generate`) and review the resulting SQL under `supabase/migrations/`
 - [x] 1.3 Add `contact.manage` to the permission enum in `packages/contracts/src/permission.ts`
 - [x] 1.4 Seed a `role_permissions` row granting `contact.manage` to the Owner role (matching how other permissions are seeded)
@@ -8,7 +8,7 @@
 ## 2. Contracts
 
 - [x] 2.1 Add `contactMessageSubmitRequestSchema` (name, email, message required; organisation, subject optional) to `packages/contracts/src/contact.ts`
-- [x] 2.2 Add response/list schemas: submitted-message shape for the public endpoint, and the admin list-item shape (includes `status`) plus a status-filter query schema (`NEW` | `READ` | unfiltered)
+- [x] 2.2 Add response/list schemas: submitted-message shape for the public endpoint, and the admin list-item shape (includes `status`) plus a status-filter query schema (`new` | `read` | unfiltered)
 
 ## 3. API: public submission endpoint
 
@@ -20,9 +20,9 @@
 ## 4. API: admin inbox endpoints
 
 - [x] 4.1 Wire `GET /admin/contact-messages` with `requirePermission('contact.manage')`, supporting the status filter from 2.2, newest-first
-- [x] 4.2 Wire `GET /admin/contact-messages/unread-count` with `requirePermission('contact.manage')`, returning the count of `NEW` messages
-- [x] 4.3 Wire `PATCH /admin/contact-messages/:id` with `requirePermission('contact.manage')` to set `status` to `NEW` or `READ`; reject an unknown id with 404
-- [x] 4.4 Add tests for permission gating (missing permission, no session), the rate limit on submission, validation rejection, and the toggle behavior (including the unknown-id case)
+- [x] 4.2 Wire `GET /admin/contact-messages/unread-count` with `requirePermission('contact.manage')`, returning the count of `new` messages
+- [x] 4.3 Wire `PATCH /admin/contact-messages/:id` with `requirePermission('contact.manage')` to set `status` to `new` or `read`; reject an unknown id with 404
+- [x] 4.4 Add tests for permission gating (missing permission, no session), the rate limit on submission, validation rejection, and the toggle behavior (including the unknown-id case) — `contact.routes.test.ts` mounts the real `requirePermission('contact.manage')` / `contactRateLimiter()` guards for the first two; `contracts/src/contact.test.ts` covers validation; `contact.service.test.ts` covers the toggle and unknown-id cases
 
 ## 5. Admin UI
 
@@ -40,6 +40,6 @@
 
 ## 7. Verification
 
-- [x] 7.1 Ran the full workspace test suite (`npx vitest run` — this repo's tests run as one Vitest workspace, not per-package scripts): 93 files, 808 tests, all passing
-- [x] 7.2 Ran `pnpm typecheck` (`pnpm -r run typecheck`): clean across every package, including `@siders/web` and `@siders/admin`
+- [x] 7.1 Ran `pnpm test` (full workspace, includes api/admin/web) — 94 files, 815 tests passing
+- [x] 7.2 Ran `pnpm typecheck` (full workspace, includes web/admin) — clean across all six projects
 - [x] 7.3 Ran the app locally against a real Postgres: verified via HTTP end-to-end — public submission lands in the DB, admin list/unread-count/toggle all behave correctly (including 403 for no-permission, 403 for no session, 404 for unknown id, 429 past the 3/hour rate limit). Browser-level visual check (badge rendering, collapsed sidebar) not done — no browser automation available in this environment; recommend a manual look before merging

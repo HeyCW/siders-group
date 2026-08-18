@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import type { PermissionKey } from '@siders/contracts';
 import { useDarkMode } from '../hooks/useDarkMode.js';
 import { useSession } from '../session/SessionContext.js';
+import { contactApi } from '../lib/contactApi.js';
 
 interface IconProps {
   className?: string;
@@ -100,6 +101,15 @@ function IconPartners(props: IconProps) {
   );
 }
 
+function IconMessages(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <path d="M3 5h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+      <path d="m3.5 5.5 6.5 5 6.5-5" />
+    </IconShell>
+  );
+}
+
 function IconComments(props: IconProps) {
   return (
     <IconShell {...props}>
@@ -165,7 +175,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Site',
-    items: [{ to: '/partners', label: 'Partners', icon: IconPartners, permission: 'settings.manage' }],
+    items: [
+      { to: '/partners', label: 'Partners', icon: IconPartners, permission: 'settings.manage' },
+      { to: '/messages', label: 'Messages', icon: IconMessages, permission: 'contact.manage' },
+    ],
   },
   {
     label: 'Community',
@@ -180,6 +193,30 @@ function jakartaClock(): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }).format(new Date());
 }
 
+/** The unread-count pill, shared verbatim by the wordmark and the `Messages` nav item — one
+ *  definition instead of two copies of the same markup and class string. */
+function UnreadCountBadge({ count, title }: { count: number; title?: string }) {
+  return (
+    <span
+      className="rounded-full bg-[var(--panel-signal)] px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
+      title={title}
+    >
+      {count}
+    </span>
+  );
+}
+
+/** The collapsed-sidebar equivalent of `UnreadCountBadge` — a bare dot, since a collapsed nav
+ *  item has no room for a count. */
+function UnreadDot() {
+  return <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--panel-signal)]" />;
+}
+
+/** Matches `CommentModerationPage`'s own poll interval and `docs/ARCHITECTURE.md` §8.2's
+ *  reasoning — this is the house convention for "staff should notice new X soon-ish", not a new
+ *  cadence (design.md - "Poll interval: 30 seconds"). */
+const UNREAD_MESSAGES_POLL_INTERVAL_MS = 30_000;
+
 export interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -191,6 +228,7 @@ export interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseToggle = true }: SidebarProps) {
   const [isDark, toggleDark] = useDarkMode();
   const [clock, setClock] = useState(jakartaClock);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const { session, signOut } = useSession();
   const account = session.status === 'authenticated' ? session.account : null;
 
@@ -207,6 +245,37 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseT
     return account.isOwner || account.permissionKeys.includes(permission);
   }
 
+  const canSeeMessages = canSee('contact.manage');
+
+  // Polled independently of the inbox page itself — the badge must reflect the unread count
+  // whether or not an admin has ever opened /messages (design.md - "The badge lives on a
+  // Messages nav item... and the wordmark mirrors it only when the wordmark is actually
+  // rendered"). Skipped entirely for an account that cannot see the endpoint, so this never
+  // spends a request on a 403 nobody will act on.
+  useEffect(() => {
+    if (!canSeeMessages) {
+      setUnreadMessages(0);
+      return;
+    }
+    let cancelled = false;
+    function poll() {
+      contactApi
+        .unreadCount()
+        .then(({ count }) => {
+          if (!cancelled) setUnreadMessages(count);
+        })
+        .catch(() => {
+          /* a transient failure just leaves the last known count showing */
+        });
+    }
+    poll();
+    const id = setInterval(poll, UNREAD_MESSAGES_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [canSeeMessages]);
+
   // signOut() clears local session state; RequireSession reacts to that and redirects to
   // /login on its own — no navigation call needed here (specs/admin-session/spec.md -
   // "Sign-out calls the endpoint and returns to sign-in").
@@ -220,7 +289,17 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseT
       aria-label="Admin navigation"
     >
       <div className={`flex items-center border-b border-[var(--panel-fg)]/10 px-3 py-4 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-        {!collapsed && <span className="font-display text-lg tracking-tight">Siders</span>}
+        {!collapsed && (
+          <span className="flex items-center gap-1.5">
+            <span className="font-display text-lg tracking-tight">Siders</span>
+            {unreadMessages > 0 && (
+              <UnreadCountBadge
+                count={unreadMessages}
+                title={`${unreadMessages} unread message${unreadMessages === 1 ? '' : 's'}`}
+              />
+            )}
+          </span>
+        )}
         {showCollapseToggle && (
           <button
             type="button"
@@ -262,13 +341,30 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate, showCollapseT
                   }`
                 }
               >
-                {({ isActive }) => (
-                  <>
-                    {isActive && <span className="absolute bottom-1 left-0 top-1 w-0.5 rounded-full bg-[var(--panel-signal)]" />}
-                    <item.icon className="h-[18px] w-[18px] shrink-0" />
-                    {!collapsed && <span className="truncate font-medium">{item.label}</span>}
-                  </>
-                )}
+                {({ isActive }) => {
+                  const showUnreadBadge = item.to === '/messages' && unreadMessages > 0;
+                  return (
+                    <>
+                      {isActive && <span className="absolute bottom-1 left-0 top-1 w-0.5 rounded-full bg-[var(--panel-signal)]" />}
+                      <span className="relative shrink-0">
+                        <item.icon className="h-[18px] w-[18px]" />
+                        {/* The count lives on the nav item, not just the wordmark — the wordmark
+                            disappears entirely when the sidebar is collapsed, exactly the state
+                            where a compact badge matters most (design.md - "Badge lives on a
+                            Messages nav item... the wordmark mirrors it only when the wordmark
+                            is actually rendered"). Collapsed: a bare dot. Expanded: the count
+                            renders inline below instead. */}
+                        {showUnreadBadge && collapsed && <UnreadDot />}
+                      </span>
+                      {!collapsed && (
+                        <span className="flex flex-1 items-center justify-between gap-2">
+                          <span className="truncate font-medium">{item.label}</span>
+                          {showUnreadBadge && <UnreadCountBadge count={unreadMessages} />}
+                        </span>
+                      )}
+                    </>
+                  );
+                }}
               </NavLink>
             ))}
           </div>
