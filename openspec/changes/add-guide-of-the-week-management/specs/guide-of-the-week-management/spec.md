@@ -127,3 +127,12 @@ authentication and SHALL NOT include inactive guide picks or any admin-only fiel
 - **WHEN** a client reads the public guide-pick listing
 - **THEN** each entry contains city, place, description, and photo URL only — no active flag, no
   sort-order value, no internal id
+
+### Requirement: Guide-pick writes revalidate the home page
+The system SHALL trigger revalidation of the home page path whenever a guide pick is created,
+updated, deleted, or reordered, or whenever a guide pick's active flag changes. A failed
+revalidation SHALL be logged and SHALL NOT fail the write, which is already committed.
+
+#### Scenario: Saving a guide-pick change revalidates the home page
+- **WHEN** a staff member creates, updates, deletes, or reorders a guide pick
+- **THEN** the system requests revalidation of the home page path

@@ -13,7 +13,7 @@
 
 - [x] 2.1 Add `packages/contracts/src/guidePick.ts`: `GuidePickCreateRequest`,
   `GuidePickUpdateRequest`, `GuidePickReorderRequest`, `GuidePickResponse` (admin — includes
-  `isActive`) and `PublicGuidePickResponse` (public — city, place, description, photo URL only),
+  `isActive`) and `PublicGuidePick` (public — city, place, description, photo URL only),
   following `packages/contracts/src/partner.ts`'s split between admin and public shapes. No
   maximum-length array constraint on the reorder request (design.md - "No maximum pick count").
 - [x] 2.2 Add `packages/contracts/src/guidePick.test.ts` validating the request/response schemas,
@@ -28,7 +28,7 @@
   pattern.
 - [x] 3.2 Add `apps/api/src/modules/guidePicks/guidePick.mapper.ts`: map a guide-pick record to
   `GuidePickResponse` (admin, deriving the photo URL via the existing media URL derivation) and to
-  `PublicGuidePickResponse` (public).
+  `PublicGuidePick` (public).
 - [x] 3.3 Add `apps/api/src/modules/guidePicks/guidePick.service.ts`: create (validates photo
   exists), update, delete (self-heals order), replace-order (validates the submitted set is
   exactly every existing guide-pick id, atomic), list-active-for-public. Each write calls the

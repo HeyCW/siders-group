@@ -2,6 +2,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { media, guidePicks, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
+import { isExactIdSet, replaceSortOrder } from '../../lib/replaceSortOrder.js';
 
 export interface GuidePickRow {
   id: string;
@@ -75,24 +76,11 @@ function invalidGuidePickSetError(): AppError {
 /**
  * The rule `reorder` enforces: the submitted collection must name every existing guide pick,
  * nothing more and nothing fewer
- * (specs/guide-of-the-week-management/spec.md - "Reorder submits every existing id"). Pure and
- * exported so the rule is testable without a database, mirroring
- * `partner.repository.ts`'s `isExactPartnerIdSet`.
- *
- * Compared as sets, not just by length: `guidePickReorderRequestSchema` already rejects duplicate
- * ids, so a duplicate reaching here would be a contract regression, and set comparison fails it
- * rather than letting `[a, a]` pass against a stored `{a, b}`.
+ * (specs/guide-of-the-week-management/spec.md - "Reorder submits every existing id"). Re-exported
+ * under this table-specific name for `guidePick.repository.test.ts`; the implementation itself
+ * lives in `lib/replaceSortOrder.ts`, shared with `partner.repository.ts`'s identical rule.
  */
-export function isExactGuidePickIdSet(currentIds: readonly string[], submittedIds: readonly string[]): boolean {
-  if (currentIds.length !== submittedIds.length) return false;
-  const current = new Set(currentIds);
-  const submitted = new Set(submittedIds);
-  if (current.size !== submitted.size) return false;
-  for (const id of current) {
-    if (!submitted.has(id)) return false;
-  }
-  return true;
-}
+export const isExactGuidePickIdSet = isExactIdSet;
 
 const SELECT_COLUMNS = {
   id: guidePicks.id,
@@ -187,22 +175,20 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
       await db.delete(guidePicks).where(eq(guidePicks.id, id));
     },
 
-    async reorder(guidePickIds) {
-      return db.transaction(async (tx) => {
-        await tx.execute(sql`LOCK TABLE app.guide_picks IN EXCLUSIVE MODE`);
-        const current = await tx.execute(sql`select id from app.guide_picks`);
-        const currentIds = current.rows.map((r) => (r as { id: string }).id);
-        if (!isExactGuidePickIdSet(currentIds, guidePickIds)) throw invalidGuidePickSetError();
-
-        for (const [index, id] of guidePickIds.entries()) {
-          await tx.update(guidePicks).set({ sortOrder: index, updatedAt: new Date() }).where(eq(guidePicks.id, id));
-        }
-
-        return tx
-          .select(SELECT_COLUMNS)
-          .from(guidePicks)
-          .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
-          .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt));
+    reorder(guidePickIds) {
+      return replaceSortOrder({
+        db,
+        ids: guidePickIds,
+        table: 'app.guide_picks',
+        updateSortOrder: (tx, id, sortOrder) =>
+          tx.update(guidePicks).set({ sortOrder, updatedAt: new Date() }).where(eq(guidePicks.id, id)),
+        selectJoined: (tx) =>
+          tx
+            .select(SELECT_COLUMNS)
+            .from(guidePicks)
+            .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+            .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt)),
+        onInvalidSet: invalidGuidePickSetError,
       });
     },
 
