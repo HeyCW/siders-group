@@ -10,6 +10,7 @@ import { ChangePasswordPage } from './pages/ChangePasswordPage.js';
 import { ReelLibraryPage } from './pages/ReelLibraryPage.js';
 import { ReelsCurationPage } from './pages/ReelsCurationPage.js';
 import { PartnersPage } from './pages/PartnersPage.js';
+import { GuidePicksPage } from './pages/GuidePicksPage.js';
 import { ContactMessagesPage } from './pages/ContactMessagesPage.js';
 import { CommentModerationPage } from './pages/CommentModerationPage.js';
 import { ReaderModerationPage } from './pages/ReaderModerationPage.js';
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="/reels" element={<ReelLibraryPage />} />
             <Route path="/reels-curation" element={<ReelsCurationPage />} />
             <Route path="/partners" element={<PartnersPage />} />
+            <Route path="/guide-picks" element={<GuidePicksPage />} />
             <Route path="/messages" element={<ContactMessagesPage />} />
             <Route path="/moderation/comments" element={<CommentModerationPage />} />
             <Route path="/moderation/readers" element={<ReaderModerationPage />} />

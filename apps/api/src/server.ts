@@ -29,6 +29,7 @@ import { tagRoutes } from './modules/tags/tag.routes.js';
 import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
 import { reelRoutes, reelsCurationRoutes, publicReelsRoutes } from './modules/reels/reels.routes.js';
 import { partnerRoutes, publicPartnerRoutes } from './modules/partners/partner.routes.js';
+import { guidePickRoutes, publicGuidePickRoutes } from './modules/guidePicks/guidePick.routes.js';
 import { publicEngagementRoutes } from './modules/engagement/engagement.routes.js';
 import {
   commentModerationRoutes,
@@ -79,6 +80,8 @@ export function createServer(): Express {
   app.use('/reels', publicReelsRoutes(db, env));
   app.use('/admin/partners', partnerRoutes(db, env));
   app.use('/partners', publicPartnerRoutes(db, env));
+  app.use('/admin/guide-picks', guidePickRoutes(db, env));
+  app.use('/guide-picks', publicGuidePickRoutes(db, env));
   app.use('/admin/dashboard', analyticsRoutes(db));
   app.use('/admin/comments', commentModerationRoutes(db));
   app.use('/admin/readers', readerModerationRoutes(db));

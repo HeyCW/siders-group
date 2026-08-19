@@ -1,4 +1,4 @@
-import { getHomeFeed, getPartners, getReels } from '../lib/api';
+import { getGuidePicks, getHomeFeed, getPartners, getReels } from '../lib/api';
 import { Container } from '../components/layout/Container';
 import { Hero } from '../components/home/Hero';
 import { IntroBlurb } from '../components/home/IntroBlurb';
@@ -13,7 +13,7 @@ import { CtaBand } from '../components/home/CtaBand';
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [articles, reels, partners] = await Promise.all([
+  const [articles, reels, partners, guides] = await Promise.all([
     getHomeFeed(3, { next: { revalidate: 60 } }),
     getReels({ next: { revalidate: 60 } }),
     // The partner strip is the one section on this page with a defined empty state — it renders
@@ -22,6 +22,10 @@ export default async function HomePage() {
     // articles and reels down with it through `Promise.all`; there is no `error.tsx` here to catch
     // it otherwise.
     getPartners({ next: { revalidate: 60 } }).catch(() => []),
+    // Same treatment as partners: a failed or empty guide-picks fetch hides the section rather
+    // than failing the whole home page (specs/web-public-site/spec.md - "No guide picks means no
+    // section"; design.md - "Zero-pick hiding").
+    getGuidePicks({ next: { revalidate: 60 } }).catch(() => []),
   ]);
 
   return (
@@ -35,7 +39,7 @@ export default async function HomePage() {
       <StatsBand />
 
       <Container>
-        <GuideOfWeek />
+        <GuideOfWeek guides={guides} />
       </Container>
       <Container>
         <Showcase articles={articles} />

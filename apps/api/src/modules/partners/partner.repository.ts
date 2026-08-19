@@ -2,6 +2,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { media, partners, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
+import { isExactIdSet, replaceSortOrder } from '../../lib/replaceSortOrder.js';
 
 export interface PartnerRow {
   id: string;
@@ -76,23 +77,11 @@ function invalidPartnerSetError(): AppError {
 /**
  * The rule `reorder` enforces: the submitted collection must name every existing partner, nothing
  * more and nothing fewer (specs/partner-management/spec.md - "Missing or unknown identifiers are
- * rejected"). Pure and exported so the rule is testable without a database — the same shape as
- * `article.repository.ts`'s exported `isPubliclyVisible`, since this repo has no live-DB harness.
- *
- * Compared as sets, not just by length: `partnerReorderRequestSchema` already rejects duplicate
- * ids, so a duplicate reaching here would be a contract regression, and set comparison fails it
- * rather than letting `[a, a]` pass against a stored `{a, b}`.
+ * rejected"). Re-exported under this table-specific name for `partner.repository.test.ts` and any
+ * other caller that reads "partner" here; the implementation itself now lives in
+ * `lib/replaceSortOrder.ts`, shared with `guidePick.repository.ts`'s identical rule.
  */
-export function isExactPartnerIdSet(currentIds: readonly string[], submittedIds: readonly string[]): boolean {
-  if (currentIds.length !== submittedIds.length) return false;
-  const current = new Set(currentIds);
-  const submitted = new Set(submittedIds);
-  if (current.size !== submitted.size) return false;
-  for (const id of current) {
-    if (!submitted.has(id)) return false;
-  }
-  return true;
-}
+export const isExactPartnerIdSet = isExactIdSet;
 
 const SELECT_COLUMNS = {
   id: partners.id,
@@ -187,22 +176,20 @@ export function createPartnerRepository(db: Database): PartnerRepository {
       await db.delete(partners).where(eq(partners.id, id));
     },
 
-    async reorder(partnerIds) {
-      return db.transaction(async (tx) => {
-        await tx.execute(sql`LOCK TABLE app.partners IN EXCLUSIVE MODE`);
-        const current = await tx.execute(sql`select id from app.partners`);
-        const currentIds = current.rows.map((r) => (r as { id: string }).id);
-        if (!isExactPartnerIdSet(currentIds, partnerIds)) throw invalidPartnerSetError();
-
-        for (const [index, id] of partnerIds.entries()) {
-          await tx.update(partners).set({ sortOrder: index, updatedAt: new Date() }).where(eq(partners.id, id));
-        }
-
-        return tx
-          .select(SELECT_COLUMNS)
-          .from(partners)
-          .innerJoin(media, eq(media.id, partners.logoMediaId))
-          .orderBy(asc(partners.sortOrder), asc(partners.createdAt));
+    reorder(partnerIds) {
+      return replaceSortOrder({
+        db,
+        ids: partnerIds,
+        table: 'app.partners',
+        updateSortOrder: (tx, id, sortOrder) =>
+          tx.update(partners).set({ sortOrder, updatedAt: new Date() }).where(eq(partners.id, id)),
+        selectJoined: (tx) =>
+          tx
+            .select(SELECT_COLUMNS)
+            .from(partners)
+            .innerJoin(media, eq(media.id, partners.logoMediaId))
+            .orderBy(asc(partners.sortOrder), asc(partners.createdAt)),
+        onInvalidSet: invalidPartnerSetError,
       });
     },
 

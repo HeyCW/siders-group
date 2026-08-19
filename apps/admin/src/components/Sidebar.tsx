@@ -91,6 +91,15 @@ function IconReelsCuration(props: IconProps) {
   );
 }
 
+function IconGuidePicks(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <path d="M10 3 4 6.5v7L10 17l6-3.5v-7L10 3Z" />
+      <path d="M10 3v14M4 6.5l6 3.5 6-3.5" />
+    </IconShell>
+  );
+}
+
 function IconPartners(props: IconProps) {
   return (
     <IconShell {...props}>
@@ -192,6 +201,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/curation', label: 'Home curation', icon: IconHomeCuration, permission: 'news.manage' },
       { to: '/reels', label: 'Reels library', icon: IconReelsLibrary, permission: 'news.manage' },
       { to: '/reels-curation', label: 'Reels curation', icon: IconReelsCuration, permission: 'news.manage' },
+      { to: '/guide-picks', label: 'Guide of the week', icon: IconGuidePicks, permission: 'news.manage' },
     ],
   },
   {

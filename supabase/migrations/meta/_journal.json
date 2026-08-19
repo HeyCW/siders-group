@@ -57,6 +57,13 @@
       "when": 1787018065552,
       "tag": "0007_wandering_omega_flight",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787120836502,
+      "tag": "0008_busy_silver_centurion",
+      "breakpoints": true
     }
   ]
 }
