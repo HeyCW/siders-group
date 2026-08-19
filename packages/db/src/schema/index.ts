@@ -10,6 +10,7 @@ export * from './homeCuration';
 export * from './reels';
 export * from './reelsCuration';
 export * from './partners';
+export * from './guidePicks';
 export * from './engagement';
 export * from './moderation';
 export * from './contact';

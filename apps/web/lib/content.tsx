@@ -55,27 +55,6 @@ export const STATS = [
   { value: '100.000.000+', label: 'Total\nviews' },
 ];
 
-export interface GuidePick {
-  city: string;
-  place: string;
-  description: string;
-}
-
-export const GUIDE_OF_THE_WEEK: GuidePick[] = [
-  {
-    city: 'Surabaya',
-    place: 'Seven Cafe',
-    description:
-      'Wifi yang benar-benar kuat, colokan di tiap meja, dan buka sampai tengah malam. Pilihan pertama untuk kerja remote di Surabaya Timur.',
-  },
-  {
-    city: 'Jakarta',
-    place: 'Playground, Blok M',
-    description:
-      'Halaman belakang jadi ruang kumpul, panggung kecil tiap Jumat, dan harga yang masih masuk untuk anak rantau.',
-  },
-];
-
 export const CONTACT_INFO = {
   address: ['Jalan Raya Darmo, Surabaya', 'Jawa Timur, Indonesia'],
   whatsapp: '+62 812 0000 0000',

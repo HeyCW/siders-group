@@ -4,6 +4,7 @@ import type {
   CategoryResponse,
   ContactMessageSubmitRequest,
   ContactMessageSubmitResponse,
+  PublicGuidePick,
   PublicPartner,
   PublicReelItem,
 } from '@siders/contracts';
@@ -111,6 +112,10 @@ export function getReels(init?: RequestInit): Promise<PublicReelItem[]> {
 
 export function getPartners(init?: RequestInit): Promise<PublicPartner[]> {
   return apiFetch<PublicPartner[]>('/partners', init);
+}
+
+export function getGuidePicks(init?: RequestInit): Promise<PublicGuidePick[]> {
+  return apiFetch<PublicGuidePick[]>('/guide-picks', init);
 }
 
 /**
