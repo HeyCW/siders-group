@@ -4,6 +4,7 @@ export const PERMISSION_KEYS = [
   'news.manage',
   'category.manage',
   'tag.manage',
+  'anak-usaha.manage',
   'media.manage',
   'user.manage',
   'role.manage',

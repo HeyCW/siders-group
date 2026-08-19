@@ -31,7 +31,7 @@ export const reelsCurationReelSummarySchema = z.object({
   id: z.string().uuid(),
   provider: reelProviderSchema,
   externalId: z.string(),
-  posterUrl: z.string(),
+  posterUrl: z.string().nullable(),
   caption: z.string().nullable(),
 });
 export type ReelsCurationReelSummary = z.infer<typeof reelsCurationReelSummarySchema>;

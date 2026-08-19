@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ApiError } from '../lib/api.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
+import { Button } from '../components/ui/Button.js';
 
 interface TaxonomyItem {
   id: string;
@@ -129,14 +130,14 @@ export function TaxonomyManagementPage({
               placeholder={`${singularLabel} name`}
               className="flex-1 rounded-md border border-[var(--rule)] bg-transparent px-3 py-2 text-sm placeholder:text-[var(--muted)]/60 focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
             />
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={handleCreate}
               disabled={createState.loading || !newName.trim()}
-              className="shrink-0 rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
+              className="shrink-0"
             >
               {createState.loading ? 'Adding…' : 'Add'}
-            </button>
+            </Button>
           </div>
           {createState.errorMessage && !createState.forbidden && (
             <p className="mt-1.5 text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
@@ -170,21 +171,17 @@ export function TaxonomyManagementPage({
                     autoFocus
                     className="flex-1 rounded-md border border-[var(--rule)] bg-transparent px-2.5 py-1.5 text-sm focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
                   />
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
                     onClick={() => handleSaveEdit(item.id)}
                     disabled={updateState.loading}
-                    className="shrink-0 font-mono text-xs uppercase tracking-wide text-[var(--signal)] hover:text-[var(--signal-hover)]"
+                    className="shrink-0"
                   >
                     Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="shrink-0 font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                  >
+                  </Button>
+                  <Button variant="ghost" onClick={cancelEdit} className="shrink-0">
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-3 rounded-lg py-2.5 pl-3 pr-2 transition-colors hover:bg-[var(--ink)]/[0.03]">
@@ -193,20 +190,12 @@ export function TaxonomyManagementPage({
                     <p className="truncate font-mono text-xs text-[var(--muted)]">{item.slug}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(item)}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    <Button variant="ghost" onClick={() => startEdit(item)}>
                       Rename
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(item.id)}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
-                    >
+                    </Button>
+                    <Button variant="ghost" tone="danger" onClick={() => handleRemove(item.id)}>
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

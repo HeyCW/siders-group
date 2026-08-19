@@ -4,6 +4,11 @@ import { sessionApi } from '../lib/sessionApi.js';
 import { ApiError } from '../lib/api.js';
 import { useSession } from '../session/SessionContext.js';
 import { DEFAULT_LANDING_ROUTE } from '../session/redirectTarget.js';
+import { Button } from '../components/ui/Button.js';
+
+const FIELD_LABEL = 'block text-xs font-medium uppercase tracking-wide text-[var(--muted)]';
+const TEXT_INPUT =
+  'mt-1.5 w-full rounded-md border border-[var(--rule)] bg-transparent px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/30';
 
 /**
  * Shown whenever the probed account reports `mustChangePassword`
@@ -37,61 +42,57 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <div className="mx-auto mt-24 max-w-sm p-6">
-      <div className="mb-2 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Change your password</h1>
-        {/* This screen has no other route to navigate to while mustChangePassword is set
-            (session/RouteGuards.tsx), so it needs its own way out. */}
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          className="text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-        >
-          Sign out
-        </button>
+    <div className="siders-scope flex min-h-screen w-full items-center justify-center bg-[var(--paper)] px-6 py-12 text-[var(--ink)]">
+      <div className="w-full max-w-sm">
+        <div className="mb-1 flex items-start justify-between gap-4">
+          <h1 className="font-display text-3xl">Change your password</h1>
+          {/* This screen has no other route to navigate to while mustChangePassword is set
+              (session/RouteGuards.tsx), so it needs its own way out. */}
+          <Button variant="ghost" onClick={() => void signOut()} className="mt-2 shrink-0">
+            Sign out
+          </Button>
+        </div>
+        <p className="mt-1 text-sm text-[var(--muted)]">You must set a new password before continuing.</p>
+        <div className="mt-6 h-px bg-[var(--rule)]" />
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          <div>
+            <label htmlFor="currentPassword" className={FIELD_LABEL}>
+              Current password
+            </label>
+            <input
+              id="currentPassword"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className={TEXT_INPUT}
+            />
+          </div>
+          <div>
+            <label htmlFor="newPassword" className={FIELD_LABEL}>
+              New password
+            </label>
+            <input
+              id="newPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className={TEXT_INPUT}
+            />
+          </div>
+
+          {errorMessage && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>}
+
+          <Button type="submit" variant="primary" disabled={submitting} className="w-full">
+            {submitting ? 'Changing…' : 'Change password'}
+          </Button>
+        </form>
       </div>
-      <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">You must set a new password before continuing.</p>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="currentPassword" className="block text-sm text-gray-700 dark:text-gray-300">
-            Current password
-          </label>
-          <input
-            id="currentPassword"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          />
-        </div>
-        <div>
-          <label htmlFor="newPassword" className="block text-sm text-gray-700 dark:text-gray-300">
-            New password
-          </label>
-          <input
-            id="newPassword"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
-          />
-        </div>
-
-        {errorMessage && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-        >
-          Change password
-        </button>
-      </form>
     </div>
   );
 }

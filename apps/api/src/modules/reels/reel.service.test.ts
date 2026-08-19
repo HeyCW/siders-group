@@ -27,7 +27,7 @@ function createFakeReelRepository(initial: ReelRow[] = []) {
   let stored = [...initial];
   const repository: ReelRepository = {
     async create(input) {
-      const created = row({ id: `generated-${stored.length}`, ...input });
+      const created = row({ id: `generated-${stored.length}`, ...input, posterMediaId: input.posterMediaId ?? null });
       stored.push(created);
       return created;
     },
@@ -42,7 +42,10 @@ function createFakeReelRepository(initial: ReelRow[] = []) {
       if (!existing) throw new Error('not found');
       const updated: ReelRow = {
         ...existing,
-        posterMediaId: input.posterMediaId ?? existing.posterMediaId,
+        // `posterMediaId` distinguishes omitted (leave as-is) from explicit `null` (clear) — a
+        // plain `??` would treat both the same, mirroring the real repository's `stripUndefined`
+        // behavior over a plain object.
+        posterMediaId: 'posterMediaId' in input ? (input.posterMediaId ?? null) : existing.posterMediaId,
         caption: input.caption === undefined ? existing.caption : input.caption,
         status: input.status ?? existing.status,
         updatedAt: new Date(),
@@ -83,6 +86,35 @@ describe('ReelService.create', () => {
     await expect(
       service.create({ url: 'https://example.com/video/1', posterMediaId: '11111111-1111-1111-1111-000000000001', caption: null }),
     ).rejects.toMatchObject({ code: 'invalid_reel_url' });
+  });
+
+  it('creates a reel with no poster', async () => {
+    const { repository } = createFakeReelRepository();
+    const service = createReelService(repository, revalidateEnv, logger);
+
+    const created = await service.create({ url: 'https://www.instagram.com/reel/AbC-123x/', caption: null });
+
+    expect(created.posterMediaId).toBeNull();
+  });
+});
+
+describe('ReelService.update', () => {
+  it('clears the poster when explicitly updated to null', async () => {
+    const { repository } = createFakeReelRepository([row({ id: 'a' })]);
+    const service = createReelService(repository, revalidateEnv, logger);
+
+    const updated = await service.update('a', { posterMediaId: null });
+
+    expect(updated.posterMediaId).toBeNull();
+  });
+
+  it('leaves the poster unchanged when the field is omitted from the update', async () => {
+    const { repository } = createFakeReelRepository([row({ id: 'a' })]);
+    const service = createReelService(repository, revalidateEnv, logger);
+
+    const updated = await service.update('a', { caption: 'new caption' });
+
+    expect(updated.posterMediaId).toBe('11111111-1111-1111-1111-000000000001');
   });
 });
 

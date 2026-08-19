@@ -4,10 +4,10 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ArticlePublicCard, CategoryResponse } from '@siders/contracts';
 import { getArticles } from '../../lib/api';
+import { NEWS_PAGE_SIZE } from '../../lib/newsPageSize';
 import { ArticleCard } from './ArticleCard';
 import { FilterOption, FilterTrigger } from './FilterTrigger';
 
-const PAGE_SIZE = 6;
 const DATE_OPTIONS = ['7 hari terakhir', '30 hari terakhir', 'Tahun ini', 'Rentang khusus'];
 const SUB_BRAND_OPTIONS = ['SidersVox', 'Surabaya Siders', 'Jakarta Siders', 'Siders Culture'];
 
@@ -24,7 +24,7 @@ export function NewsExplorer({
 }) {
   const router = useRouter();
   const [articles, setArticles] = useState(initialArticles);
-  const [hasMore, setHasMore] = useState(initialArticles.length === PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(initialArticles.length === NEWS_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState('');
   const [openPopover, setOpenPopover] = useState<PopoverKey>(null);
@@ -55,11 +55,11 @@ export function NewsExplorer({
     try {
       const next = await getArticles({
         categorySlug: activeCategorySlug,
-        limit: PAGE_SIZE,
+        limit: NEWS_PAGE_SIZE,
         offset: articles.length,
       });
       setArticles((prev) => [...prev, ...next]);
-      setHasMore(next.length === PAGE_SIZE);
+      setHasMore(next.length === NEWS_PAGE_SIZE);
     } finally {
       setLoadingMore(false);
     }

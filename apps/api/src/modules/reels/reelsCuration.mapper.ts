@@ -14,7 +14,7 @@ export function toReelsCurationEntryResponse(
       id: entry.reelId,
       provider: entry.provider,
       externalId: entry.externalId,
-      posterUrl: publicUrlFor(env, entry.posterStoragePath),
+      posterUrl: entry.posterStoragePath ? publicUrlFor(env, entry.posterStoragePath) : null,
       caption: entry.caption,
     },
     status: entry.status,
@@ -29,7 +29,7 @@ export function toPublicReelItem(env: MediaUrlEnv, entry: ReelsCurationEntryRow)
   return {
     provider: entry.provider,
     externalId: entry.externalId,
-    posterUrl: publicUrlFor(env, entry.posterStoragePath),
+    posterUrl: entry.posterStoragePath ? publicUrlFor(env, entry.posterStoragePath) : null,
     caption: entry.caption,
   };
 }

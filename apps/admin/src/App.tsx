@@ -16,7 +16,7 @@ import { CommentModerationPage } from './pages/CommentModerationPage.js';
 import { ReaderModerationPage } from './pages/ReaderModerationPage.js';
 import { RolesPage } from './pages/RolesPage.js';
 import { StaffPage } from './pages/StaffPage.js';
-import { categoriesApi, tagsApi } from './lib/taxonomyApi.js';
+import { anakUsahaApi, categoriesApi, tagsApi } from './lib/taxonomyApi.js';
 import { SessionProvider } from './session/SessionContext.js';
 import { RedirectIfAuthenticated, RequireSession } from './session/RouteGuards.js';
 import { AppShell } from './components/AppShell.js';
@@ -68,6 +68,10 @@ export default function App() {
               element={<TaxonomyManagementPage title="Categories" singularLabel="category" api={categoriesApi} />}
             />
             <Route path="/tags" element={<TaxonomyManagementPage title="Tags" singularLabel="tag" api={tagsApi} />} />
+            <Route
+              path="/anak-usaha"
+              element={<TaxonomyManagementPage title="Anak Perusahaan" singularLabel="anak perusahaan" api={anakUsahaApi} />}
+            />
             <Route path="/curation" element={<HomeCurationPage />} />
             <Route path="/reels" element={<ReelLibraryPage />} />
             <Route path="/reels-curation" element={<ReelsCurationPage />} />

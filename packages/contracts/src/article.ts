@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { articleStatusSchema } from './article-status.js';
 import { categoryResponseSchema } from './category.js';
 import { tagResponseSchema } from './tag.js';
+import { anakUsahaResponseSchema } from './anak-usaha.js';
 
 /** Manual slug overrides go through the same shape the auto-generator produces. */
 export const articleSlugSchema = z
@@ -31,6 +32,7 @@ export const articleWriteFieldsSchema = z.object({
   categoryIds: z.array(z.string().uuid()).optional(),
   tagIds: z.array(z.string().uuid()).optional(),
   featuredMediaId: z.string().uuid().nullable().optional(),
+  anakUsahaId: z.string().uuid().nullable().optional(),
   seoTitle: z.string().max(200).optional(),
   seoDescription: z.string().max(500).optional(),
 });
@@ -55,6 +57,7 @@ export const articleAutosaveRequestSchema = z
     categoryIds: z.array(z.string().uuid()).optional(),
     tagIds: z.array(z.string().uuid()).optional(),
     featuredMediaId: z.string().uuid().nullable().optional(),
+    anakUsahaId: z.string().uuid().nullable().optional(),
     seoTitle: z.string().max(200).optional(),
     seoDescription: z.string().max(500).optional(),
   })
@@ -149,6 +152,7 @@ export const articleAdminResponseSchema = z.object({
   featuredImageUrl: z.string().nullable(),
   categories: z.array(categoryResponseSchema),
   tags: z.array(tagResponseSchema),
+  anakUsaha: anakUsahaResponseSchema.nullable(),
   seoTitle: z.string().nullable(),
   seoDescription: z.string().nullable(),
   publishedAt: z.string().datetime().nullable(),

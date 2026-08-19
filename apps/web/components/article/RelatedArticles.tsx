@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getArticles } from '../../lib/api';
+import { MediaSlot } from '../ui/MediaSlot';
 
 /**
  * Real category overlap, not the prototype's hardcoded sample list — omitted entirely when the
@@ -32,7 +33,13 @@ export async function RelatedArticles({
           href={`/news/${article.slug}`}
           className="group grid grid-cols-[64px_1fr] items-start gap-3 border-b border-rule py-3.5 transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
         >
-          <span className="block aspect-square w-16 bg-ink" />
+          <MediaSlot
+            src={article.featuredImageUrl}
+            alt={article.title}
+            label="No image"
+            aspectClassName="aspect-square"
+            className="w-16"
+          />
           <span className="block">
             <span className="mark-group font-serif text-sm font-bold leading-tight">
               {article.title}

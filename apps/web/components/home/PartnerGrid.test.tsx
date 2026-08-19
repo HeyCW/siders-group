@@ -10,6 +10,12 @@ const partners: PublicPartner[] = [
   { name: 'Beta Inc', logoUrl: 'https://cdn.example.com/beta.webp', websiteUrl: 'https://beta.example.com' },
 ];
 
+/** Acme has a website, Gamma does not — used to assert the two render differently. */
+const mixedPartners: PublicPartner[] = [
+  { name: 'Acme Corp', logoUrl: 'https://cdn.example.com/acme.webp', websiteUrl: 'https://acme.example.com' },
+  { name: 'Gamma LLC', logoUrl: 'https://cdn.example.com/gamma.webp', websiteUrl: null },
+];
+
 describe('PartnerGrid', () => {
   /** specs/web-public-site/spec.md - "No partners means no section". */
   it('renders nothing when there are no partners', () => {
@@ -68,21 +74,24 @@ describe('PartnerGrid', () => {
 
   /**
    * Pinning the two interaction states apart, because they are not the same and the difference is
-   * the fix for a measured bug: hover pauses in place, focus *clears* the animation so the track
-   * snaps back to `translateX(0)` where the tabbable copies live. With `focus-within` merely
+   * the fix for a measured bug: hover pauses in place, keyboard focus *clears* the animation so the
+   * track snaps back to `translateX(0)` where the tabbable copies live. With `focus-within` merely
    * pausing, a link tabbed to mid-cycle measured 0 of 160px visible inside the `overflow-hidden`
-   * clip in Chromium — a transform does not move scroll position, so nothing recovered it. jsdom
-   * cannot evaluate either state, so this asserts the class contract that produces them; the
-   * behaviour itself is verified in a real browser (tasks.md 8.2).
+   * clip in Chromium — a transform does not move scroll position, so nothing recovered it. Scoped
+   * to `:focus-visible` (via `has-[:focus-visible]`) rather than plain `:focus-within`, so a mouse
+   * click on a partner link — which also focuses it — doesn't trigger the same backward snap; only
+   * a keyboard Tab does. jsdom cannot evaluate either state, so this asserts the class contract
+   * that produces them; the behaviour itself is verified in a real browser (tasks.md 8.2).
    */
-  it('pauses on hover but clears the animation on focus, so a focused tile returns to view', () => {
+  it('pauses on hover but clears the animation on keyboard focus, so a focused tile returns to view', () => {
     render(<PartnerGrid partners={partners} />);
 
     const track = screen.getByTestId('partner-ticker').firstElementChild as HTMLElement;
 
     expect(track.className).toContain('hover:[animation-play-state:paused]');
-    expect(track.className).toContain('focus-within:[animation:none]');
-    expect(track.className).not.toContain('focus-within:[animation-play-state:paused]');
+    expect(track.className).toContain('has-[:focus-visible]:[animation:none]');
+    expect(track.className).not.toContain('focus-within:[animation:none]');
+    expect(track.className).not.toContain('has-[:focus-visible]:[animation-play-state:paused]');
   });
 
   /** The reduced-motion branch renders from the same `PartnerTile` as the ticker, so a reader who
@@ -100,5 +109,41 @@ describe('PartnerGrid', () => {
       expect(link).not.toHaveAttribute('aria-hidden');
       expect(link).not.toHaveAttribute('tabindex');
     }
+  });
+
+  /** specs/web-public-site/spec.md - "A partner with no website URL renders without a link". */
+  it('renders a partner with no website URL as a non-interactive tile, not a link', () => {
+    render(<PartnerGrid partners={mixedPartners} />);
+
+    const ticker = screen.getByTestId('partner-ticker');
+    const links = within(ticker).getAllByRole('link', { hidden: true });
+    const linkedNames = links.map((link) => link.querySelector('img')?.alt);
+
+    expect(linkedNames).not.toContain('Gamma LLC');
+    expect(linkedNames).toContain('Acme Corp');
+    // The logo itself still renders — only the link wrapper is absent.
+    expect(within(ticker).getAllByAltText('Gamma LLC').length).toBeGreaterThan(0);
+  });
+
+  it('leaves a partner with a website URL as a link when other partners have none', () => {
+    render(<PartnerGrid partners={mixedPartners} />);
+
+    const ticker = screen.getByTestId('partner-ticker');
+    const links = within(ticker).getAllByRole('link', { hidden: true });
+    const reachable = links.filter((link) => link.getAttribute('aria-hidden') !== 'true');
+
+    expect(reachable.map((link) => link.querySelector('img')?.alt)).toEqual(['Acme Corp']);
+    expect(reachable[0]).toHaveAttribute('href', 'https://acme.example.com');
+  });
+
+  it('excludes a linkless partner from the reduced-motion grid\'s reachable links, keeping the linked one', () => {
+    render(<PartnerGrid partners={mixedPartners} />);
+
+    const staticGrid = screen.getByTestId('partner-static-grid');
+    const links = within(staticGrid).getAllByRole('link', { hidden: true });
+
+    expect(links).toHaveLength(1);
+    expect(links[0]?.querySelector('img')?.alt).toBe('Acme Corp');
+    expect(within(staticGrid).getAllByAltText('Gamma LLC').length).toBeGreaterThan(0);
   });
 });

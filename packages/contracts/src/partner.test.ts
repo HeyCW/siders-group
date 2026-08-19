@@ -44,6 +44,23 @@ describe('partnerCreateRequestSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts a create request with no websiteUrl at all', () => {
+    const parsed = partnerCreateRequestSchema.parse({ name: 'Acme Corp', logoMediaId: id(1) });
+    expect(parsed.websiteUrl).toBeUndefined();
+  });
+
+  it('accepts an explicit null websiteUrl', () => {
+    const parsed = partnerCreateRequestSchema.parse({ name: 'Acme Corp', logoMediaId: id(1), websiteUrl: null });
+    expect(parsed.websiteUrl).toBeNull();
+  });
+
+  /** An empty string is not normalized by the schema — the admin form sends `null` for a blank
+   *  field instead (design.md - "Validation stays on the shared schema"). */
+  it('rejects an empty-string websiteUrl rather than treating it as absent', () => {
+    const result = partnerCreateRequestSchema.safeParse({ name: 'Acme Corp', logoMediaId: id(1), websiteUrl: '' });
+    expect(result.success).toBe(false);
+  });
+
   /**
    * `z.string().url()` alone accepts every one of these — `new URL()` parses any scheme. They
    * reach an `href` on the public home page, so the scheme allowlist is what stops a
@@ -88,6 +105,11 @@ describe('partnerUpdateRequestSchema', () => {
   it('rejects a non-http(s) scheme on update, the same as on create', () => {
     const result = partnerUpdateRequestSchema.safeParse({ websiteUrl: 'javascript:alert(1)' });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts an explicit null websiteUrl to clear it', () => {
+    const parsed = partnerUpdateRequestSchema.parse({ websiteUrl: null });
+    expect(parsed.websiteUrl).toBeNull();
   });
 
   it('does not accept sortOrder — order changes only via the reorder endpoint', () => {

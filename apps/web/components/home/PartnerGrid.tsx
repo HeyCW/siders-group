@@ -3,12 +3,20 @@ import { Reveal } from '../ui/Reveal';
 import { RuleDraw } from '../ui/RuleDraw';
 
 /**
- * Enough tiles in one animated half of the track that it exceeds the widest realistic viewport
- * even with a single partner — not a hardcoded ×2 duplication
- * (specs/web-public-site/spec.md - "Few partners still scroll continuously"). At a ~160px tile,
- * 24 tiles is ~3840px, comfortably past a 4K-wide browser window.
+ * Enough tiles in one animated half of the track that it exceeds a common wide browser window
+ * even with a single partner — not a hardcoded ×2 duplication (specs/web-public-site/spec.md -
+ * "Few partners still scroll continuously"). At a ~224px tile, 16 tiles is ~3584px, past a
+ * standard widescreen monitor's full-width browser. Traded deliberately for fewer visible repeats
+ * of the same few logos when the partner list is short — a very wide (4K+) browser just loops a
+ * little sooner, never sits static or shows a partial row.
  */
-const MIN_TILES_PER_HALF = 24;
+const MIN_TILES_PER_HALF = 16;
+
+/** Seconds one tile takes to cross the row — fixed per-tile pacing, not a fixed loop duration, so
+ *  a short partner list doesn't cycle its few logos past any faster than a long one does
+ *  (`specs/web-public-site/spec.md` - "Few partners still scroll continuously" says nothing about
+ *  a specific rate, only that it must not sit static). */
+const SECONDS_PER_TILE = 3;
 
 function repeatToFill(partners: PublicPartner[]): PublicPartner[] {
   const repeatFactor = Math.max(1, Math.ceil(MIN_TILES_PER_HALF / partners.length));
@@ -16,10 +24,13 @@ function repeatToFill(partners: PublicPartner[]): PublicPartner[] {
 }
 
 /**
- * One partner, as a link. Both presentations render through this so the reduced-motion branch
- * carries the same click-through the ticker does — the two differ only in layout, never in what a
- * reader can reach. `hidden` marks a looped duplicate: visual repetition without assistive-tech or
- * keyboard repetition.
+ * One partner, as a link when it has a website URL. Both presentations render through this so the
+ * reduced-motion branch carries the same click-through the ticker does — the two differ only in
+ * layout, never in what a reader can reach. `hidden` marks a looped duplicate: visual repetition
+ * without assistive-tech or keyboard repetition. A partner with no website URL renders as a plain,
+ * non-interactive tile instead of a link — no `href`, no navigation, and (since it is not a link at
+ * all) no place in the keyboard/screen-reader reachable set
+ * (specs/web-public-site/spec.md - "A partner with no website URL renders without a link").
  */
 function PartnerTile({
   partner,
@@ -30,6 +41,16 @@ function PartnerTile({
   hidden?: boolean;
   className: string;
 }) {
+  const logo = <img src={partner.logoUrl} alt={partner.name} className="h-full w-full object-contain" />;
+
+  if (!partner.websiteUrl) {
+    return (
+      <span aria-hidden={hidden || undefined} className={className}>
+        {logo}
+      </span>
+    );
+  }
+
   return (
     <a
       href={partner.websiteUrl}
@@ -39,13 +60,13 @@ function PartnerTile({
       tabIndex={hidden ? -1 : undefined}
       className={className}
     >
-      <img src={partner.logoUrl} alt={partner.name} className="max-h-full max-w-full object-contain" />
+      {logo}
     </a>
   );
 }
 
-const TICKER_TILE = 'flex h-16 w-40 shrink-0 items-center justify-center px-4';
-const STATIC_TILE = 'flex h-24 items-center justify-center border-b border-r border-rule px-4';
+const TICKER_TILE = 'flex h-28 w-56 shrink-0 items-center justify-center px-3 py-2';
+const STATIC_TILE = 'flex h-36 items-center justify-center border-b border-r border-rule px-3 py-2';
 
 /**
  * The partner section: an admin-managed logo ticker (specs/partner-management/spec.md), replacing
@@ -70,12 +91,20 @@ const STATIC_TILE = 'flex h-24 items-center justify-center border-b border-r bor
  * scroll-into-view has nothing to scroll (`scrollLeft` stays 0). Dropping the animation snaps the
  * track back to `translateX(0)`, which is precisely where the reachable tiles live, so a tabbed-to
  * link is on screen. Resuming on blur restarts from 0, the position it is already in.
+ *
+ * Scoped to `:focus-visible`, not plain `:focus-within` — a mouse click on a partner link also
+ * focuses it, and `:focus-within` can't tell that apart from a keyboard Tab. Without the
+ * `:focus-visible` scoping, every click snapped the whole track backward to `translateX(0)`
+ * before the link's `target="_blank"` navigation even happened, which read as the ticker
+ * lurching backward on click. `:focus-visible` keeps the keyboard-Tab fix while a mouse click
+ * no longer clears the animation at all.
  */
 export function PartnerGrid({ partners }: { partners: PublicPartner[] }) {
   if (partners.length === 0) return null;
 
   const half = repeatToFill(partners);
   const track = [...half, ...half];
+  const durationSeconds = half.length * SECONDS_PER_TILE;
 
   return (
     <div className="pt-[clamp(32px,5vw,64px)]">
@@ -88,7 +117,7 @@ export function PartnerGrid({ partners }: { partners: PublicPartner[] }) {
 
       <Reveal delayMs={90}>
         <div data-testid="partner-static-grid" className="hidden overflow-hidden motion-reduce:block">
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] border-l border-t border-rule">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] border-l border-t border-rule">
             {partners.map((partner, index) => (
               <PartnerTile key={`${partner.name}-${index}`} partner={partner} className={STATIC_TILE} />
             ))}
@@ -97,7 +126,8 @@ export function PartnerGrid({ partners }: { partners: PublicPartner[] }) {
 
         <div data-testid="partner-ticker" className="motion-reduce:hidden overflow-hidden">
           <div
-            className="flex w-max motion-safe:animate-marquee hover:[animation-play-state:paused] focus-within:[animation:none]"
+            className="flex w-max motion-safe:animate-marquee hover:[animation-play-state:paused] has-[:focus-visible]:[animation:none]"
+            style={{ animationDuration: `${durationSeconds}s` }}
           >
             {track.map((partner, index) => (
               <PartnerTile

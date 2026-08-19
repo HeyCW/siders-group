@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ArticleEngagement, CommentResponse } from '@siders/contracts';
@@ -89,6 +90,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   setCsrfCookie(null);
+  localStorage.clear();
 });
 
 describe('EngagementBar — loading', () => {
@@ -147,6 +149,107 @@ describe('EngagementBar — the mount sequence', () => {
 
     expect(await screen.findByText(/sedang tidak tersedia/i)).toBeInTheDocument();
     expect(screen.queryByText(/kali dibaca/i)).not.toBeInTheDocument();
+  });
+
+  it('skips the view POST on a second mount for the same article the same day', async () => {
+    const { unmount } = renderAnonymous();
+    await screen.findByText(/kali dibaca/i);
+    expect(recordArticleView).toHaveBeenCalledTimes(1);
+    unmount();
+
+    renderAnonymous();
+    await screen.findByText(/kali dibaca/i);
+    expect(recordArticleView).toHaveBeenCalledTimes(1);
+  });
+
+  it('still records a view for a different article', async () => {
+    const OTHER_ARTICLE = '44444444-4444-4444-8444-444444444444';
+    const { unmount } = renderAnonymous();
+    await screen.findByText(/kali dibaca/i);
+    unmount();
+
+    setCsrfCookie(null);
+    vi.stubGlobal('fetch', vi.fn());
+    render(
+      <ReaderSessionProvider>
+        <EngagementBar articleId={OTHER_ARTICLE} />
+      </ReaderSessionProvider>,
+    );
+    await screen.findByText(/kali dibaca/i);
+    expect(recordArticleView).toHaveBeenCalledTimes(2);
+    expect(recordArticleView).toHaveBeenLastCalledWith(OTHER_ARTICLE);
+  });
+
+  it('retries the view POST next load when the previous attempt failed', async () => {
+    recordArticleView.mockRejectedValueOnce(new Error('429'));
+    const { unmount } = renderAnonymous();
+    await screen.findByText(/kali dibaca/i);
+    expect(recordArticleView).toHaveBeenCalledTimes(1);
+    unmount();
+
+    recordArticleView.mockResolvedValue(undefined);
+    renderAnonymous();
+    await screen.findByText(/kali dibaca/i);
+    expect(recordArticleView).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends the view exactly once under React StrictMode"s double-invoked mount effect', async () => {
+    // StrictMode mounts this effect, cleans it up, and remounts it synchronously — before the
+    // first attempt's POST has resolved. A gate that only persists the "recorded" flag after the
+    // request succeeds would see "not recorded" from both invocations; the in-flight claim in
+    // `articleViewGate.ts` is what keeps this at one.
+    setCsrfCookie(null);
+    vi.stubGlobal('fetch', vi.fn());
+    render(
+      <StrictMode>
+        <ReaderSessionProvider>
+          <EngagementBar articleId={ARTICLE} />
+        </ReaderSessionProvider>
+      </StrictMode>,
+    );
+
+    await screen.findByText(/kali dibaca/i);
+    expect(recordArticleView).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the view it just recorded rather than a stale pre-view count, under StrictMode', async () => {
+    // StrictMode's *first* effect invocation — the one that actually starts the POST — is also
+    // the one React discards; only the second invocation's state update ever renders. If that
+    // second invocation reads the engagement summary without waiting for the first's POST to
+    // land, it renders whatever the count was *before* this view — one short of what the reader
+    // should see, and only correct again after a refresh (once the earlier POST has long since
+    // committed).
+    let viewLanded = false;
+    let resolveView: (() => void) | undefined;
+    recordArticleView.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveView = () => {
+            viewLanded = true;
+            resolve();
+          };
+        }),
+    );
+    getArticleEngagement.mockImplementation(async () => summary({ viewCount: viewLanded ? 1 : 0 }));
+
+    setCsrfCookie(null);
+    vi.stubGlobal('fetch', vi.fn());
+    render(
+      <StrictMode>
+        <ReaderSessionProvider>
+          <EngagementBar articleId={ARTICLE} />
+        </ReaderSessionProvider>
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(recordArticleView).toHaveBeenCalledTimes(1));
+    // The engagement summary must not have been read yet — both StrictMode invocations are still
+    // waiting on the one recorded view.
+    expect(getArticleEngagement).not.toHaveBeenCalled();
+
+    resolveView?.();
+
+    expect(await screen.findByText('1 kali dibaca')).toBeInTheDocument();
   });
 });
 

@@ -23,14 +23,15 @@ export interface SubBrand {
   kind: string;
   tile: string;
   tileInk: string;
+  logo: string;
 }
 
 /** Tile colors match the approved design exactly (`Siders Broadsheet.dc.html` — `subBrands`). */
 export const SUB_BRANDS: SubBrand[] = [
-  { name: 'SidersVox', kind: 'News & Community', tile: '#141414', tileInk: '#F7F6F2' },
-  { name: 'Surabaya Siders', kind: 'Media Platform', tile: '#FFFFFF', tileInk: '#141414' },
-  { name: 'Jakarta Siders', kind: 'Media Platform', tile: '#141414', tileInk: '#F7F6F2' },
-  { name: 'Siders Culture', kind: 'News & Community', tile: '#FFFFFF', tileInk: '#141414' },
+  { name: 'SidersVox', kind: 'News & Community', tile: '#000000', tileInk: '#F7F6F2', logo: '/siders_vos.png' },
+  { name: 'Surabaya Siders', kind: 'Media Platform', tile: '#FFFFFF', tileInk: '#141414', logo: '/surabaya_siders.png' },
+  { name: 'Jakarta Siders', kind: 'Media Platform', tile: '#000000', tileInk: '#F7F6F2', logo: '/jakarta_siders.png' },
+  { name: 'Siders Culture', kind: 'News & Community', tile: '#FFFFFF', tileInk: '#141414', logo: '/siders_culture.png' },
 ];
 
 export const MANIFESTO = {

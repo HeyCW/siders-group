@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Editor, Range } from '@tiptap/core';
-import type { ArticleAdminResponse, ArticlePublicDetail, CategoryResponse, TagResponse } from '@siders/contracts';
+import type { AnakUsahaResponse, ArticleAdminResponse, ArticlePublicDetail, CategoryResponse, TagResponse } from '@siders/contracts';
 import { articlesApi } from '../lib/articlesApi.js';
-import { categoriesApi, tagsApi } from '../lib/taxonomyApi.js';
+import { anakUsahaApi, categoriesApi, tagsApi } from '../lib/taxonomyApi.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { ApiError } from '../lib/api.js';
 import { ARTICLE_STATUS_STYLES } from '../lib/articleStatusStyles.js';
 import { EditorCanvas } from '../editor/EditorCanvas.js';
 import { useDebouncedCallback } from '../hooks/useDebouncedCallback.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
-import { useChrome } from '../context/ChromeContext.js';
 import { SaveStatusIndicator, type SaveStatus } from '../components/SaveStatusIndicator.js';
 import { MultiSelectChips } from '../components/MultiSelectChips.js';
 import { PreviewModal } from '../components/PreviewModal.js';
+import { Button } from '../components/ui/Button.js';
 
 interface FormState {
   title: string;
@@ -24,6 +24,7 @@ interface FormState {
   tagIds: string[];
   featuredMediaId: string | null;
   featuredImageUrl: string | null;
+  anakUsahaId: string | null;
   bodyJson: unknown;
 }
 
@@ -37,6 +38,7 @@ function toFormState(article: ArticleAdminResponse): FormState {
     tagIds: article.tags.map((t) => t.id),
     featuredMediaId: article.featuredMediaId,
     featuredImageUrl: article.featuredImageUrl,
+    anakUsahaId: article.anakUsaha?.id ?? null,
     bodyJson: article.bodyJson,
   };
 }
@@ -48,21 +50,13 @@ function errorMessage(err: unknown, fallback: string): string {
 const FIELD_LABEL = 'mb-1 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
 const FIELD_INPUT =
   'w-full rounded-md border border-[var(--rule)] bg-transparent px-2 py-1 text-sm focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20';
-const OUTLINE_BUTTON =
-  'rounded-md border border-[var(--rule)] px-2.5 py-1 text-xs transition-colors hover:border-[var(--ink)]/30';
 
 /** The admin article authoring and management view: canvas, metadata sidebar, lifecycle
- *  actions, focus mode, and dark mode — see specs/article-editor/spec.md and
+ *  actions, and dark mode — see specs/article-editor/spec.md and
  *  specs/article-management/spec.md for the requirements this implements. */
 export function ArticleEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [focusMode, setFocusMode] = useState(false);
-  const { setHideChrome } = useChrome();
-  useEffect(() => {
-    setHideChrome(focusMode);
-    return () => setHideChrome(false);
-  }, [focusMode, setHideChrome]);
 
   const [article, setArticle] = useState<ArticleAdminResponse | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
@@ -76,6 +70,7 @@ export function ArticleEditPage() {
 
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [tags, setTags] = useState<TagResponse[]>([]);
+  const [anakUsahaOptions, setAnakUsahaOptions] = useState<AnakUsahaResponse[]>([]);
   const [taxonomyError, setTaxonomyError] = useState<string | null>(null);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -95,10 +90,11 @@ export function ArticleEditPage() {
         setSlugInput(loaded.slug);
       })
       .catch((err: unknown) => setLoadError(errorMessage(err, 'Could not load article')));
-    Promise.all([categoriesApi.list(), tagsApi.list()])
-      .then(([c, t]) => {
+    Promise.all([categoriesApi.list(), tagsApi.list(), anakUsahaApi.list()])
+      .then(([c, t, a]) => {
         setCategories(c);
         setTags(t);
+        setAnakUsahaOptions(a);
       })
       .catch((err: unknown) => setTaxonomyError(errorMessage(err, 'Could not load categories and tags')));
   }, [id]);
@@ -119,6 +115,7 @@ export function ArticleEditPage() {
         categoryIds: formRef.current.categoryIds,
         tagIds: formRef.current.tagIds,
         featuredMediaId: formRef.current.featuredMediaId,
+        anakUsahaId: formRef.current.anakUsahaId,
         seoTitle: formRef.current.seoTitle,
         seoDescription: formRef.current.seoDescription,
       });
@@ -283,53 +280,33 @@ export function ArticleEditPage() {
 
   return (
     <div className="siders-scope flex h-full flex-col bg-[var(--paper)] text-[var(--ink)]">
-      {!focusMode && (
-        <header className="flex items-center justify-between border-b border-[var(--rule)] px-4 py-2">
-          <Link to="/articles" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] hover:underline">
-            ← Articles
-          </Link>
-          <div className="flex items-center gap-3">
-            <SaveStatusIndicator status={saveStatus} errorMessage={saveError} />
-            <span className={`rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${statusStyle.chip}`}>
-              {article.status}
-            </span>
-            <button type="button" onClick={handlePreview} className={OUTLINE_BUTTON}>
-              Preview
-            </button>
-            {article.status !== 'published' && (
-              <button
-                type="button"
-                onClick={handlePublish}
-                disabled={publishState.loading}
-                className="rounded-md bg-[var(--signal)] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-              >
-                Publish
-              </button>
-            )}
-            {article.status === 'published' && (
-              <button
-                type="button"
-                onClick={handleUnpublish}
-                disabled={unpublishState.loading}
-                className={OUTLINE_BUTTON}
-              >
-                Unpublish
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleteState.loading}
-              className="rounded-md border border-red-300 px-2.5 py-1 text-xs text-red-600 transition-colors hover:border-red-400 dark:border-red-800 dark:text-red-400"
-            >
-              Delete
-            </button>
-            <button type="button" onClick={() => setFocusMode(true)} className={OUTLINE_BUTTON}>
-              Focus mode
-            </button>
-          </div>
-        </header>
-      )}
+      <header className="flex items-center justify-between border-b border-[var(--rule)] px-4 py-2">
+        <Link to="/articles" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] hover:underline">
+          ← Articles
+        </Link>
+        <div className="flex items-center gap-3">
+          <SaveStatusIndicator status={saveStatus} errorMessage={saveError} />
+          <span className={`rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${statusStyle.chip}`}>
+            {article.status}
+          </span>
+          <Button variant="secondary" size="sm" onClick={handlePreview}>
+            Preview
+          </Button>
+          {article.status !== 'published' && (
+            <Button variant="primary" size="sm" onClick={handlePublish} disabled={publishState.loading}>
+              Publish
+            </Button>
+          )}
+          {article.status === 'published' && (
+            <Button variant="secondary" size="sm" onClick={handleUnpublish} disabled={unpublishState.loading}>
+              Unpublish
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" tone="danger" onClick={handleDelete} disabled={deleteState.loading}>
+            Delete
+          </Button>
+        </div>
+      </header>
 
       {permissionDenied && (
         <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
@@ -364,95 +341,99 @@ export function ArticleEditPage() {
           />
         </main>
 
-        {!focusMode && (
-          <aside className="w-80 shrink-0 overflow-y-auto border-l border-[var(--rule)] p-4">
-            <div className="space-y-5">
-              <div>
-                <label className={FIELD_LABEL}>Slug</label>
-                <input value={slugInput} onChange={(e) => setSlugInput(e.target.value)} onBlur={commitSlug} className={FIELD_INPUT} />
-                {slugError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{slugError}</p>}
-              </div>
-
-              <div>
-                <label className={FIELD_LABEL}>Featured image</label>
-                {form.featuredImageUrl && (
-                  <img src={form.featuredImageUrl} alt="" className="mb-2 w-full rounded-md" />
-                )}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void handleFeaturedImageChosen(file);
-                  }}
-                  className="w-full text-xs"
-                />
-              </div>
-
-              <div>
-                <label className={FIELD_LABEL}>Excerpt</label>
-                <textarea value={form.excerpt} onChange={(e) => patchForm({ excerpt: e.target.value })} rows={3} className={FIELD_INPUT} />
-              </div>
-
-              {taxonomyError && <p className="text-xs text-red-600 dark:text-red-400">{taxonomyError}</p>}
-              <MultiSelectChips
-                label="Categories"
-                options={categories}
-                selectedIds={form.categoryIds}
-                onChange={(ids) => patchForm({ categoryIds: ids })}
-              />
-              <MultiSelectChips
-                label="Tags"
-                options={tags}
-                selectedIds={form.tagIds}
-                onChange={(ids) => patchForm({ tagIds: ids })}
-              />
-
-              <div>
-                <label className={FIELD_LABEL}>SEO title</label>
-                <input value={form.seoTitle} onChange={(e) => patchForm({ seoTitle: e.target.value })} className={FIELD_INPUT} />
-              </div>
-              <div>
-                <label className={FIELD_LABEL}>SEO description</label>
-                <textarea
-                  value={form.seoDescription}
-                  onChange={(e) => patchForm({ seoDescription: e.target.value })}
-                  rows={2}
-                  className={FIELD_INPUT}
-                />
-              </div>
-
-              <div className="border-t border-[var(--rule)] pt-4">
-                <label className={FIELD_LABEL}>Schedule publish</label>
-                <input
-                  type="datetime-local"
-                  value={scheduleAt}
-                  onChange={(e) => setScheduleAt(e.target.value)}
-                  className={`mb-2 ${FIELD_INPUT}`}
-                />
-                <button
-                  type="button"
-                  onClick={handleSchedule}
-                  disabled={scheduleState.loading || !scheduleAt}
-                  className="w-full rounded-md bg-[var(--signal)] px-2 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-                >
-                  Schedule
-                </button>
-              </div>
+        <aside className="w-80 shrink-0 overflow-y-auto border-l border-[var(--rule)] p-4">
+          <div className="space-y-5">
+            <div>
+              <label className={FIELD_LABEL}>Slug</label>
+              <input value={slugInput} onChange={(e) => setSlugInput(e.target.value)} onBlur={commitSlug} className={FIELD_INPUT} />
+              {slugError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{slugError}</p>}
             </div>
-          </aside>
-        )}
-      </div>
 
-      {focusMode && (
-        <button
-          type="button"
-          onClick={() => setFocusMode(false)}
-          className="fixed bottom-4 right-4 rounded-full border border-[var(--rule)] bg-[var(--paper)] px-3 py-1.5 text-xs text-[var(--ink)] shadow"
-        >
-          Exit focus mode
-        </button>
-      )}
+            <div>
+              <label className={FIELD_LABEL}>Featured image</label>
+              {form.featuredImageUrl && (
+                <img src={form.featuredImageUrl} alt="" className="mb-2 w-full rounded-md" />
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleFeaturedImageChosen(file);
+                }}
+                className="w-full text-xs"
+              />
+            </div>
+
+            <div>
+              <label className={FIELD_LABEL}>Excerpt</label>
+              <textarea value={form.excerpt} onChange={(e) => patchForm({ excerpt: e.target.value })} rows={3} className={FIELD_INPUT} />
+            </div>
+
+            {taxonomyError && <p className="text-xs text-red-600 dark:text-red-400">{taxonomyError}</p>}
+            <MultiSelectChips
+              label="Categories"
+              options={categories}
+              selectedIds={form.categoryIds}
+              onChange={(ids) => patchForm({ categoryIds: ids })}
+            />
+            <MultiSelectChips
+              label="Tags"
+              options={tags}
+              selectedIds={form.tagIds}
+              onChange={(ids) => patchForm({ tagIds: ids })}
+            />
+
+            <div>
+              <label className={FIELD_LABEL}>Anak Perusahaan</label>
+              <select
+                value={form.anakUsahaId ?? ''}
+                onChange={(e) => patchForm({ anakUsahaId: e.target.value || null })}
+                className={`${FIELD_INPUT} bg-[var(--paper)]`}
+              >
+                <option value="">None</option>
+                {anakUsahaOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className={FIELD_LABEL}>SEO title</label>
+              <input value={form.seoTitle} onChange={(e) => patchForm({ seoTitle: e.target.value })} className={FIELD_INPUT} />
+            </div>
+            <div>
+              <label className={FIELD_LABEL}>SEO description</label>
+              <textarea
+                value={form.seoDescription}
+                onChange={(e) => patchForm({ seoDescription: e.target.value })}
+                rows={2}
+                className={FIELD_INPUT}
+              />
+            </div>
+
+            <div className="border-t border-[var(--rule)] pt-4">
+              <label className={FIELD_LABEL}>Schedule publish</label>
+              <input
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className={`mb-2 ${FIELD_INPUT}`}
+              />
+              <Button
+                variant="primary"
+                onClick={handleSchedule}
+                disabled={scheduleState.loading || !scheduleAt}
+                className="w-full"
+              >
+                Schedule
+              </Button>
+            </div>
+          </div>
+        </aside>
+      </div>
 
       {previewArticle && <PreviewModal article={previewArticle} onClose={() => setPreviewArticle(null)} />}
     </div>

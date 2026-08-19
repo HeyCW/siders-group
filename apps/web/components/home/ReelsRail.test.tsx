@@ -20,6 +20,11 @@ const reels: PublicReelItem[] = [
   },
 ];
 
+const reelsWithNoPoster: PublicReelItem[] = [
+  ...reels,
+  { provider: 'youtube', externalId: 'oHg5SJYRHA0', posterUrl: null, caption: 'Third reel' },
+];
+
 describe('ReelsRail', () => {
   it('renders no iframe before any activation', () => {
     render(<ReelsRail reels={reels} />);
@@ -51,5 +56,45 @@ describe('ReelsRail', () => {
     fireEvent.click(screen.getByRole('button', { name: /first reel/i }));
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(document.querySelectorAll('iframe')).toHaveLength(0);
+  });
+
+  /** specs/reels-curation/spec.md - "A posterless reel's tile is a live, non-interactive embed". */
+  it('renders no image for a reel with no poster, showing a live embed preview instead', () => {
+    render(<ReelsRail reels={reelsWithNoPoster} />);
+
+    const tile = screen.getByRole('button', { name: /third reel/i });
+    expect(tile.querySelector('img')).toBeNull();
+    const previewIframe = tile.querySelector('iframe');
+    expect(previewIframe).not.toBeNull();
+    expect(previewIframe?.src).toContain('oHg5SJYRHA0');
+    expect(tile.textContent).toContain('PLAY');
+  });
+
+  it('a poster-bearing reel loads no embed until activated, unaffected by any posterless reel', () => {
+    render(<ReelsRail reels={reelsWithNoPoster} />);
+
+    const posterTile = screen.getByRole('button', { name: /first reel/i });
+    expect(posterTile.querySelector('iframe')).toBeNull();
+  });
+
+  it("a posterless reel's tile embed does not autoplay", () => {
+    render(<ReelsRail reels={reelsWithNoPoster} />);
+
+    const tile = screen.getByRole('button', { name: /third reel/i });
+    const previewIframe = tile.querySelector('iframe');
+    expect(previewIframe?.getAttribute('allow') ?? '').not.toContain('autoplay');
+  });
+
+  it('activating a poster-less reel opens the same lightbox as any other reel, not the tile preview', () => {
+    render(<ReelsRail reels={reelsWithNoPoster} />);
+    fireEvent.click(screen.getByRole('button', { name: /third reel/i }));
+
+    // One iframe is the posterless tile's own always-on preview; the other is the lightbox
+    // opened by the click, mounted once activation is triggered by the wrapping button rather
+    // than by the (pointer-events-none) preview iframe itself.
+    const iframes = [...document.querySelectorAll('iframe')];
+    expect(iframes).toHaveLength(2);
+    expect(iframes.filter((f) => f.src.includes('oHg5SJYRHA0'))).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /close/i })).toBeTruthy();
   });
 });

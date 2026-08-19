@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { articlesApi } from '../lib/articlesApi.js';
 import { ApiError } from '../lib/api.js';
+import { Button } from '../components/ui/Button.js';
 
 /**
  * Creates a fresh draft immediately on mount and redirects into its edit view, so
@@ -36,13 +37,9 @@ export function NewArticlePage() {
       <div className="siders-scope flex h-full min-h-full items-center justify-center bg-[var(--paper)] p-8 text-center text-[var(--ink)]">
         <div>
           <p className="text-red-600 dark:text-red-400">{error}</p>
-          <button
-            type="button"
-            className="mt-4 rounded-md border border-[var(--rule)] px-3 py-1.5 text-sm transition-colors hover:border-[var(--ink)]/30"
-            onClick={() => navigate('/articles')}
-          >
+          <Button variant="secondary" size="sm" className="mt-4" onClick={() => navigate('/articles')}>
             Back to articles
-          </button>
+          </Button>
         </div>
       </div>
     );

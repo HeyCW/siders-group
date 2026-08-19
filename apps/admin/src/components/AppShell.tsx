@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar.js';
-import { ChromeProvider, useChrome } from '../context/ChromeContext.js';
 import { useSidebarCollapsed } from '../hooks/useSidebarCollapsed.js';
 
 function IconMenu({ className }: { className?: string }) {
@@ -21,18 +20,8 @@ function IconClose({ className }: { className?: string }) {
 }
 
 function ShellChrome() {
-  const { hideChrome } = useChrome();
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Focus mode (article editor) hides every bit of app chrome, not just its own header.
-  if (hideChrome) {
-    return (
-      <main className="siders-scope h-screen overflow-y-auto bg-[var(--paper)]">
-        <Outlet />
-      </main>
-    );
-  }
 
   return (
     <div className="siders-scope flex h-screen overflow-hidden bg-[var(--paper)]">
@@ -97,9 +86,5 @@ function ShellChrome() {
  * (specs/admin-session/spec.md - "Permission-aware rendering is cosmetic, never authoritative").
  */
 export function AppShell() {
-  return (
-    <ChromeProvider>
-      <ShellChrome />
-    </ChromeProvider>
-  );
+  return <ShellChrome />;
 }

@@ -18,7 +18,7 @@ export const partners = app.table('partners', {
   logoMediaId: uuid('logo_media_id')
     .notNull()
     .references(() => media.id, { onDelete: 'restrict' }),
-  websiteUrl: text('website_url').notNull(),
+  websiteUrl: text('website_url'),
   sortOrder: integer('sort_order').notNull(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

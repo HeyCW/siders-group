@@ -7,11 +7,12 @@ export interface ReelRow {
   id: string;
   provider: ReelProvider;
   externalId: string;
-  posterMediaId: string;
+  posterMediaId: string | null;
   /** Joined from `app.media` at read time so the mapper can derive a poster URL without a
    *  second round trip — mirrors `HomeCurationEntryRow` joining in the article title/slug it
-   *  needs to render (curation.repository.ts). */
-  posterStoragePath: string;
+   *  needs to render (curation.repository.ts). `null` when the reel has no poster — the join is a
+   *  `leftJoin` precisely so such a reel is still returned rather than silently dropped. */
+  posterStoragePath: string | null;
   caption: string | null;
   status: ReelStatus;
   createdAt: Date;
@@ -21,12 +22,12 @@ export interface ReelRow {
 export interface CreateReelInput {
   provider: ReelProvider;
   externalId: string;
-  posterMediaId: string;
+  posterMediaId?: string | null | undefined;
   caption: string | null;
 }
 
 export interface UpdateReelInput {
-  posterMediaId?: string | undefined;
+  posterMediaId?: string | null | undefined;
   caption?: string | null | undefined;
   status?: ReelStatus | undefined;
 }
@@ -73,7 +74,7 @@ export function createReelRepository(db: Database): ReelRepository {
     const [row] = await db
       .select(SELECT_COLUMNS)
       .from(reels)
-      .innerJoin(media, eq(media.id, reels.posterMediaId))
+      .leftJoin(media, eq(media.id, reels.posterMediaId))
       .where(eq(reels.id, id))
       .limit(1);
     return row ?? null;
@@ -81,7 +82,10 @@ export function createReelRepository(db: Database): ReelRepository {
 
   return {
     async create(input) {
-      const [inserted] = await db.insert(reels).values(input).returning({ id: reels.id });
+      const [inserted] = await db
+        .insert(reels)
+        .values({ ...input, posterMediaId: input.posterMediaId ?? null })
+        .returning({ id: reels.id });
       if (!inserted) throw new Error('reel insert returned no row');
       const row = await findByIdJoined(inserted.id);
       if (!row) throw new Error('reel missing immediately after insert');
@@ -94,7 +98,7 @@ export function createReelRepository(db: Database): ReelRepository {
       return db
         .select(SELECT_COLUMNS)
         .from(reels)
-        .innerJoin(media, eq(media.id, reels.posterMediaId))
+        .leftJoin(media, eq(media.id, reels.posterMediaId))
         .orderBy(desc(reels.createdAt));
     },
 

@@ -21,10 +21,12 @@ export const reelStatus = app.enum('reel_status', ['draft', 'published', 'unavai
  * The reel library. A reel references a video hosted by a recognized third-party provider; this
  * system stores no video bytes of its own — only the parsed `(provider, externalId)` identity,
  * never the submitted URL (design.md - "Provider identity, not URLs"). `posterMediaId` is
- * required and `ON DELETE RESTRICT` rather than `SET NULL` or `CASCADE`: a reel without a poster
- * cannot degrade gracefully when the provider is unreachable, so losing the poster must fail
- * loudly rather than silently leave a reel with nothing to render
- * (specs/reels-curation/spec.md - "Every reel has a locally stored poster image").
+ * optional — a reel is playable via its third-party embed with or without one
+ * (specs/reels-curation/spec.md - "Every reel has a locally stored poster image") — but when set,
+ * it is `ON DELETE RESTRICT` rather than `SET NULL` or `CASCADE`: a reel that does have a stored
+ * poster cannot degrade gracefully if that poster's media row disappears out from under it, so
+ * losing a poster that was actually referenced must fail loudly rather than silently leave a
+ * dangling reference.
  */
 export const reels = app.table(
   'reels',
@@ -32,9 +34,7 @@ export const reels = app.table(
     id: uuid('id').primaryKey().defaultRandom(),
     provider: reelProvider('provider').notNull(),
     externalId: text('external_id').notNull(),
-    posterMediaId: uuid('poster_media_id')
-      .notNull()
-      .references(() => media.id, { onDelete: 'restrict' }),
+    posterMediaId: uuid('poster_media_id').references(() => media.id, { onDelete: 'restrict' }),
     caption: text('caption'),
     status: reelStatus('status').notNull().default('draft'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

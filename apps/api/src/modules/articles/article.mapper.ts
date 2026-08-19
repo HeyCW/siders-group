@@ -59,6 +59,7 @@ export function toAdminResponse(env: MediaUrlEnv, article: ArticleWithRelations)
     featuredImageUrl: featuredImageUrl(env, article),
     categories: toTaxonomyResponse(article.categories),
     tags: toTaxonomyResponse(article.tags),
+    anakUsaha: article.anakUsaha,
     seoTitle: article.seoTitle,
     seoDescription: article.seoDescription,
     publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,

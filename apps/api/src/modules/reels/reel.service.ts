@@ -7,7 +7,7 @@ import { isReelPubliclyVisible, type ReelRepository, type ReelRow, type UpdateRe
 
 export interface CreateReelServiceInput {
   url: string;
-  posterMediaId: string;
+  posterMediaId?: string | null | undefined;
   caption: string | null;
 }
 

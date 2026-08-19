@@ -21,6 +21,7 @@ function baseRow(overrides: Partial<ArticleWithRelations> = {}): ArticleWithRela
     status: 'draft',
     authorId: 'author-1',
     featuredMediaId: null,
+    anakUsahaId: null,
     seoTitle: null,
     seoDescription: null,
     publishedAt: null,
@@ -30,6 +31,7 @@ function baseRow(overrides: Partial<ArticleWithRelations> = {}): ArticleWithRela
     featuredMediaStoragePath: null,
     categories: [],
     tags: [],
+    anakUsaha: null,
     ...overrides,
   };
 }

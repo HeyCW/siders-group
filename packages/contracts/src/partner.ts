@@ -33,7 +33,7 @@ export const partnerCreateRequestSchema = z
   .object({
     name: z.string().min(1).max(200),
     logoMediaId: z.string().uuid(),
-    websiteUrl: websiteUrlSchema,
+    websiteUrl: websiteUrlSchema.nullable().optional(),
     isActive: z.boolean().optional(),
   })
   .strict();
@@ -42,13 +42,15 @@ export type PartnerCreateRequest = z.infer<typeof partnerCreateRequestSchema>;
 /**
  * All fields optional for a partial update. `sortOrder` is deliberately absent — order changes
  * only through the dedicated reorder endpoint, never through a per-partner update
- * (specs/partner-management/spec.md - "Partner order is replaced as a whole list").
+ * (specs/partner-management/spec.md - "Partner order is replaced as a whole list"). `websiteUrl`
+ * is `.nullable()` on top of `.optional()`, the same shape as `articleWriteFieldsSchema`'s
+ * `featuredMediaId`: absent means "leave it as it is", `null` means "clear it".
  */
 export const partnerUpdateRequestSchema = z
   .object({
     name: z.string().min(1).max(200).optional(),
     logoMediaId: z.string().uuid().optional(),
-    websiteUrl: websiteUrlSchema.optional(),
+    websiteUrl: websiteUrlSchema.nullable().optional(),
     isActive: z.boolean().optional(),
   })
   .strict();
@@ -79,7 +81,7 @@ export const partnerResponseSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   logoUrl: z.string(),
-  websiteUrl: z.string(),
+  websiteUrl: z.string().nullable(),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
   createdAt: z.string().datetime(),
@@ -96,6 +98,6 @@ export type PartnerResponse = z.infer<typeof partnerResponseSchema>;
 export const publicPartnerSchema = z.object({
   name: z.string(),
   logoUrl: z.string(),
-  websiteUrl: z.string(),
+  websiteUrl: z.string().nullable(),
 });
 export type PublicPartner = z.infer<typeof publicPartnerSchema>;

@@ -12,9 +12,17 @@ describe('reelCreateRequestSchema', () => {
     expect(parsed.posterMediaId).toBe(id(1));
   });
 
-  it('requires posterMediaId', () => {
-    const result = reelCreateRequestSchema.safeParse({ url: 'https://www.instagram.com/reel/AbC-123x/' });
-    expect(result.success).toBe(false);
+  it('accepts a create request with no posterMediaId at all', () => {
+    const parsed = reelCreateRequestSchema.parse({ url: 'https://www.instagram.com/reel/AbC-123x/' });
+    expect(parsed.posterMediaId).toBeUndefined();
+  });
+
+  it('accepts an explicit null posterMediaId', () => {
+    const parsed = reelCreateRequestSchema.parse({
+      url: 'https://www.instagram.com/reel/AbC-123x/',
+      posterMediaId: null,
+    });
+    expect(parsed.posterMediaId).toBeNull();
   });
 
   it('rejects a non-uuid posterMediaId', () => {
@@ -49,5 +57,10 @@ describe('reelUpdateRequestSchema', () => {
   it('does not accept a url or provider field — those are immutable after creation', () => {
     const result = reelUpdateRequestSchema.safeParse({ url: 'https://www.instagram.com/reel/AbC-123x/' });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts an explicit null posterMediaId to clear it', () => {
+    const parsed = reelUpdateRequestSchema.parse({ posterMediaId: null });
+    expect(parsed.posterMediaId).toBeNull();
   });
 });

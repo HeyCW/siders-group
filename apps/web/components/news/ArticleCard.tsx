@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ArticlePublicCard } from '@siders/contracts';
+import { MediaSlot } from '../ui/MediaSlot';
 
 function formatMeta(article: ArticlePublicCard): string {
   const cats = article.categories.map((c) => c.name).join(', ');
@@ -24,7 +25,12 @@ export function ArticleCard({
         href={`/news/${article.slug}`}
         className="group grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[clamp(20px,3vw,32px)] border-b border-ink py-[clamp(20px,3vw,32px)] transition-[border-bottom-width] duration-hover ease-hover hover:border-b-[5px] focus-visible:border-b-[5px]"
       >
-        <span className="block aspect-[4/3] w-full bg-ink" />
+        <MediaSlot
+          src={article.featuredImageUrl}
+          alt={article.title}
+          label="No image"
+          aspectClassName="aspect-[4/3]"
+        />
         <span className="block">
           <span className="block font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
             Featured · {formatMeta(article)}
@@ -49,7 +55,12 @@ export function ArticleCard({
       href={`/news/${article.slug}`}
       className="group block border-b border-rule border-r border-r-rule-strong px-[clamp(14px,2vw,28px)] py-[clamp(18px,2.4vw,26px)] transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-b-ink focus-visible:border-b-[3px] focus-visible:border-b-ink"
     >
-      <span className="block aspect-[3/2] w-full bg-ink" />
+      <MediaSlot
+        src={article.featuredImageUrl}
+        alt={article.title}
+        label="No image"
+        aspectClassName="aspect-[3/2]"
+      />
       <span className="my-1.5 block font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
         {formatMeta(article)}
       </span>

@@ -15,6 +15,7 @@ function article(overrides: Partial<ArticleWithRelations> & Pick<ArticleWithRela
     status: 'published',
     authorId: 'author-1',
     featuredMediaId: null,
+    anakUsahaId: null,
     seoTitle: null,
     seoDescription: null,
     publishedAt: new Date('2026-01-01T00:00:00Z'),
@@ -24,6 +25,7 @@ function article(overrides: Partial<ArticleWithRelations> & Pick<ArticleWithRela
     featuredMediaStoragePath: null,
     categories: [],
     tags: [],
+    anakUsaha: null,
     ...overrides,
   };
 }

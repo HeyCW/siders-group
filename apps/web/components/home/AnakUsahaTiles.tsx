@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { SUB_BRANDS } from '../../lib/content';
 import { Reveal } from '../ui/Reveal';
@@ -18,10 +19,16 @@ export function AnakUsahaTiles() {
         {SUB_BRANDS.map((brand) => (
           <Link key={brand.name} href="/news" className="block">
             <span
-              className="flex h-[clamp(64px,7vw,84px)] items-center justify-center border border-rule px-3 text-center font-sans text-[clamp(11px,1.3vw,15px)] font-bold uppercase tracking-widest"
-              style={{ background: brand.tile, color: brand.tileInk }}
+              className="flex h-[clamp(96px,11vw,140px)] items-center justify-center border border-rule p-2"
+              style={{ background: brand.tile }}
             >
-              {brand.name}
+              <Image
+                src={brand.logo}
+                alt={brand.name}
+                width={140}
+                height={140}
+                className="h-full w-full object-contain"
+              />
             </span>
             <span className="mt-3 block font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
               {brand.kind}

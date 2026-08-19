@@ -3,6 +3,7 @@ import type { ContactMessageRow, ContactMessageStatusFilter } from '@siders/cont
 import { ApiError } from '../lib/api.js';
 import { contactApi } from '../lib/contactApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
+import { Button } from '../components/ui/Button.js';
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -101,13 +102,9 @@ export function ContactMessagesPage() {
             <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Site</p>
             <h1 className="font-display text-3xl">Messages</h1>
           </div>
-          <button
-            type="button"
-            onClick={() => setReloadToken((t) => t + 1)}
-            className="rounded-md border border-[var(--rule)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:border-[var(--ink)]/30 hover:text-[var(--ink)]"
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={() => setReloadToken((t) => t + 1)}>
             Refresh
-          </button>
+          </Button>
         </div>
         <p className="mb-5 max-w-xl text-sm text-[var(--muted)]">
           Every contact-form submission, newest first. There is no reply from here — use the sender&apos;s
@@ -165,14 +162,9 @@ export function ContactMessagesPage() {
                     plain text in the admin inbox"). */}
                 <p className="whitespace-pre-wrap text-sm text-[var(--ink)]">{message.message}</p>
                 <div className="flex items-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => void toggleStatus(message)}
-                    disabled={toggleState.loading}
-                    className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-50"
-                  >
+                  <Button type="button" variant="ghost" onClick={() => void toggleStatus(message)} disabled={toggleState.loading}>
                     {message.status === 'new' ? 'Mark read' : 'Mark unread'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </li>

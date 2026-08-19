@@ -79,4 +79,13 @@ describe('PublicReelsService.getRail', () => {
 
     expect(Object.keys(item ?? {}).sort()).toEqual(['caption', 'externalId', 'posterUrl', 'provider']);
   });
+
+  it('serves a reel with no poster with posterUrl null, not an empty string', async () => {
+    const repository = fakeRepository([row({ reelId: 'a', position: 0, posterStoragePath: null })]);
+    const service = createPublicReelsService(repository, env);
+
+    const [item] = await service.getRail();
+
+    expect(item?.posterUrl).toBeNull();
+  });
 });

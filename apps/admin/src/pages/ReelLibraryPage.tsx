@@ -6,6 +6,8 @@ import { mediaApi } from '../lib/mediaApi.js';
 import { reelsApi } from '../lib/reelsApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
 import { REEL_STATUS_STYLES } from '../lib/reelStatusStyles.js';
+import { Button } from '../components/ui/Button.js';
+import { Select } from '../components/ui/Select.js';
 
 const STATUS_LABELS: Record<ReelStatus, string> = {
   draft: 'Draft',
@@ -27,13 +29,13 @@ const FILE_LABEL =
  * video. There is no video upload here — only a URL, parsed client-side for an immediate
  * preview and re-parsed server-side as the actual source of truth
  * (specs/reels-curation/spec.md - "Provider allowlist"). A poster image, uploaded through the
- * existing media endpoint, is required before a reel can be created
- * (specs/reels-curation/spec.md - "Every reel has a locally stored poster image"). No live
- * provider embed is ever rendered here — only the stored poster, consistent with the facade
- * rule this capability depends on (design.md - "Facade rendering: poster first, frame only on
- * user activation"). The provider and identifier are immutable after creation
- * (`reelUpdateRequestSchema` has no `url` field), so editing a reel only ever touches caption,
- * poster, and status — never re-parses a URL.
+ * existing media endpoint, is optional — a reel is playable via its third-party embed with or
+ * without one (specs/reels-curation/spec.md - "Every reel has a locally stored poster image").
+ * No live provider embed is ever rendered here — only the stored poster (or a placeholder when
+ * there is none), consistent with the facade rule this capability depends on (design.md -
+ * "Facade rendering: poster first, frame only on user activation"). The provider and identifier
+ * are immutable after creation (`reelUpdateRequestSchema` has no `url` field), so editing a reel
+ * only ever touches caption, poster, and status — never re-parses a URL.
  */
 export function ReelLibraryPage() {
   const [reels, setReels] = useState<ReelResponse[]>([]);
@@ -99,12 +101,16 @@ export function ReelLibraryPage() {
     }
   }
 
-  const canCreate = parsed !== null && posterMediaId !== null && !createState.loading && !uploadingPoster;
+  const canCreate = parsed !== null && !createState.loading && !uploadingPoster;
 
   async function handleCreate() {
-    if (!parsed || !posterMediaId) return;
+    if (!parsed) return;
     try {
-      const created = await runCreate({ url: url.trim(), posterMediaId, caption: caption.trim() || undefined });
+      const created = await runCreate({
+        url: url.trim(),
+        posterMediaId: posterMediaId ?? null,
+        caption: caption.trim() || undefined,
+      });
       setReels((prev) => [created, ...prev]);
       setUrl('');
       setCaption('');
@@ -236,7 +242,7 @@ export function ReelLibraryPage() {
           </div>
 
           <div>
-            <label className={FIELD_LABEL}>Poster image (required)</label>
+            <label className={FIELD_LABEL}>Poster image (optional)</label>
             <div className="flex items-center gap-3">
               <label className={FILE_LABEL}>
                 Choose file
@@ -259,14 +265,9 @@ export function ReelLibraryPage() {
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={!canCreate}
-              className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-            >
+            <Button type="button" variant="primary" onClick={handleCreate} disabled={!canCreate}>
               {createState.loading ? 'Adding…' : 'Add reel'}
-            </button>
+            </Button>
             {createState.errorMessage && !createState.forbidden && (
               <p className="text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
             )}
@@ -323,27 +324,29 @@ export function ReelLibraryPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-3 pt-1">
-                      <button
+                      <Button
                         type="button"
+                        variant="primary"
                         onClick={handleSaveEdit}
                         disabled={updateState.loading || editUploadingPoster}
-                        className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
                       >
                         {updateState.loading ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelEdit}
-                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                      >
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={cancelEdit}>
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-4 rounded-lg py-3 pl-5 pr-3 transition-colors hover:bg-[var(--ink)]/[0.03]">
                     <span className={`absolute inset-y-2 left-0 w-1 rounded-full ${statusStyle.rule}`} aria-hidden="true" />
-                    <img src={reel.posterUrl} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />
+                    {reel.posterUrl ? (
+                      <img src={reel.posterUrl} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />
+                    ) : (
+                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-[var(--ink)]/[0.06] font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]">
+                        No poster
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-display text-lg capitalize">
                         {reel.provider} · {reel.externalId}
@@ -351,31 +354,23 @@ export function ReelLibraryPage() {
                       {reel.caption && <p className="mt-0.5 truncate font-mono text-xs text-[var(--muted)]">{reel.caption}</p>}
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <select
+                      <Select
+                        size="sm"
                         value={reel.status}
                         onChange={(e) => handleStatusChange(reel.id, reelStatusSchema.parse(e.target.value))}
-                        className="rounded-md border border-[var(--rule)] bg-transparent px-2 py-1.5 text-xs focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
                       >
                         {Object.entries(STATUS_LABELS).map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}
                           </option>
                         ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(reel)}
-                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                      >
+                      </Select>
+                      <Button type="button" variant="ghost" onClick={() => startEdit(reel)}>
                         Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(reel.id)}
-                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
-                      >
+                      </Button>
+                      <Button type="button" variant="ghost" tone="danger" onClick={() => handleRemove(reel.id)}>
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}

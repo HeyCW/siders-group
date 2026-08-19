@@ -3,6 +3,7 @@ import type { CommentQueueRow, CommentQueueStatusFilter } from '@siders/contract
 import { ApiError } from '../lib/api.js';
 import { moderationApi } from '../lib/moderationApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
+import { Button } from '../components/ui/Button.js';
 
 const POLL_INTERVAL_MS = 30_000;
 const PAGE_LIMIT = 20;
@@ -143,13 +144,9 @@ export function CommentModerationPage() {
             <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Community</p>
             <h1 className="font-display text-3xl">Comments</h1>
           </div>
-          <button
-            type="button"
-            onClick={loadFirstPage}
-            className="rounded-md border border-[var(--rule)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:border-[var(--ink)]/30 hover:text-[var(--ink)]"
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={loadFirstPage}>
             Refresh
-          </button>
+          </Button>
         </div>
         <p className="mb-5 max-w-xl text-sm text-[var(--muted)]">
           Every reader comment, newest first. Removing a comment hides it from the public article
@@ -214,21 +211,13 @@ export function CommentModerationPage() {
                     affordance and this screen shows exactly what was stored. */}
                 <p className="whitespace-pre-wrap text-sm text-[var(--ink)]">{comment.body}</p>
                 <div className="flex items-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => startAction(comment.id, 'moderate')}
-                    className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                  >
+                  <Button type="button" variant="ghost" onClick={() => startAction(comment.id, 'moderate')}>
                     {comment.status === 'visible' ? 'Remove' : 'Restore'}
-                  </button>
+                  </Button>
                   {comment.openReportCount !== undefined && (
-                    <button
-                      type="button"
-                      onClick={() => startAction(comment.id, 'dismiss')}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    <Button type="button" variant="ghost" onClick={() => startAction(comment.id, 'dismiss')}>
                       Dismiss reports
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {expanded?.id === comment.id && (
@@ -240,31 +229,29 @@ export function CommentModerationPage() {
                       className={REASON_INPUT}
                     />
                     {expanded.action === 'moderate' ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="primary"
+                        className="shrink-0"
                         onClick={() => void confirmAction(comment)}
                         disabled={moderateState.loading}
-                        className="shrink-0 rounded-md bg-[var(--signal)] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
                       >
                         {comment.status === 'visible' ? 'Confirm remove' : 'Confirm restore'}
-                      </button>
+                      </Button>
                     ) : (
-                      <button
+                      <Button
                         type="button"
+                        variant="primary"
+                        className="shrink-0"
                         onClick={() => void confirmDismiss(comment)}
                         disabled={dismissState.loading}
-                        className="shrink-0 rounded-md bg-[var(--signal)] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
                       >
                         Confirm dismiss
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setExpanded(null)}
-                      className="shrink-0 font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    <Button type="button" variant="ghost" className="shrink-0" onClick={() => setExpanded(null)}>
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -274,14 +261,15 @@ export function CommentModerationPage() {
 
         {nextCursor && (
           <div className="mt-4 flex justify-center">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={() => void handleLoadMore()}
               disabled={loadingMore}
-              className="rounded-md border border-[var(--rule)] px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:border-[var(--ink)]/30 hover:text-[var(--ink)] disabled:opacity-50"
             >
               {loadingMore ? 'Loading…' : 'Load older'}
-            </button>
+            </Button>
           </div>
         )}
       </div>

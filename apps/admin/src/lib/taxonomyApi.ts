@@ -1,4 +1,4 @@
-import type { CategoryResponse, TagResponse } from '@siders/contracts';
+import type { AnakUsahaResponse, CategoryResponse, TagResponse } from '@siders/contracts';
 import { apiFetch } from './api.js';
 
 interface Envelope<T> {
@@ -6,15 +6,15 @@ interface Envelope<T> {
   data: T;
 }
 
-function makeTaxonomyApi(resource: 'categories' | 'tags') {
+function makeTaxonomyApi(resource: 'categories' | 'tags' | 'anak-usaha') {
   return {
-    list<T = CategoryResponse | TagResponse>(): Promise<T[]> {
+    list<T = CategoryResponse | TagResponse | AnakUsahaResponse>(): Promise<T[]> {
       return apiFetch<Envelope<T[]>>(`/${resource}`).then((r) => r.data);
     },
-    create<T = CategoryResponse | TagResponse>(name: string): Promise<T> {
+    create<T = CategoryResponse | TagResponse | AnakUsahaResponse>(name: string): Promise<T> {
       return apiFetch<Envelope<T>>(`/${resource}`, { method: 'POST', body: { name } }).then((r) => r.data);
     },
-    update<T = CategoryResponse | TagResponse>(id: string, name: string): Promise<T> {
+    update<T = CategoryResponse | TagResponse | AnakUsahaResponse>(id: string, name: string): Promise<T> {
       return apiFetch<Envelope<T>>(`/${resource}/${id}`, { method: 'PATCH', body: { name } }).then((r) => r.data);
     },
     remove(id: string): Promise<void> {
@@ -35,4 +35,11 @@ export const tagsApi = {
   create: (name: string) => makeTaxonomyApi('tags').create<TagResponse>(name),
   update: (id: string, name: string) => makeTaxonomyApi('tags').update<TagResponse>(id, name),
   remove: (id: string) => makeTaxonomyApi('tags').remove(id),
+};
+
+export const anakUsahaApi = {
+  list: () => makeTaxonomyApi('anak-usaha').list<AnakUsahaResponse>(),
+  create: (name: string) => makeTaxonomyApi('anak-usaha').create<AnakUsahaResponse>(name),
+  update: (id: string, name: string) => makeTaxonomyApi('anak-usaha').update<AnakUsahaResponse>(id, name),
+  remove: (id: string) => makeTaxonomyApi('anak-usaha').remove(id),
 };

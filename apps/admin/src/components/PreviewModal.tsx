@@ -1,4 +1,5 @@
 import type { ArticlePublicDetail } from '@siders/contracts';
+import { Button } from './ui/Button.js';
 
 /**
  * Renders the same sanitized `bodyHtml` the public site would render, without changing the
@@ -12,13 +13,9 @@ export function PreviewModal({ article, onClose }: { article: ArticlePublicDetai
       <div className="siders-scope w-full max-w-3xl rounded-lg bg-[var(--paper)] text-[var(--ink)] shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--rule)] p-4">
           <span className="font-mono text-xs uppercase tracking-wide text-[var(--muted)]">Preview</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-2 py-1 text-sm text-[var(--muted)] hover:bg-[var(--ink)]/5 hover:text-[var(--ink)]"
-          >
+          <Button type="button" variant="ghost" onClick={onClose}>
             Close
-          </button>
+          </Button>
         </div>
         <article className="prose dark:prose-invert max-w-none p-8">
           <h1 className="font-['Fraunces']">{article.title}</h1>

@@ -7,6 +7,7 @@ export * from './staff.js';
 export * from './session.js';
 export * from './category.js';
 export * from './tag.js';
+export * from './anak-usaha.js';
 export * from './media.js';
 export * from './article.js';
 export * from './curation.js';

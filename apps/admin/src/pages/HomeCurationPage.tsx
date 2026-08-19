@@ -5,6 +5,7 @@ import { articlesApi } from '../lib/articlesApi.js';
 import { curationApi } from '../lib/curationApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
 import { ARTICLE_STATUS_STYLES } from '../lib/articleStatusStyles.js';
+import { Button } from '../components/ui/Button.js';
 
 const MAX_ENTRIES = 10;
 
@@ -170,13 +171,9 @@ export function HomeCurationPage() {
                           Not yet live
                         </span>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => removeArticle(item.id)}
-                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
-                      >
+                      <Button type="button" variant="ghost" tone="danger" onClick={() => removeArticle(item.id)}>
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 );
@@ -184,22 +181,12 @@ export function HomeCurationPage() {
             </ul>
 
             <div className="mb-8 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saveState.loading}
-                className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-              >
+              <Button type="button" variant="primary" onClick={handleSave} disabled={saveState.loading}>
                 {saveState.loading ? 'Saving…' : 'Save order'}
-              </button>
-              <button
-                type="button"
-                onClick={clearAll}
-                disabled={picked.length === 0}
-                className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-40"
-              >
+              </Button>
+              <Button type="button" variant="ghost" onClick={clearAll} disabled={picked.length === 0}>
                 Clear all
-              </button>
+              </Button>
               {picked.length >= MAX_ENTRIES && (
                 <span className="font-mono text-xs text-[var(--muted)]">Maximum of {MAX_ENTRIES} curated articles reached</span>
               )}
@@ -225,14 +212,14 @@ export function HomeCurationPage() {
                     >
                       {article.status}
                     </span>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => addArticle(article)}
                       disabled={picked.length >= MAX_ENTRIES}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--signal)] hover:text-[var(--signal-hover)] disabled:opacity-40"
                     >
                       Add
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}

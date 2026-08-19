@@ -5,12 +5,13 @@ import { ApiError } from '../lib/api.js';
 import { reelsApi, reelsCurationApi } from '../lib/reelsApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
 import { REEL_STATUS_STYLES } from '../lib/reelStatusStyles.js';
+import { Button } from '../components/ui/Button.js';
 
 interface PickedItem {
   id: string;
   provider: ReelProvider;
   externalId: string;
-  posterUrl: string;
+  posterUrl: string | null;
   caption: string | null;
   status: ReelResponse['status'];
   /** Authoritative for every entry loaded from `GET /admin/reels-curation`. For an item just
@@ -176,7 +177,13 @@ export function ReelsCurationPage() {
                     <span className={`absolute inset-y-2 left-0 w-1 rounded-full ${statusStyle.rule}`} aria-hidden="true" />
                     <IconGrip className="ml-2 h-4 w-4 shrink-0 text-[var(--muted)]/50" />
                     <span className="w-5 shrink-0 font-mono text-xs text-[var(--muted)]">{index + 1}</span>
-                    <img src={item.posterUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                    {item.posterUrl ? (
+                      <img src={item.posterUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                    ) : (
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-[var(--ink)]/[0.06] font-mono text-[9px] uppercase tracking-wide text-[var(--muted)]">
+                        No poster
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm capitalize text-[var(--ink)]">
                         {item.provider} · {item.externalId}
@@ -192,13 +199,9 @@ export function ReelsCurationPage() {
                           Not live
                         </span>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => removeReel(item.id)}
-                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
-                      >
+                      <Button type="button" variant="ghost" tone="danger" onClick={() => removeReel(item.id)}>
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 );
@@ -206,22 +209,12 @@ export function ReelsCurationPage() {
             </ul>
 
             <div className="mb-8 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saveState.loading}
-                className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-              >
+              <Button type="button" variant="primary" onClick={handleSave} disabled={saveState.loading}>
                 {saveState.loading ? 'Saving…' : 'Save order'}
-              </button>
-              <button
-                type="button"
-                onClick={clearAll}
-                disabled={picked.length === 0}
-                className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-40"
-              >
+              </Button>
+              <Button type="button" variant="ghost" onClick={clearAll} disabled={picked.length === 0}>
                 Clear all
-              </button>
+              </Button>
               {picked.length >= MAX_REELS_CURATION_ENTRIES && (
                 <span className="font-mono text-xs text-[var(--muted)]">Maximum of {MAX_REELS_CURATION_ENTRIES} reels reached</span>
               )}
@@ -238,7 +231,13 @@ export function ReelsCurationPage() {
                   className={`flex items-center justify-between gap-3 px-3 py-2 ${index > 0 ? 'border-t border-[var(--rule)]' : ''}`}
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <img src={reel.posterUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                    {reel.posterUrl ? (
+                      <img src={reel.posterUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                    ) : (
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-[var(--ink)]/[0.06] font-mono text-[9px] uppercase tracking-wide text-[var(--muted)]">
+                        No poster
+                      </span>
+                    )}
                     <p className="truncate text-sm capitalize text-[var(--ink)]">
                       {reel.provider} · {reel.externalId}
                     </p>
@@ -249,14 +248,14 @@ export function ReelsCurationPage() {
                     >
                       {reel.status}
                     </span>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => addReel(reel)}
                       disabled={picked.length >= MAX_REELS_CURATION_ENTRIES}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--signal)] hover:text-[var(--signal-hover)] disabled:opacity-40"
                     >
                       Add
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}

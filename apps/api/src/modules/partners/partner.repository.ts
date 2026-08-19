@@ -11,7 +11,7 @@ export interface PartnerRow {
   /** Joined from `app.media` at read time so the mapper can derive a logo URL without a second
    *  round trip — mirrors `ReelRow.posterStoragePath` (reel.repository.ts). */
   logoStoragePath: string;
-  websiteUrl: string;
+  websiteUrl: string | null;
   sortOrder: number;
   isActive: boolean;
   createdAt: Date;
@@ -21,14 +21,14 @@ export interface PartnerRow {
 export interface CreatePartnerInput {
   name: string;
   logoMediaId: string;
-  websiteUrl: string;
+  websiteUrl?: string | null | undefined;
   isActive?: boolean | undefined;
 }
 
 export interface UpdatePartnerInput {
   name?: string | undefined;
   logoMediaId?: string | undefined;
-  websiteUrl?: string | undefined;
+  websiteUrl?: string | null | undefined;
   isActive?: boolean | undefined;
 }
 
@@ -141,7 +141,7 @@ export function createPartnerRepository(db: Database): PartnerRepository {
           .values({
             name: input.name,
             logoMediaId: input.logoMediaId,
-            websiteUrl: input.websiteUrl,
+            websiteUrl: input.websiteUrl ?? null,
             isActive: input.isActive ?? true,
             sortOrder: maxRow.nextSortOrder,
           })

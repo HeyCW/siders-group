@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api.js';
 import { rolesApi, type PermissionCatalogEntry } from '../lib/rolesApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
 import { useSession } from '../session/SessionContext.js';
+import { Button } from '../components/ui/Button.js';
 
 const FIELD_LABEL = 'mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
 const TEXT_INPUT =
@@ -242,14 +243,9 @@ export function RolesPage() {
             <PermissionEditor catalog={catalog} selected={permissions} onChange={setPermissions} idPrefix="new-role" />
           </div>
           <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={!canCreate}
-              className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-            >
+            <Button variant="primary" onClick={handleCreate} disabled={!canCreate}>
               {createState.loading ? 'Adding…' : 'Add role'}
-            </button>
+            </Button>
             {createState.errorMessage && !createState.forbidden && (
               <p className="text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
             )}
@@ -276,13 +272,9 @@ export function RolesPage() {
                       {/* Save has nothing valid to submit here — no permission set ever loaded —
                           but Cancel must stay reachable, or a failed fetch leaves this row with
                           no way back to its normal Edit/Delete controls until the page reloads. */}
-                      <button
-                        type="button"
-                        onClick={cancelEdit}
-                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                      >
+                      <Button variant="ghost" onClick={cancelEdit}>
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {!editDetailLoading && !editDetailError && (
@@ -309,21 +301,16 @@ export function RolesPage() {
                         />
                       </div>
                       <div className="flex items-center gap-3 pt-1">
-                        <button
-                          type="button"
+                        <Button
+                          variant="primary"
                           onClick={handleSaveEdit}
                           disabled={editName.trim().length === 0 || updateState.loading}
-                          className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
                         >
                           {updateState.loading ? 'Saving…' : 'Save'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                        >
+                        </Button>
+                        <Button variant="ghost" onClick={cancelEdit}>
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </>
                   )}
@@ -344,13 +331,9 @@ export function RolesPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(role)}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    <Button variant="ghost" onClick={() => startEdit(role)}>
                       Edit
-                    </button>
+                    </Button>
                     {role.isSystem ? null : role.holderCount > 0 ? (
                       <span
                         className="font-mono text-xs uppercase tracking-wide text-[var(--muted)]/50"
@@ -359,13 +342,9 @@ export function RolesPage() {
                         Delete
                       </span>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(role)}
-                        className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
-                      >
+                      <Button variant="ghost" tone="danger" onClick={() => handleRemove(role)}>
                         Delete
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

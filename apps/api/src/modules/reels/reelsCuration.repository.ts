@@ -9,7 +9,7 @@ export interface ReelsCurationEntryRow {
   position: number;
   provider: ReelProvider;
   externalId: string;
-  posterStoragePath: string;
+  posterStoragePath: string | null;
   caption: string | null;
   status: ReelStatus;
 }
@@ -44,7 +44,7 @@ async function selectJoined(executor: OrderingExecutor): Promise<ReelsCurationEn
     })
     .from(reelsCuration)
     .innerJoin(reels, eq(reels.id, reelsCuration.reelId))
-    .innerJoin(media, eq(media.id, reels.posterMediaId))
+    .leftJoin(media, eq(media.id, reels.posterMediaId))
     .orderBy(asc(reelsCuration.position));
 }
 

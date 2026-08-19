@@ -64,6 +64,15 @@ function IconTags(props: IconProps) {
   );
 }
 
+function IconAnakUsaha(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <path d="M4 17V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v12M12 17V9a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v8M3 17h14" />
+      <path d="M6.5 7h1M6.5 10h1M6.5 13h1M9.5 7h1M9.5 10h1M9.5 13h1" />
+    </IconShell>
+  );
+}
+
 function IconHomeCuration(props: IconProps) {
   return (
     <IconShell {...props}>
@@ -193,6 +202,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/articles', label: 'Articles', icon: IconArticles, permission: 'news.manage' },
       { to: '/categories', label: 'Categories', icon: IconCategories, permission: 'category.manage' },
       { to: '/tags', label: 'Tags', icon: IconTags, permission: 'tag.manage' },
+      { to: '/anak-usaha', label: 'Anak Perusahaan', icon: IconAnakUsaha, permission: 'anak-usaha.manage' },
     ],
   },
   {

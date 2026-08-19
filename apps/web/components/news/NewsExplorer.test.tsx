@@ -64,9 +64,9 @@ describe('NewsExplorer', () => {
   });
 
   it('load-more appends fetched articles, and hides itself once a page returns fewer than a full page', async () => {
-    // A full first page (PAGE_SIZE = 6) is required for the button to render at all.
-    const firstPage = Array.from({ length: 6 }, (_, i) => makeArticle({ title: `Article ${i}` }));
-    const nextPage = [makeArticle({ title: 'Extra article' })]; // fewer than PAGE_SIZE -> no more after
+    // A full first page (NEWS_PAGE_SIZE = 9) is required for the button to render at all.
+    const firstPage = Array.from({ length: 9 }, (_, i) => makeArticle({ title: `Article ${i}` }));
+    const nextPage = [makeArticle({ title: 'Extra article' })]; // fewer than NEWS_PAGE_SIZE -> no more after
     getArticlesMock.mockResolvedValueOnce(nextPage);
     render(
       <NewsExplorer

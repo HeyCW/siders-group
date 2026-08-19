@@ -26,6 +26,7 @@ import { createArticleRepository } from './modules/articles/article.repository.j
 import { createScheduledPublishJob } from './modules/articles/scheduledPublishWorker.js';
 import { categoryRoutes } from './modules/categories/category.routes.js';
 import { tagRoutes } from './modules/tags/tag.routes.js';
+import { anakUsahaRoutes } from './modules/anak-usaha/anakUsaha.routes.js';
 import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
 import { reelRoutes, reelsCurationRoutes, publicReelsRoutes } from './modules/reels/reels.routes.js';
 import { partnerRoutes, publicPartnerRoutes } from './modules/partners/partner.routes.js';
@@ -73,6 +74,7 @@ export function createServer(): Express {
   app.use('/articles', publicEngagementRoutes(db, env));
   app.use('/categories', categoryRoutes(db));
   app.use('/tags', tagRoutes(db));
+  app.use('/anak-usaha', anakUsahaRoutes(db));
   app.use('/admin/curation', curationRoutes(db, env));
   app.use('/home', publicHomeRoutes(db, env));
   app.use('/admin/reels-curation', reelsCurationRoutes(db, env));

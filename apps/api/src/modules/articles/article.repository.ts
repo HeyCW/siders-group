@@ -7,6 +7,7 @@ import {
   tags,
   media,
   users,
+  anakUsaha,
   type Database,
 } from '@siders/db';
 import type { ArticleStatus } from '@siders/contracts';
@@ -24,6 +25,7 @@ export interface ArticleRow {
   status: ArticleStatus;
   authorId: string;
   featuredMediaId: string | null;
+  anakUsahaId: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   publishedAt: Date | null;
@@ -42,6 +44,7 @@ export interface ArticleWithRelations extends ArticleRow {
   featuredMediaStoragePath: string | null;
   categories: TaxonomyRef[];
   tags: TaxonomyRef[];
+  anakUsaha: TaxonomyRef | null;
 }
 
 export interface CreateArticleInput {
@@ -52,6 +55,7 @@ export interface CreateArticleInput {
   excerpt: string | null;
   authorId: string;
   featuredMediaId: string | null;
+  anakUsahaId: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   categoryIds: string[];
@@ -65,6 +69,7 @@ export interface UpdateArticleInput {
   bodyHtml?: string | undefined;
   excerpt?: string | null | undefined;
   featuredMediaId?: string | null | undefined;
+  anakUsahaId?: string | null | undefined;
   seoTitle?: string | null | undefined;
   seoDescription?: string | null | undefined;
   categoryIds?: string[] | undefined;
@@ -112,6 +117,7 @@ export interface ArticleRepository {
 
 const SLUG_CONSTRAINT = 'articles_slug_unique';
 const FEATURED_MEDIA_CONSTRAINT = 'featured_media_id';
+const ANAK_USAHA_CONSTRAINT = 'anak_usaha_id';
 
 function invalidTaxonomyError(): AppError {
   return new AppError('One or more category or tag ids do not exist', 400, 'invalid_taxonomy_reference');
@@ -119,6 +125,10 @@ function invalidTaxonomyError(): AppError {
 
 function invalidFeaturedMediaError(): AppError {
   return new AppError('The referenced featured media item does not exist', 400, 'invalid_media_reference');
+}
+
+function invalidAnakUsahaError(): AppError {
+  return new AppError('The referenced anak usaha entry does not exist', 400, 'invalid_anak_usaha_reference');
 }
 
 function slugConflictError(): AppError {
@@ -135,9 +145,10 @@ function slugConflictError(): AppError {
 function translateArticleWriteError(err: unknown): AppError | null {
   if (isUniqueViolationOn(err, SLUG_CONSTRAINT)) return slugConflictError();
   if (isForeignKeyViolation(err)) {
-    return violatedConstraint(err)?.includes(FEATURED_MEDIA_CONSTRAINT)
-      ? invalidFeaturedMediaError()
-      : invalidTaxonomyError();
+    const constraint = violatedConstraint(err);
+    if (constraint?.includes(FEATURED_MEDIA_CONSTRAINT)) return invalidFeaturedMediaError();
+    if (constraint?.includes(ANAK_USAHA_CONSTRAINT)) return invalidAnakUsahaError();
+    return invalidTaxonomyError();
   }
   return null;
 }
@@ -216,8 +227,9 @@ async function attachRelations(db: Database, rows: ArticleRow[]): Promise<Articl
   const articleIds = rows.map((r) => r.id);
   const authorIds = [...new Set(rows.map((r) => r.authorId))];
   const mediaIds = [...new Set(rows.map((r) => r.featuredMediaId).filter((id): id is string => id !== null))];
+  const anakUsahaIds = [...new Set(rows.map((r) => r.anakUsahaId).filter((id): id is string => id !== null))];
 
-  const [categoryLinks, tagLinks, authors, mediaRows] = await Promise.all([
+  const [categoryLinks, tagLinks, authors, mediaRows, anakUsahaRows] = await Promise.all([
     db
       .select({ articleId: articleCategories.articleId, id: categories.id, name: categories.name, slug: categories.slug })
       .from(articleCategories)
@@ -234,12 +246,19 @@ async function attachRelations(db: Database, rows: ArticleRow[]): Promise<Articl
     mediaIds.length > 0
       ? db.select({ id: media.id, storagePath: media.storagePath }).from(media).where(inArray(media.id, mediaIds))
       : Promise.resolve([]),
+    anakUsahaIds.length > 0
+      ? db
+          .select({ id: anakUsaha.id, name: anakUsaha.name, slug: anakUsaha.slug })
+          .from(anakUsaha)
+          .where(inArray(anakUsaha.id, anakUsahaIds))
+      : Promise.resolve([]),
   ]);
 
   const categoriesByArticle = groupByArticleId(categoryLinks);
   const tagsByArticle = groupByArticleId(tagLinks);
   const authorNameById = new Map(authors.map((a) => [a.id, a.name]));
   const mediaPathById = new Map(mediaRows.map((m) => [m.id, m.storagePath]));
+  const anakUsahaById = new Map(anakUsahaRows.map((a) => [a.id, a]));
 
   return rows.map((row) => ({
     ...row,
@@ -247,6 +266,7 @@ async function attachRelations(db: Database, rows: ArticleRow[]): Promise<Articl
     featuredMediaStoragePath: row.featuredMediaId ? (mediaPathById.get(row.featuredMediaId) ?? null) : null,
     categories: (categoriesByArticle.get(row.id) ?? []).map(({ id, name, slug }) => ({ id, name, slug })),
     tags: (tagsByArticle.get(row.id) ?? []).map(({ id, name, slug }) => ({ id, name, slug })),
+    anakUsaha: row.anakUsahaId ? (anakUsahaById.get(row.anakUsahaId) ?? null) : null,
   }));
 }
 
@@ -270,6 +290,7 @@ export function createArticleRepository(db: Database): ArticleRepository {
               excerpt: input.excerpt,
               authorId: input.authorId,
               featuredMediaId: input.featuredMediaId,
+              anakUsahaId: input.anakUsahaId,
               seoTitle: input.seoTitle,
               seoDescription: input.seoDescription,
             })

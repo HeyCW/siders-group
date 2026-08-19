@@ -1,0 +1,1 @@
+ALTER TABLE "app"."partners" ALTER COLUMN "website_url" DROP NOT NULL;

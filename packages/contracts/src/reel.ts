@@ -14,13 +14,13 @@ export type ReelStatus = z.infer<typeof reelStatusSchema>;
  * The client submits a URL; the server parses it and persists only the extracted
  * `(provider, externalId)` — the submitted URL itself is never stored
  * (specs/reels-curation/spec.md - "Only a provider identity is persisted"). `posterMediaId` is
- * required: a reel cannot be created without a locally stored poster
+ * optional: a reel is playable via its third-party embed with or without a locally stored poster
  * (specs/reels-curation/spec.md - "Every reel has a locally stored poster image").
  */
 export const reelCreateRequestSchema = z
   .object({
     url: z.string().url(),
-    posterMediaId: z.string().uuid(),
+    posterMediaId: z.string().uuid().nullable().optional(),
     caption: z.string().max(1000).optional(),
   })
   .strict();
@@ -28,11 +28,13 @@ export type ReelCreateRequest = z.infer<typeof reelCreateRequestSchema>;
 
 /**
  * The provider and identifier are immutable after creation — editing a reel never re-parses a
- * URL. Only presentation fields and status can change.
+ * URL. Only presentation fields and status can change. `posterMediaId` is `.nullable()` on top of
+ * `.optional()`, the same shape as `partner.ts`'s `websiteUrl`: absent means "leave it as it is",
+ * `null` means "clear it".
  */
 export const reelUpdateRequestSchema = z
   .object({
-    posterMediaId: z.string().uuid().optional(),
+    posterMediaId: z.string().uuid().nullable().optional(),
     caption: z.string().max(1000).nullable().optional(),
     status: reelStatusSchema.optional(),
   })
@@ -48,7 +50,7 @@ export const reelResponseSchema = z.object({
   id: z.string().uuid(),
   provider: reelProviderSchema,
   externalId: z.string(),
-  posterUrl: z.string(),
+  posterUrl: z.string().nullable(),
   caption: z.string().nullable(),
   status: reelStatusSchema,
   createdAt: z.string().datetime(),
@@ -65,7 +67,7 @@ export type ReelResponse = z.infer<typeof reelResponseSchema>;
 export const publicReelItemSchema = z.object({
   provider: reelProviderSchema,
   externalId: z.string(),
-  posterUrl: z.string(),
+  posterUrl: z.string().nullable(),
   caption: z.string().nullable(),
 });
 export type PublicReelItem = z.infer<typeof publicReelItemSchema>;

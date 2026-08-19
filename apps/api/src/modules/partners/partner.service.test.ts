@@ -45,7 +45,7 @@ function createFakePartnerRepository(initial: PartnerRow[] = []) {
         sortOrder: stored.length,
         name: input.name,
         logoMediaId: input.logoMediaId,
-        websiteUrl: input.websiteUrl,
+        websiteUrl: input.websiteUrl ?? null,
         isActive: input.isActive ?? true,
       });
       stored.push(created);
@@ -68,7 +68,10 @@ function createFakePartnerRepository(initial: PartnerRow[] = []) {
         ...existing,
         name: input.name ?? existing.name,
         logoMediaId: input.logoMediaId ?? existing.logoMediaId,
-        websiteUrl: input.websiteUrl ?? existing.websiteUrl,
+        // `websiteUrl` distinguishes omitted (leave as-is) from explicit `null` (clear) — a plain
+        // `??` would treat both the same, mirroring the real repository's `stripUndefined`
+        // behavior over a plain object.
+        websiteUrl: 'websiteUrl' in input ? (input.websiteUrl ?? null) : existing.websiteUrl,
         isActive: input.isActive ?? existing.isActive,
         updatedAt: new Date(),
       };
@@ -127,6 +130,15 @@ describe('PartnerService.create', () => {
 
     expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
   });
+
+  it('creates a partner with no website URL', async () => {
+    const { repository } = createFakePartnerRepository();
+    const service = createPartnerService(repository, revalidateEnv, logger);
+
+    const created = await service.create({ name: 'Acme', logoMediaId: '11111111-1111-1111-1111-000000000001' });
+
+    expect(created.websiteUrl).toBeNull();
+  });
 });
 
 describe('PartnerService.update', () => {
@@ -153,6 +165,24 @@ describe('PartnerService.update', () => {
     await service.update('a', { isActive: false });
 
     expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the website URL when explicitly updated to null', async () => {
+    const { repository } = createFakePartnerRepository([row({ id: 'a', websiteUrl: 'https://acme.example.com' })]);
+    const service = createPartnerService(repository, revalidateEnv, logger);
+
+    const updated = await service.update('a', { websiteUrl: null });
+
+    expect(updated.websiteUrl).toBeNull();
+  });
+
+  it('leaves the website URL unchanged when the field is omitted from the update', async () => {
+    const { repository } = createFakePartnerRepository([row({ id: 'a', websiteUrl: 'https://acme.example.com' })]);
+    const service = createPartnerService(repository, revalidateEnv, logger);
+
+    const updated = await service.update('a', { name: 'New name' });
+
+    expect(updated.websiteUrl).toBe('https://acme.example.com');
   });
 });
 

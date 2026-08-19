@@ -3,6 +3,7 @@ import type { ReaderQueueRow, ReaderQueueStatusFilter } from '@siders/contracts'
 import { ApiError } from '../lib/api.js';
 import { moderationApi } from '../lib/moderationApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
+import { Button } from '../components/ui/Button.js';
 
 const PAGE_LIMIT = 20;
 
@@ -18,9 +19,6 @@ const TAB_BUTTON = (active: boolean) =>
       ? 'bg-[var(--signal)] text-white'
       : 'text-[var(--muted)] hover:bg-[var(--ink)]/[0.05] hover:text-[var(--ink)]'
   }`;
-
-const ACTION_BUTTON =
-  'rounded-md border border-[var(--rule)] px-2.5 py-1 text-xs font-medium text-[var(--muted)] transition-colors hover:border-[var(--ink)]/30 hover:text-[var(--ink)] disabled:opacity-50';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -146,9 +144,9 @@ export function ReaderModerationPage() {
               placeholder="Search by name or email"
               className="w-56 rounded-md border border-[var(--rule)] bg-transparent px-3 py-1.5 text-sm placeholder:text-[var(--muted)]/60 focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
             />
-            <button type="submit" className={ACTION_BUTTON}>
+            <Button type="submit" variant="secondary" size="sm">
               Search
-            </button>
+            </Button>
           </form>
         </div>
 
@@ -205,39 +203,42 @@ export function ReaderModerationPage() {
                       className="w-48 rounded-md border border-[var(--rule)] bg-transparent px-2.5 py-1 text-xs placeholder:text-[var(--muted)]/60 focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20"
                     />
 
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="sm"
                       disabled={moderateState.loading}
                       onClick={() => void applyAction(reader.id, { status: reader.status === 'active' ? 'banned' : 'active' })}
-                      className={ACTION_BUTTON}
                     >
                       {reader.status === 'active' ? 'Ban' : 'Unban'}
-                    </button>
+                    </Button>
 
                     {muted ? (
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
+                        size="sm"
                         disabled={moderateState.loading}
                         onClick={() => void applyAction(reader.id, { mutedUntil: null })}
-                        className={ACTION_BUTTON}
                       >
                         Unmute
-                      </button>
+                      </Button>
                     ) : (
                       MUTE_PRESETS.map((preset) => (
-                        <button
+                        <Button
                           key={preset.label}
                           type="button"
+                          variant="secondary"
+                          size="sm"
                           disabled={moderateState.loading}
                           onClick={() =>
                             void applyAction(reader.id, {
                               mutedUntil: new Date(Date.now() + preset.hours * 60 * 60 * 1000).toISOString(),
                             })
                           }
-                          className={ACTION_BUTTON}
                         >
                           Mute {preset.label}
-                        </button>
+                        </Button>
                       ))
                     )}
                   </div>
@@ -249,14 +250,15 @@ export function ReaderModerationPage() {
 
         {hasMore && (
           <div className="mt-4 flex justify-center">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={() => void handleLoadMore()}
               disabled={loadingMore}
-              className="rounded-md border border-[var(--rule)] px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:border-[var(--ink)]/30 hover:text-[var(--ink)] disabled:opacity-50"
             >
               {loadingMore ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           </div>
         )}
       </div>

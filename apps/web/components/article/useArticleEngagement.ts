@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { COMMENT_PAGE_SIZE, type ArticleEngagement, type CommentResponse } from '@siders/contracts';
+import { ensureViewRecorded } from '../../lib/articleViewGate';
 import {
   getArticleComments,
   getArticleEngagement,
@@ -62,10 +63,14 @@ export function useArticleEngagement(articleId: string, readerId: string | null)
     let cancelled = false;
 
     async function load(): Promise<void> {
-      // React's development StrictMode mounts effects twice, so this fires twice in `next dev`
-      // and once in a production build. Uniques are unaffected — the server deduplicates per
-      // visitor per day — so the only consequence is an inflated total in local development.
-      await recordArticleView(articleId).catch(() => undefined);
+      // Gated per device per calendar day (`lib/articleViewGate.ts`), on top of the server's own
+      // IP-based dedup, and awaited here rather than fired-and-skipped: React's development
+      // StrictMode mounts this effect, cleans it up, and remounts it before the first attempt's
+      // `await` ever settles, and the *first* invocation is the one StrictMode discards — so if the
+      // second invocation merely skipped an already-started POST and moved on, it would read the
+      // engagement summary before that POST had landed, rendering a count one short of the view it
+      // just sent. `ensureViewRecorded` makes every invocation wait on the same attempt instead.
+      await ensureViewRecorded(articleId, () => recordArticleView(articleId));
 
       try {
         const [summary, comments] = await Promise.all([

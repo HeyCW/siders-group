@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from './ui/Button.js';
 
 export interface TemporaryPasswordPanelProps {
   /** Whose credential this is, for the panel's heading (e.g. "New Editor"). */
@@ -38,20 +39,12 @@ export function TemporaryPasswordPanel({ accountLabel, temporaryPassword, onDism
         This will not be shown again. Copy it now and share it with the staff member through a secure channel.
       </p>
       <div className="mt-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded-md border border-[var(--rule)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)]/30"
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={handleCopy}>
           {copied ? 'Copied' : 'Copy'}
-        </button>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-        >
+        </Button>
+        <Button type="button" variant="ghost" onClick={onDismiss}>
           Dismiss
-        </button>
+        </Button>
       </div>
     </div>
   );

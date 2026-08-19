@@ -20,6 +20,7 @@ export interface ArticleCreateInput {
   categoryIds?: string[] | undefined;
   tagIds?: string[] | undefined;
   featuredMediaId?: string | null | undefined;
+  anakUsahaId?: string | null | undefined;
   seoTitle?: string | undefined;
   seoDescription?: string | undefined;
 }
@@ -38,6 +39,7 @@ export interface ArticleEditInput {
   categoryIds?: string[] | undefined;
   tagIds?: string[] | undefined;
   featuredMediaId?: string | null | undefined;
+  anakUsahaId?: string | null | undefined;
   seoTitle?: string | undefined;
   seoDescription?: string | undefined;
 }
@@ -85,7 +87,7 @@ export function createArticleService(
 
   function toRepositoryFields(input: ArticleEditInput): Pick<
     UpdateArticleInput,
-    'title' | 'bodyJson' | 'bodyHtml' | 'excerpt' | 'featuredMediaId' | 'seoTitle' | 'seoDescription'
+    'title' | 'bodyJson' | 'bodyHtml' | 'excerpt' | 'featuredMediaId' | 'anakUsahaId' | 'seoTitle' | 'seoDescription'
   > {
     const fields: ReturnType<typeof toRepositoryFields> = {};
     if (input.title !== undefined) fields.title = input.title;
@@ -95,6 +97,7 @@ export function createArticleService(
     }
     if (input.excerpt !== undefined) fields.excerpt = input.excerpt;
     if (input.featuredMediaId !== undefined) fields.featuredMediaId = input.featuredMediaId;
+    if (input.anakUsahaId !== undefined) fields.anakUsahaId = input.anakUsahaId;
     if (input.seoTitle !== undefined) fields.seoTitle = input.seoTitle;
     if (input.seoDescription !== undefined) fields.seoDescription = input.seoDescription;
     return fields;
@@ -112,6 +115,7 @@ export function createArticleService(
         excerpt: input.excerpt ?? null,
         authorId,
         featuredMediaId: input.featuredMediaId ?? null,
+        anakUsahaId: input.anakUsahaId ?? null,
         seoTitle: input.seoTitle ?? null,
         seoDescription: input.seoDescription ?? null,
         categoryIds: input.categoryIds ?? [],

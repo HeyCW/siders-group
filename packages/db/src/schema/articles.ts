@@ -2,6 +2,7 @@ import { index, jsonb, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { app } from './schema';
 import { users } from './users';
 import { media } from './media';
+import { anakUsaha } from './anakUsaha';
 
 export const articleStatus = app.enum('article_status', ['draft', 'scheduled', 'published']);
 
@@ -28,6 +29,7 @@ export const articles = app.table(
       .notNull()
       .references(() => users.id),
     featuredMediaId: uuid('featured_media_id').references(() => media.id, { onDelete: 'set null' }),
+    anakUsahaId: uuid('anak_usaha_id').references(() => anakUsaha.id, { onDelete: 'set null' }),
     seoTitle: text('seo_title'),
     seoDescription: text('seo_description'),
     publishedAt: timestamp('published_at', { withTimezone: true }),
@@ -41,5 +43,6 @@ export const articles = app.table(
     statusPublishedAtIdx: index('articles_status_published_at_idx').on(table.status, table.publishedAt),
     authorIdx: index('articles_author_idx').on(table.authorId),
     featuredMediaIdx: index('articles_featured_media_idx').on(table.featuredMediaId),
+    anakUsahaIdx: index('articles_anak_usaha_idx').on(table.anakUsahaId),
   }),
 );

@@ -1,0 +1,1 @@
+ALTER TABLE "app"."reels" ALTER COLUMN "poster_media_id" DROP NOT NULL;

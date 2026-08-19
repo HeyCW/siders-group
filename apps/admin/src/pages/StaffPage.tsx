@@ -7,6 +7,8 @@ import { useAsyncAction } from '../hooks/useAsyncAction.js';
 import { useSession } from '../session/SessionContext.js';
 import { hasPermission } from '../lib/permissions.js';
 import { TemporaryPasswordPanel } from '../components/TemporaryPasswordPanel.js';
+import { Button } from '../components/ui/Button.js';
+import { Select } from '../components/ui/Select.js';
 
 const FIELD_LABEL = 'mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
 const TEXT_INPUT =
@@ -203,24 +205,19 @@ export function StaffPage() {
               <label htmlFor="staff-role" className={FIELD_LABEL}>
                 Role
               </label>
-              <select id="staff-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} className={TEXT_INPUT}>
+              <Select id="staff-role" size="md" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
                 <option value="">Select a role…</option>
                 {assignableRoles.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="flex items-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={!canCreate}
-                className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-              >
+              <Button variant="primary" onClick={handleCreate} disabled={!canCreate}>
                 {createState.loading ? 'Creating…' : 'Create account'}
-              </button>
+              </Button>
               {createState.errorMessage && !createState.forbidden && (
                 <p className="text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
               )}
@@ -274,12 +271,13 @@ export function StaffPage() {
                 </div>
 
                 {showRoleChange ? (
-                  <select
+                  <Select
                     aria-label={`Role for ${entry.name}`}
+                    size="sm"
                     value={entry.roleId}
                     disabled={assignState.loading}
                     onChange={(e) => handleAssign(entry, e.target.value)}
-                    className="shrink-0 rounded-md border border-[var(--rule)] bg-transparent px-2 py-1 text-xs"
+                    className="shrink-0"
                   >
                     {/* This row is never shown for an Owner-held target to a non-Owner caller
                         (`showRoleChange` above), so `entry.roleId` is always present in
@@ -289,31 +287,21 @@ export function StaffPage() {
                         {r.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
                   <span className="shrink-0 font-mono text-xs text-[var(--muted)]">{entry.roleName}</span>
                 )}
 
                 <div className="flex shrink-0 items-center gap-3">
                   {showReset && (
-                    <button
-                      type="button"
-                      onClick={() => handleReset(entry)}
-                      disabled={resetState.loading}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    <Button variant="ghost" onClick={() => handleReset(entry)} disabled={resetState.loading}>
                       Reset
-                    </button>
+                    </Button>
                   )}
                   {showDisable && entry.status === 'active' && (
-                    <button
-                      type="button"
-                      onClick={() => handleDisable(entry)}
-                      disabled={disableState.loading}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
-                    >
+                    <Button variant="ghost" tone="danger" onClick={() => handleDisable(entry)} disabled={disableState.loading}>
                       Disable
-                    </button>
+                    </Button>
                   )}
                 </div>
               </li>

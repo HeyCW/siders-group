@@ -47,6 +47,45 @@
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
+/*
+ * Every `<select>`'s native option popup, console-wide: the popup ignores the select's own
+ * `background-color` and paints itself using the OS/browser theme, so without this an option
+ * list can render light-on-light or dark-on-dark against `--ink` text (specs/article-editor,
+ * the Reel status select, the Staff role select all hit this the same way).
+ */
+.siders-scope select option {
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+/*
+ * A thin, token-colored scrollbar for every scrolling panel in the console (the article editor's
+ * metadata sidebar, the main canvas, etc.) — the OS default scrollbar is a thick gray bar that
+ * reads as a stock browser widget against this design's hairline rules and flat paper/ink colors.
+ */
+.siders-scope {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+.siders-scope ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.siders-scope ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.siders-scope ::-webkit-scrollbar-thumb {
+  background-color: var(--rule);
+  border-radius: 9999px;
+}
+
+.siders-scope ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;

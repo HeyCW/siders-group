@@ -4,6 +4,7 @@ export * from './users';
 export * from './readers';
 export * from './sessions';
 export * from './media';
+export * from './anakUsaha';
 export * from './articles';
 export * from './taxonomy';
 export * from './homeCuration';

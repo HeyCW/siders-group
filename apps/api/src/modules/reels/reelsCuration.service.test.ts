@@ -104,4 +104,14 @@ describe('ReelsCurationService', () => {
 
     expect(entry?.reel.posterUrl).toBe('https://media.example.com/2026/08/x.webp');
   });
+
+  it('reports posterUrl as null for a reel with no poster, rather than an empty string', async () => {
+    const { repository, setStored } = createFakeReelsCurationRepository();
+    setStored([row({ reelId: 'a', position: 0, posterStoragePath: null })]);
+    const service = createReelsCurationService(repository, revalidateEnv, mediaEnv, logger);
+
+    const [entry] = await service.list();
+
+    expect(entry?.reel.posterUrl).toBeNull();
+  });
 });

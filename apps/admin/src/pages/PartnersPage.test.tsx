@@ -38,15 +38,16 @@ async function renderPage(initial: PartnerResponse[] = []) {
 }
 
 describe('PartnersPage — new partner form', () => {
-  /** specs/partner-management/spec.md - "A partner requires a logo". */
-  it('keeps "Add partner" disabled until name, a valid website URL, and a logo are all present', async () => {
+  /** specs/partner-management/spec.md - "A partner requires a logo". Website URL is optional
+   *  (proposal.md - "partner-optional-website"), so it is deliberately left blank here and must
+   *  not block the button. */
+  it('keeps "Add partner" disabled until name and a logo are present, with no website URL required', async () => {
     await renderPage();
 
     const addButton = screen.getByRole('button', { name: 'Add partner' }) as HTMLButtonElement;
     expect(addButton.disabled).toBe(true);
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Acme Corp' } });
-    fireEvent.change(screen.getByLabelText('Website URL'), { target: { value: 'https://acme.example.com' } });
     expect(addButton.disabled).toBe(true);
 
     vi.mocked(mediaApi.upload).mockResolvedValue({
@@ -64,7 +65,7 @@ describe('PartnersPage — new partner form', () => {
   it('shows validation feedback for an invalid website URL', async () => {
     await renderPage();
 
-    fireEvent.change(screen.getByLabelText('Website URL'), { target: { value: 'not-a-url' } });
+    fireEvent.change(screen.getByLabelText('Website URL (optional)'), { target: { value: 'not-a-url' } });
 
     expect(screen.getByText('Enter a valid http(s) URL.')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Add partner' }) as HTMLButtonElement).disabled).toBe(true);
@@ -78,12 +79,37 @@ describe('PartnersPage — new partner form', () => {
     async (value) => {
       await renderPage();
 
-      fireEvent.change(screen.getByLabelText('Website URL'), { target: { value } });
+      fireEvent.change(screen.getByLabelText('Website URL (optional)'), { target: { value } });
 
       expect(screen.getByText('Enter a valid http(s) URL.')).toBeTruthy();
       expect((screen.getByRole('button', { name: 'Add partner' }) as HTMLButtonElement).disabled).toBe(true);
     },
   );
+
+  /** proposal.md - "a partner can be created and stored with no website URL": a blank field
+   *  submits `null`, not an empty string, so it isn't mistaken for an invalid URL server-side. */
+  it('creates a partner with no website URL, sending null rather than an empty string', async () => {
+    await renderPage();
+    vi.mocked(partnersApi.create).mockResolvedValue(partner({ id: 'a', websiteUrl: null }));
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Acme Corp' } });
+    vi.mocked(mediaApi.upload).mockResolvedValue({
+      id: 'media-1',
+      url: 'https://cdn.example.com/acme.webp',
+    } as never);
+    const file = new File(['x'], 'logo.png', { type: 'image/png' });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Choose file'), { target: { files: [file] } });
+    });
+
+    const addButton = screen.getByRole('button', { name: 'Add partner' }) as HTMLButtonElement;
+    await waitFor(() => expect(addButton.disabled).toBe(false));
+    await act(async () => {
+      addButton.click();
+    });
+
+    expect(partnersApi.create).toHaveBeenCalledWith({ name: 'Acme Corp', logoMediaId: 'media-1', websiteUrl: null });
+  });
 });
 
 describe('PartnersPage — edit form', () => {
@@ -96,10 +122,10 @@ describe('PartnersPage — edit form', () => {
       screen.getByRole('button', { name: 'Edit' }).click();
     });
 
-    // Both the create form and the open edit row label a field "Website URL"; this is the edit
-    // row's, distinguished by the per-partner id the page assigns it.
+    // Both the create form and the open edit row label a field "Website URL (optional)"; this is
+    // the edit row's, distinguished by the per-partner id the page assigns it.
     const urlInput = screen
-      .getAllByLabelText('Website URL')
+      .getAllByLabelText('Website URL (optional)')
       .find((el) => el.id === 'edit-partner-website-url-a') as HTMLInputElement;
     fireEvent.change(urlInput, { target: { value: 'javascript:alert(1)' } });
 
@@ -109,6 +135,39 @@ describe('PartnersPage — edit form', () => {
 
     fireEvent.change(urlInput, { target: { value: 'https://acme.example.com' } });
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  /** proposal.md - clearing an existing website: an emptied field is a valid save (never blocked)
+   *  and sends `null` so the server clears the stored value, matching
+   *  `partnerUpdateRequestSchema.websiteUrl`'s `.nullable()`. */
+  it('allows saving an edit with the website URL cleared, sending null', async () => {
+    const existing = partner({ id: 'a', websiteUrl: 'https://acme.example.com' });
+    await renderPage([existing]);
+    vi.mocked(partnersApi.update).mockResolvedValue({ ...existing, websiteUrl: null });
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Edit' }).click();
+    });
+    const urlInput = screen
+      .getAllByLabelText('Website URL (optional)')
+      .find((el) => el.id === 'edit-partner-website-url-a') as HTMLInputElement;
+    fireEvent.change(urlInput, { target: { value: '' } });
+
+    const saveButton = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(false);
+    await act(async () => {
+      saveButton.click();
+    });
+
+    expect(partnersApi.update).toHaveBeenCalledWith('a', { name: 'Acme Corp', websiteUrl: null });
+  });
+});
+
+describe('PartnersPage — partner list', () => {
+  it('shows "No website" for a partner with no website URL', async () => {
+    await renderPage([partner({ id: 'a', websiteUrl: null })]);
+
+    expect(screen.getByText('No website')).toBeTruthy();
   });
 });
 

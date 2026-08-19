@@ -12,7 +12,7 @@ export function createReelController(service: ReelService, env: Pick<Env, 'MEDIA
     async create(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const body = reelCreateRequestSchema.parse(req.body);
-        const row = await service.create({ ...body, caption: body.caption ?? null });
+        const row = await service.create({ ...body, posterMediaId: body.posterMediaId ?? null, caption: body.caption ?? null });
         res.status(201).json({ success: true, data: toReelResponse(env, row) });
       } catch (err) {
         next(err);

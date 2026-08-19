@@ -1,13 +1,12 @@
 import type { Metadata } from 'next';
 import { getArticles, getCategories } from '../../lib/api';
+import { NEWS_PAGE_SIZE } from '../../lib/newsPageSize';
 import { Container } from '../../components/layout/Container';
 import { NewsExplorer } from '../../components/news/NewsExplorer';
 
 export const metadata: Metadata = {
   title: 'News — Siders',
 };
-
-const PAGE_SIZE = 6;
 
 /**
  * Server-rendered, `searchParams`-driven, per `docs/ARCHITECTURE.md` §8.1: "filters live in the
@@ -19,7 +18,7 @@ export default async function NewsPage({ searchParams }: { searchParams: { categ
 
   const [categories, articles] = await Promise.all([
     getCategories({ cache: 'no-store' }),
-    getArticles({ categorySlug, limit: PAGE_SIZE, offset: 0 }, { cache: 'no-store' }),
+    getArticles({ categorySlug, limit: NEWS_PAGE_SIZE, offset: 0 }, { cache: 'no-store' }),
   ]);
 
   return (

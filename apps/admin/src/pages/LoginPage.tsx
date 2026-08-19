@@ -4,6 +4,7 @@ import { sessionApi } from '../lib/sessionApi.js';
 import { useSession } from '../session/SessionContext.js';
 import { resolveInAppTarget } from '../session/redirectTarget.js';
 import { useDarkMode } from '../hooks/useDarkMode.js';
+import { Button } from '../components/ui/Button.js';
 
 interface PulseItem {
   time: string;
@@ -208,13 +209,9 @@ export function LoginPage() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-md bg-[var(--signal)] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)] focus:ring-offset-2 disabled:opacity-60"
-            >
+            <Button type="submit" variant="primary" disabled={submitting} className="w-full py-2.5">
               {submitting ? 'Signing in…' : 'Sign in'}
-            </button>
+            </Button>
           </form>
 
           <p className="mt-6 text-center text-xs text-[var(--muted)]">Need access? Ask an admin to add your account.</p>

@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { partnersApi } from '../lib/partnersApi.js';
 import { useAsyncAction } from '../hooks/useAsyncAction.js';
+import { Button } from '../components/ui/Button.js';
 
 const FIELD_LABEL = 'mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
 const TEXT_INPUT =
@@ -33,6 +34,11 @@ function IconGrip({ className }: { className?: string }) {
 const isValidWebsiteUrl = isHttpUrl;
 
 const WEBSITE_URL_HINT = 'Enter a valid http(s) URL.';
+
+/** PNG only — the ticker relies on a transparent background so a partner's own tile color shows
+ *  through around the mark, not a logo-colored rectangle (PartnerGrid.tsx / `PartnerTile`). */
+const LOGO_MUST_BE_PNG_ERROR = 'Logo must be a PNG file with a transparent background.';
+const isPngFile = (file: File) => file.type === 'image/png';
 
 /**
  * The partner directory: create, edit, delete, reorder, and toggle active partners backing the
@@ -89,7 +95,6 @@ export function PartnersPage() {
   const canCreate =
     name.trim().length > 0 &&
     logoMediaId !== null &&
-    websiteUrl.trim().length > 0 &&
     !websiteUrlIsInvalid &&
     !createState.loading &&
     !uploadingLogo;
@@ -99,7 +104,6 @@ export function PartnersPage() {
   const editWebsiteUrlIsInvalid = editWebsiteUrl.trim().length > 0 && !isValidWebsiteUrl(editWebsiteUrl.trim());
   const canSaveEdit =
     editName.trim().length > 0 &&
-    editWebsiteUrl.trim().length > 0 &&
     !editWebsiteUrlIsInvalid &&
     !updateState.loading &&
     !editUploadingLogo;
@@ -107,6 +111,12 @@ export function PartnersPage() {
   async function handleLogoSelected(file: File | null) {
     setLogoUploadError(null);
     if (!file) {
+      setLogoPreviewUrl(null);
+      setLogoMediaId(null);
+      return;
+    }
+    if (!isPngFile(file)) {
+      setLogoUploadError(LOGO_MUST_BE_PNG_ERROR);
       setLogoPreviewUrl(null);
       setLogoMediaId(null);
       return;
@@ -128,7 +138,7 @@ export function PartnersPage() {
   async function handleCreate() {
     if (!logoMediaId || !canCreate) return;
     try {
-      const created = await runCreate({ name: name.trim(), logoMediaId, websiteUrl: websiteUrl.trim() });
+      const created = await runCreate({ name: name.trim(), logoMediaId, websiteUrl: websiteUrl.trim() || null });
       setPartners((prev) => [...prev, created]);
       setName('');
       setWebsiteUrl('');
@@ -143,7 +153,7 @@ export function PartnersPage() {
   function startEdit(partner: PartnerResponse) {
     setEditingId(partner.id);
     setEditName(partner.name);
-    setEditWebsiteUrl(partner.websiteUrl);
+    setEditWebsiteUrl(partner.websiteUrl ?? '');
     setEditLogoMediaId(null);
     setEditLogoPreviewUrl(partner.logoUrl);
     setEditLogoUploadError(null);
@@ -161,6 +171,10 @@ export function PartnersPage() {
   async function handleEditLogoSelected(file: File | null) {
     setEditLogoUploadError(null);
     if (!file) return;
+    if (!isPngFile(file)) {
+      setEditLogoUploadError(LOGO_MUST_BE_PNG_ERROR);
+      return;
+    }
     setEditUploadingLogo(true);
     try {
       const media = await mediaApi.upload(file);
@@ -180,7 +194,7 @@ export function PartnersPage() {
     try {
       const updated = await runUpdate(editingId, {
         name: editName.trim(),
-        websiteUrl: editWebsiteUrl.trim(),
+        websiteUrl: editWebsiteUrl.trim() || null,
         ...(editLogoMediaId ? { logoMediaId: editLogoMediaId } : {}),
       });
       setPartners((prev) => prev.map((p) => (p.id === editingId ? updated : p)));
@@ -274,7 +288,7 @@ export function PartnersPage() {
 
           <div>
             <label htmlFor="partner-website-url" className={FIELD_LABEL}>
-              Website URL
+              Website URL (optional)
             </label>
             <input
               id="partner-website-url"
@@ -296,7 +310,7 @@ export function PartnersPage() {
                 <input
                   key={logoInputKey}
                   type="file"
-                  accept="image/*"
+                  accept="image/png"
                   onChange={(e) => handleLogoSelected(e.target.files?.[0] ?? null)}
                   className="hidden"
                 />
@@ -308,14 +322,9 @@ export function PartnersPage() {
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={!canCreate}
-              className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-            >
+            <Button variant="primary" onClick={handleCreate} disabled={!canCreate}>
               {createState.loading ? 'Adding…' : 'Add partner'}
-            </button>
+            </Button>
             {createState.errorMessage && !createState.forbidden && (
               <p className="text-sm text-red-600 dark:text-red-400">{createState.errorMessage}</p>
             )}
@@ -356,7 +365,7 @@ export function PartnersPage() {
                   </div>
                   <div>
                     <label htmlFor={`edit-partner-website-url-${partner.id}`} className={FIELD_LABEL}>
-                      Website URL
+                      Website URL (optional)
                     </label>
                     <input
                       id={`edit-partner-website-url-${partner.id}`}
@@ -375,7 +384,7 @@ export function PartnersPage() {
                         Choose file
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/png"
                           onChange={(e) => handleEditLogoSelected(e.target.files?.[0] ?? null)}
                           className="hidden"
                         />
@@ -390,21 +399,12 @@ export function PartnersPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleSaveEdit}
-                      disabled={!canSaveEdit}
-                      className="rounded-md bg-[var(--signal)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--signal-hover)] disabled:opacity-50"
-                    >
+                    <Button variant="primary" onClick={handleSaveEdit} disabled={!canSaveEdit}>
                       {updateState.loading ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelEdit}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    </Button>
+                    <Button variant="ghost" onClick={cancelEdit}>
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -417,30 +417,18 @@ export function PartnersPage() {
                   <img src={partner.logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-contain" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-[var(--ink)]">{partner.name}</p>
-                    <p className="truncate font-mono text-xs text-[var(--muted)]">{partner.websiteUrl}</p>
+                    <p className="truncate font-mono text-xs text-[var(--muted)]">{partner.websiteUrl ?? 'No website'}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleActive(partner)}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    <Button variant="ghost" onClick={() => handleToggleActive(partner)}>
                       {partner.isActive ? 'Active' : 'Inactive'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => startEdit(partner)}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)]"
-                    >
+                    </Button>
+                    <Button variant="ghost" onClick={() => startEdit(partner)}>
                       Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(partner.id)}
-                      className="font-mono text-xs uppercase tracking-wide text-[var(--muted)] hover:text-red-600 dark:hover:text-red-400"
-                    >
+                    </Button>
+                    <Button variant="ghost" tone="danger" onClick={() => handleRemove(partner.id)}>
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
