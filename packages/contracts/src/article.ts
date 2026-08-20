@@ -76,11 +76,26 @@ export const DEFAULT_PUBLIC_LIST_LIMIT = 20;
 export const MAX_PUBLIC_LIST_LIMIT = 100;
 
 /**
- * `excludeIds` arrives either as a comma-separated query string, or — since Express's default
- * query parser turns a repeated key into an array — as an array already; both are normalized to
- * an array before validation, since neither form is guaranteed across every HTTP client
- * (specs/public-news-api/spec.md - "Excluding specific articles from the list").
+ * Normalizes a query param that arrives either as a comma-separated string, or — since Express's
+ * default query parser turns a repeated key into an array — as an array already, into a plain
+ * `string[]` before the given item schema validates each entry. The two encodings are combinable:
+ * an array's entries may each still be comma-separated, so the array branch splits too rather
+ * than handing `"a,b"` to `itemSchema` as one element. Empty segments are dropped so a trailing
+ * comma or an empty param is ignored rather than rejected
+ * (specs/public-news-api/spec.md - "Unknown identifiers are ignored").
  */
+function commaSeparatedList<T extends z.ZodTypeAny>(itemSchema: T) {
+  return z.preprocess((value) => {
+    const raw = typeof value === 'string' ? [value] : Array.isArray(value) ? value : undefined;
+    if (raw === undefined) return undefined;
+    const entries = raw
+      .filter((entry): entry is string => typeof entry === 'string')
+      .flatMap((entry) => entry.split(','))
+      .filter((entry) => entry.length > 0);
+    return entries.length > 0 ? entries : undefined;
+  }, z.array(itemSchema).optional());
+}
+
 export const articlePublicListQuerySchema = z.object({
   // Clamped, not rejected: a client asking for more than the cap gets the cap, not a 400
   // (specs/public-news-api/spec.md - "Scenario: Limit is capped"). `.min(1)` still rejects zero
@@ -93,22 +108,12 @@ export const articlePublicListQuerySchema = z.object({
     .default(DEFAULT_PUBLIC_LIST_LIMIT)
     .transform((n) => Math.min(n, MAX_PUBLIC_LIST_LIMIT)),
   offset: z.coerce.number().int().min(0).default(0),
-  categorySlug: z.string().optional(),
+  categorySlugs: commaSeparatedList(z.string()),
+  anakUsahaSlugs: commaSeparatedList(z.string()),
   tagSlug: z.string().optional(),
-  excludeIds: z.preprocess((value) => {
-    // Both query encodings normalize to the same array, and the two are combinable: Express's
-    // `qs` turns a repeated key into an array whose elements may each still be a comma-separated
-    // list, so the array branch splits too rather than handing `"a,b"` to the uuid check as one
-    // element. Empty segments are dropped so a trailing comma or `?excludeIds=` is ignored
-    // rather than rejected (specs/public-news-api/spec.md - "Unknown identifiers are ignored").
-    const raw = typeof value === 'string' ? [value] : Array.isArray(value) ? value : undefined;
-    if (raw === undefined) return undefined;
-    const ids = raw
-      .filter((entry): entry is string => typeof entry === 'string')
-      .flatMap((entry) => entry.split(','))
-      .filter((entry) => entry.length > 0);
-    return ids.length > 0 ? ids : undefined;
-  }, z.array(z.string().uuid()).optional()),
+  publishedAfter: z.coerce.date().optional(),
+  publishedBefore: z.coerce.date().optional(),
+  excludeIds: commaSeparatedList(z.string().uuid()),
 });
 export type ArticlePublicListQuery = z.infer<typeof articlePublicListQuerySchema>;
 

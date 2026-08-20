@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte, notInArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import {
   articles,
   articleCategories,
@@ -79,8 +79,11 @@ export interface UpdateArticleInput {
 export interface PublicListFilter {
   limit: number;
   offset: number;
-  categorySlug?: string | undefined;
+  categorySlugs?: string[] | undefined;
+  anakUsahaSlugs?: string[] | undefined;
   tagSlug?: string | undefined;
+  publishedAfter?: Date | undefined;
+  publishedBefore?: Date | undefined;
   excludeIds?: string[] | undefined;
   now: Date;
 }
@@ -401,7 +404,7 @@ export function createArticleRepository(db: Database): ArticleRepository {
     async listPublished(filter) {
       const conditions = [publiclyVisible(filter.now)];
 
-      if (filter.categorySlug) {
+      if (filter.categorySlugs && filter.categorySlugs.length > 0) {
         conditions.push(
           inArray(
             articles.id,
@@ -409,7 +412,15 @@ export function createArticleRepository(db: Database): ArticleRepository {
               .select({ id: articleCategories.articleId })
               .from(articleCategories)
               .innerJoin(categories, eq(categories.id, articleCategories.categoryId))
-              .where(eq(categories.slug, filter.categorySlug)),
+              .where(inArray(categories.slug, filter.categorySlugs)),
+          ),
+        );
+      }
+      if (filter.anakUsahaSlugs && filter.anakUsahaSlugs.length > 0) {
+        conditions.push(
+          inArray(
+            articles.anakUsahaId,
+            db.select({ id: anakUsaha.id }).from(anakUsaha).where(inArray(anakUsaha.slug, filter.anakUsahaSlugs)),
           ),
         );
       }
@@ -424,6 +435,12 @@ export function createArticleRepository(db: Database): ArticleRepository {
               .where(eq(tags.slug, filter.tagSlug)),
           ),
         );
+      }
+      if (filter.publishedAfter) {
+        conditions.push(gte(articles.publishedAt, filter.publishedAfter));
+      }
+      if (filter.publishedBefore) {
+        conditions.push(lte(articles.publishedAt, filter.publishedBefore));
       }
       if (filter.excludeIds && filter.excludeIds.length > 0) {
         conditions.push(notInArray(articles.id, filter.excludeIds));

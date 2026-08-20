@@ -118,4 +118,39 @@ describe('articlePublicListQuerySchema', () => {
     const result = articlePublicListQuerySchema.safeParse({ excludeIds: 'not-a-uuid' });
     expect(result.success).toBe(false);
   });
+
+  it('splits a comma-separated categorySlugs string into an array', () => {
+    const parsed = articlePublicListQuerySchema.parse({ categorySlugs: 'kuliner,wisata' });
+    expect(parsed.categorySlugs).toEqual(['kuliner', 'wisata']);
+  });
+
+  it('accepts categorySlugs already parsed as an array (repeated query key form)', () => {
+    const parsed = articlePublicListQuerySchema.parse({ categorySlugs: ['kuliner', 'wisata'] });
+    expect(parsed.categorySlugs).toEqual(['kuliner', 'wisata']);
+  });
+
+  it('leaves categorySlugs undefined when omitted', () => {
+    const parsed = articlePublicListQuerySchema.parse({});
+    expect(parsed.categorySlugs).toBeUndefined();
+  });
+
+  it('splits a comma-separated anakUsahaSlugs string into an array', () => {
+    const parsed = articlePublicListQuerySchema.parse({ anakUsahaSlugs: 'siders-culture,sidersvox' });
+    expect(parsed.anakUsahaSlugs).toEqual(['siders-culture', 'sidersvox']);
+  });
+
+  it('parses publishedAfter and publishedBefore as dates', () => {
+    const parsed = articlePublicListQuerySchema.parse({
+      publishedAfter: '2026-01-01T00:00:00.000Z',
+      publishedBefore: '2026-02-01T00:00:00.000Z',
+    });
+    expect(parsed.publishedAfter).toEqual(new Date('2026-01-01T00:00:00.000Z'));
+    expect(parsed.publishedBefore).toEqual(new Date('2026-02-01T00:00:00.000Z'));
+  });
+
+  it('leaves publishedAfter and publishedBefore undefined when omitted', () => {
+    const parsed = articlePublicListQuerySchema.parse({});
+    expect(parsed.publishedAfter).toBeUndefined();
+    expect(parsed.publishedBefore).toBeUndefined();
+  });
 });

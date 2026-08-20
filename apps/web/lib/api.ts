@@ -1,4 +1,5 @@
 import type {
+  AnakUsahaResponse,
   ArticlePublicCard,
   ArticlePublicDetail,
   CategoryResponse,
@@ -60,7 +61,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export interface GetArticlesParams {
-  categorySlug?: string | undefined;
+  categorySlugs?: string[] | undefined;
+  anakUsahaSlugs?: string[] | undefined;
+  publishedAfter?: string | undefined;
+  publishedBefore?: string | undefined;
   limit?: number;
   offset?: number;
   excludeIds?: string[];
@@ -85,7 +89,10 @@ export function getArticles(
   init?: RequestInit,
 ): Promise<ArticlePublicCard[]> {
   const qs = buildQuery({
-    categorySlug: params.categorySlug,
+    categorySlugs: params.categorySlugs,
+    anakUsahaSlugs: params.anakUsahaSlugs,
+    publishedAfter: params.publishedAfter,
+    publishedBefore: params.publishedBefore,
     limit: params.limit,
     offset: params.offset,
     excludeIds: params.excludeIds,
@@ -104,6 +111,10 @@ export function getHomeFeed(limit?: number, init?: RequestInit): Promise<Article
 
 export function getCategories(init?: RequestInit): Promise<CategoryResponse[]> {
   return apiFetch<CategoryResponse[]>('/categories', init);
+}
+
+export function getAnakUsahaList(init?: RequestInit): Promise<AnakUsahaResponse[]> {
+  return apiFetch<AnakUsahaResponse[]>('/anak-usaha', init);
 }
 
 export function getReels(init?: RequestInit): Promise<PublicReelItem[]> {
