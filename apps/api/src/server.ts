@@ -74,7 +74,7 @@ export function createServer(): Express {
   app.use('/articles', publicEngagementRoutes(db, env));
   app.use('/categories', categoryRoutes(db));
   app.use('/tags', tagRoutes(db));
-  app.use('/anak-usaha', anakUsahaRoutes(db));
+  app.use('/anak-usaha', anakUsahaRoutes(db, env));
   app.use('/admin/curation', curationRoutes(db, env));
   app.use('/home', publicHomeRoutes(db, env));
   app.use('/admin/reels-curation', reelsCurationRoutes(db, env));

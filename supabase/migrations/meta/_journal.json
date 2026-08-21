@@ -85,6 +85,13 @@
       "when": 1787154285916,
       "tag": "0011_zippy_the_enforcers",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787279911957,
+      "tag": "0012_military_wolfsbane",
+      "breakpoints": true
     }
   ]
 }

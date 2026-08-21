@@ -139,23 +139,38 @@ profile cannot outlive the entry it presents.
 - **THEN** the entry and its profile are both removed, its public presentation disappears, and
   every previously associated article remains published with that association cleared
 
-### Requirement: Public anak usaha listing includes only presented, active entries
-The system SHALL expose the anak usaha section's public data as part of the existing public
-`GET /anak-usaha` listing: each anak usaha entry with an active profile appears with its name,
-logo URL (if set), description (if set), kind, links, and stored order; an entry with no profile,
-or with an inactive one, SHALL be omitted from this public rendering. The endpoint SHALL require
-no authentication.
+### Requirement: Public anak usaha listing carries presentation fields without breaking existing consumers
+The existing public `GET /anak-usaha` listing (used today by article tagging and the `/news`
+filter, per `anak-usaha-management`) SHALL continue to return every anak usaha entry regardless of
+whether it has a profile. Each entry SHALL additionally carry its presentation fields — logo URL,
+description, kind, links, and stored order — when, and only when, it has an active profile; an
+entry with no profile, or with an inactive one, SHALL carry none of those fields. The endpoint
+SHALL require no authentication.
 
-#### Scenario: Entry without a profile is omitted from public output
+#### Scenario: Entry without a profile keeps its plain shape
 - **WHEN** an anak usaha entry has no profile
-- **THEN** it does not appear in the public anak usaha section on the home page, footer, or
-  Contact page
+- **THEN** the public listing still includes it (so existing consumers like the `/news` filter are
+  unaffected), with no presentation fields attached
 
-#### Scenario: Entry with an inactive profile is omitted from public output
+#### Scenario: Entry with an inactive profile keeps its plain shape
 - **WHEN** an anak usaha entry has a profile whose active flag is false
-- **THEN** it does not appear in the public anak usaha section
+- **THEN** the public listing still includes it, with no presentation fields attached
 
-#### Scenario: Public listing reflects stored order
+#### Scenario: Entry with an active profile carries presentation fields
 - **WHEN** a client requests the public anak usaha listing
-- **THEN** entries with an active profile are returned in their stored order, each with its name,
-  logo URL (if set), description (if set), kind, and links
+- **THEN** every entry with an active profile carries its logo URL (if set), description (if
+  set), kind, links, and stored order alongside its name and slug
+
+### Requirement: The public site renders only entries with an active profile
+The reader-facing Anak Usaha section (home page tiles, masthead logo row, footer, and Contact
+page) SHALL render only anak usaha entries that carry presentation fields in the public listing,
+regardless of how many entries the listing itself returns.
+
+#### Scenario: Entry without a profile is absent from every public rendering
+- **WHEN** an anak usaha entry has no profile, or an inactive one
+- **THEN** it does not appear in the public anak usaha section on the home page, masthead, footer,
+  or Contact page, even though it is still present in the underlying listing response
+
+#### Scenario: Rendering order matches stored order
+- **WHEN** the public site renders the Anak Usaha section
+- **THEN** entries with an active profile appear in their stored order

@@ -80,11 +80,14 @@ any ordering on the taxonomy table (which has none).
 ### Public data folded into the existing `GET /anak-usaha` endpoint, not a new route
 
 `GET /anak-usaha` is already public and already the source the article editor and `/news` filter
-read from. Rather than adding a second public endpoint the web app would need to fetch and merge
-client-side, the existing response is extended: entries with an active profile carry the extra
-presentation fields, entries without one are omitted from this rendering (per spec). The admin-side
-list (used by the new admin screen) is a separate, permission-gated shape that includes inactive
-profiles and entries with no profile at all, so staff can create one.
+read from — both of those need every entry, including ones with no profile, so the endpoint must
+keep returning the full list unfiltered. Rather than adding a second public endpoint the web app
+would need to fetch and merge client-side, the existing response is extended in place: an entry
+carries its presentation fields only when it has an active profile, and carries none of them
+otherwise. Filtering to "only the entries worth showing" happens once, in the web app's rendering
+of the Anak Usaha section — not in the API response, which stays the single shared source for
+every consumer. The admin-side list (used by the new admin screen) is a separate, permission-gated
+shape that includes inactive profiles and entries with no profile at all, so staff can create one.
 
 ## Risks / Trade-offs
 

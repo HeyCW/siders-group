@@ -203,6 +203,12 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/categories', label: 'Categories', icon: IconCategories, permission: 'category.manage' },
       { to: '/tags', label: 'Tags', icon: IconTags, permission: 'tag.manage' },
       { to: '/anak-usaha', label: 'Anak Perusahaan', icon: IconAnakUsaha, permission: 'anak-usaha.manage' },
+      {
+        to: '/anak-usaha-presentation',
+        label: 'Anak Usaha — Tampilan',
+        icon: IconAnakUsaha,
+        permission: 'anak-usaha.manage',
+      },
     ],
   },
   {
