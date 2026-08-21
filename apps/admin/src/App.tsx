@@ -10,6 +10,7 @@ import { ChangePasswordPage } from './pages/ChangePasswordPage.js';
 import { ReelLibraryPage } from './pages/ReelLibraryPage.js';
 import { ReelsCurationPage } from './pages/ReelsCurationPage.js';
 import { PartnersPage } from './pages/PartnersPage.js';
+import { AnakUsahaPresentationPage } from './pages/AnakUsahaPresentationPage.js';
 import { GuidePicksPage } from './pages/GuidePicksPage.js';
 import { ContactMessagesPage } from './pages/ContactMessagesPage.js';
 import { CommentModerationPage } from './pages/CommentModerationPage.js';
@@ -72,6 +73,9 @@ export default function App() {
               path="/anak-usaha"
               element={<TaxonomyManagementPage title="Anak Perusahaan" singularLabel="anak perusahaan" api={anakUsahaApi} />}
             />
+            {/* A flat path, not nested under `/anak-usaha` — `NavLink` here has no `end` prop, so
+                a nested path would also light up the plain taxonomy nav item above it. */}
+            <Route path="/anak-usaha-presentation" element={<AnakUsahaPresentationPage />} />
             <Route path="/curation" element={<HomeCurationPage />} />
             <Route path="/reels" element={<ReelLibraryPage />} />
             <Route path="/reels-curation" element={<ReelsCurationPage />} />

@@ -1,10 +1,10 @@
 import type {
-  AnakUsahaResponse,
   ArticlePublicCard,
   ArticlePublicDetail,
   CategoryResponse,
   ContactMessageSubmitRequest,
   ContactMessageSubmitResponse,
+  PublicAnakUsaha,
   PublicGuidePick,
   PublicPartner,
   PublicReelItem,
@@ -113,8 +113,15 @@ export function getCategories(init?: RequestInit): Promise<CategoryResponse[]> {
   return apiFetch<CategoryResponse[]>('/categories', init);
 }
 
-export function getAnakUsahaList(init?: RequestInit): Promise<AnakUsahaResponse[]> {
-  return apiFetch<AnakUsahaResponse[]>('/anak-usaha', init);
+/**
+ * Every anak usaha entry, `{id, name, slug}` plus presentation fields only for one with an active
+ * profile — the `/news` filter and article editor read only the plain shape, unaffected by the
+ * added optional fields; `presentedAnakUsaha` (lib/anakUsaha.ts) narrows to what the public site's
+ * Anak Usaha section actually renders (design.md - "Public data folded into the existing
+ * GET /anak-usaha endpoint").
+ */
+export function getAnakUsahaList(init?: RequestInit): Promise<PublicAnakUsaha[]> {
+  return apiFetch<PublicAnakUsaha[]>('/anak-usaha', init);
 }
 
 export function getReels(init?: RequestInit): Promise<PublicReelItem[]> {

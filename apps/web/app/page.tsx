@@ -1,4 +1,5 @@
-import { getGuidePicks, getHomeFeed, getPartners, getReels } from '../lib/api';
+import { getAnakUsahaList, getGuidePicks, getHomeFeed, getPartners, getReels } from '../lib/api';
+import { presentedAnakUsaha } from '../lib/anakUsaha';
 import { Container } from '../components/layout/Container';
 import { Hero } from '../components/home/Hero';
 import { IntroBlurb } from '../components/home/IntroBlurb';
@@ -14,7 +15,7 @@ import { CtaBand } from '../components/home/CtaBand';
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [articles, reels, partners, guides] = await Promise.all([
+  const [articles, reels, partners, guides, anakUsahaList] = await Promise.all([
     getHomeFeed(3, { next: { revalidate: 60 } }),
     getReels({ next: { revalidate: 60 } }),
     // The partner strip is the one section on this page with a defined empty state — it renders
@@ -27,7 +28,13 @@ export default async function HomePage() {
     // than failing the whole home page (specs/web-public-site/spec.md - "No guide picks means no
     // section"; design.md - "Zero-pick hiding").
     getGuidePicks({ next: { revalidate: 60 } }).catch(() => []),
+    // Same treatment again — a failed anak usaha fetch hides both this page's sections that
+    // depend on it rather than failing the whole home page. Request-memoized against
+    // `layout.tsx`'s identical call within this same request, so this is not a second network
+    // round trip.
+    getAnakUsahaList({ next: { revalidate: 60 } }).catch(() => []),
   ]);
+  const anakUsahaBrands = presentedAnakUsaha(anakUsahaList);
 
   return (
     <div>
@@ -40,7 +47,7 @@ export default async function HomePage() {
       <StatsBand />
 
       <Container>
-        <ConnectedPlatforms />
+        <ConnectedPlatforms brands={anakUsahaBrands} />
       </Container>
 
       <Container>
@@ -53,7 +60,7 @@ export default async function HomePage() {
         <ReelsRail reels={reels} />
       </Container>
       <Container>
-        <AnakUsahaTiles />
+        <AnakUsahaTiles brands={anakUsahaBrands} />
         <PartnerGrid partners={partners} />
         <CtaBand />
       </Container>

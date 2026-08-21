@@ -1,16 +1,15 @@
 import Link from 'next/link';
 import { Container } from './Container';
-import {
-  CONTACT_INFO,
-  EDITION,
-  FOOTER_DESCRIPTION,
-  NAV_ITEMS,
-  SUB_BRANDS,
-} from '../../lib/content';
+import { CONTACT_INFO, EDITION, FOOTER_DESCRIPTION, NAV_ITEMS } from '../../lib/content';
+import type { PresentedAnakUsaha } from '../../lib/anakUsaha';
 
 const colClass = 'py-[clamp(20px,3vw,32px)] px-[clamp(16px,2vw,28px)] border-r border-rule-strong';
 
-export function SiteFooter() {
+/** Anak usaha entries are fetched once by `layout.tsx` (rendered on every page) rather than by
+ *  this component itself — Next.js's request memoization dedupes that against the same fetch
+ *  made by the home page and Contact page within one request, so there is only ever one network
+ *  call for it (design.md - "Public data folded into the existing GET /anak-usaha endpoint"). */
+export function SiteFooter({ brands }: { brands: PresentedAnakUsaha[] }) {
   return (
     <Container className="pt-[clamp(32px,5vw,64px)] pb-[clamp(20px,3vw,32px)]">
       <div className="border-t-[3px] border-ink" />
@@ -39,20 +38,22 @@ export function SiteFooter() {
           ))}
         </div>
 
-        <div className={colClass}>
-          <div className="border-b border-ink pb-2 font-sans text-[11px] font-bold uppercase tracking-widest">
-            Anak Usaha
+        {brands.length > 0 && (
+          <div className={colClass}>
+            <div className="border-b border-ink pb-2 font-sans text-[11px] font-bold uppercase tracking-widest">
+              Anak Usaha
+            </div>
+            {brands.map((brand) => (
+              <Link
+                key={brand.id}
+                href="/news"
+                className="group flex justify-between gap-3 border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
+              >
+                <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
+              </Link>
+            ))}
           </div>
-          {SUB_BRANDS.map((brand) => (
-            <Link
-              key={brand.name}
-              href="/news"
-              className="group flex justify-between gap-3 border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
-            >
-              <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
-            </Link>
-          ))}
-        </div>
+        )}
 
         <div className="py-[clamp(20px,3vw,32px)] pl-[clamp(16px,2vw,28px)] pr-0">
           <div className="border-b border-ink pb-2 font-sans text-[11px] font-bold uppercase tracking-widest">

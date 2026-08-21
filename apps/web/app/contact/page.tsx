@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { Container } from '../../components/layout/Container';
 import { ContactForm } from '../../components/contact/ContactForm';
 import { ContactMap } from '../../components/contact/ContactMap';
-import { CONTACT_INFO, SUB_BRANDS } from '../../lib/content';
+import { CONTACT_INFO } from '../../lib/content';
+import { getAnakUsahaList } from '../../lib/api';
+import { presentedAnakUsaha } from '../../lib/anakUsaha';
 
 export const metadata: Metadata = {
   title: 'Contact — Siders',
@@ -33,7 +35,10 @@ function InfoRow({
   );
 }
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const anakUsahaList = await getAnakUsahaList({ next: { revalidate: 60 } }).catch(() => []);
+  const brands = presentedAnakUsaha(anakUsahaList);
+
   return (
     <div>
       <Container className="pt-[clamp(24px,4vw,44px)]">
@@ -72,22 +77,32 @@ export default function ContactPage() {
               ))}
             </InfoRow>
 
-            <div className="pt-5">
-              <div className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-                Follow our sub-brands
+            {brands.length > 0 && (
+              <div className="pt-5">
+                <div className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
+                  Follow our sub-brands
+                </div>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {brands.map((brand) => {
+                    const link = brand.links[0];
+                    const className =
+                      'border border-ink px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper';
+                    // A brand with no link renders as a plain, non-interactive tag rather than a
+                    // dead `href="#"` — mirrors `PartnerTile`'s "no website means no link" rule
+                    // (apps/web/components/home/PartnerGrid.tsx).
+                    return link ? (
+                      <a key={brand.id} href={link.href} target="_blank" rel="noopener noreferrer" className={className}>
+                        {brand.name}
+                      </a>
+                    ) : (
+                      <span key={brand.id} className={className}>
+                        {brand.name}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {SUB_BRANDS.map((brand) => (
-                  <a
-                    key={brand.name}
-                    href="#"
-                    className="border border-ink px-3 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper"
-                  >
-                    {brand.name}
-                  </a>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="py-[clamp(20px,3vw,32px)] pl-[clamp(20px,3vw,40px)]">

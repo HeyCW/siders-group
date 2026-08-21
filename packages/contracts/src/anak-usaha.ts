@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isHttpUrl } from './partner.js';
 
 export const anakUsahaCreateRequestSchema = z
   .object({
@@ -20,3 +21,116 @@ export const anakUsahaResponseSchema = z.object({
   slug: z.string(),
 });
 export type AnakUsahaResponse = z.infer<typeof anakUsahaResponseSchema>;
+
+/**
+ * The fixed set of groupings the public site's masthead logo row (`ConnectedPlatforms.tsx`)
+ * filters by. Kept as a Zod enum rather than a Postgres enum (design.md - "kind as a text column
+ * with contract-level validation") so a typo can never silently drop a brand from that grouping
+ * the way a free-text column would.
+ */
+export const anakUsahaKindSchema = z.enum(['Media Platform', 'News & Community']);
+export type AnakUsahaKind = z.infer<typeof anakUsahaKindSchema>;
+
+/**
+ * A profile link's URL reuses `partner.ts`'s `isHttpUrl` guard rather than re-deriving it — same
+ * hazard as a partner website URL: this value reaches a public `href`
+ * (specs/anak-usaha-presentation/spec.md - "A profile link must be http or https").
+ */
+export const anakUsahaLinkSchema = z
+  .object({
+    label: z.string().min(1).max(100),
+    href: z.string().url().refine(isHttpUrl, { message: 'Link URL must use http or https' }),
+  })
+  .strict();
+export type AnakUsahaLink = z.infer<typeof anakUsahaLinkSchema>;
+
+/**
+ * Which taxonomy entry the profile presents is the `:id` in the route
+ * (`POST /anak-usaha/:id/profile`), not a body field — carrying it in both places would only
+ * invite a mismatch between the two. The entry must already exist
+ * (specs/anak-usaha-presentation/spec.md - "A profile presents exactly one anak usaha entry"),
+ * enforced by the service layer against `anak_usaha`. `logoMediaId` is nullable, unlike
+ * `partnerCreateRequestSchema.logoMediaId` (design.md - "Logo FK is nullable").
+ */
+export const anakUsahaProfileCreateRequestSchema = z
+  .object({
+    logoMediaId: z.string().uuid().nullable().optional(),
+    description: z.string().max(2000).nullable().optional(),
+    kind: anakUsahaKindSchema,
+    links: z.array(anakUsahaLinkSchema).max(10).optional(),
+  })
+  .strict();
+export type AnakUsahaProfileCreateRequest = z.infer<typeof anakUsahaProfileCreateRequestSchema>;
+
+/**
+ * All fields optional for a partial update. `sortOrder` is deliberately absent, same as
+ * `partnerUpdateRequestSchema` — order changes only through the dedicated reorder endpoint
+ * (specs/anak-usaha-presentation/spec.md - "Profile order is replaced as a whole list").
+ */
+export const anakUsahaProfileUpdateRequestSchema = z
+  .object({
+    logoMediaId: z.string().uuid().nullable().optional(),
+    description: z.string().max(2000).nullable().optional(),
+    kind: anakUsahaKindSchema.optional(),
+    links: z.array(anakUsahaLinkSchema).max(10).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .strict();
+export type AnakUsahaProfileUpdateRequest = z.infer<typeof anakUsahaProfileUpdateRequestSchema>;
+
+/**
+ * Whole-list replacement, identical shape to `partnerReorderRequestSchema`
+ * (specs/anak-usaha-presentation/spec.md - "Profile order is replaced as a whole list"). Each id
+ * is the `anakUsahaId` a profile belongs to, since the profile has no separate id of its own.
+ */
+export const anakUsahaProfileReorderRequestSchema = z
+  .object({
+    anakUsahaIds: z.array(z.string().uuid()).refine((ids) => new Set(ids).size === ids.length, {
+      message: 'anakUsahaIds must not contain duplicates',
+    }),
+  })
+  .strict();
+export type AnakUsahaProfileReorderRequest = z.infer<typeof anakUsahaProfileReorderRequestSchema>;
+
+/**
+ * The profile fields as returned to callers, nested rather than flattened onto the taxonomy shape
+ * so "this entry has no profile yet" is exactly `profile: null`, not a set of blank fields.
+ */
+export const anakUsahaProfileFieldsSchema = z.object({
+  logoUrl: z.string().nullable(),
+  description: z.string().nullable(),
+  kind: anakUsahaKindSchema,
+  links: z.array(anakUsahaLinkSchema),
+  sortOrder: z.number().int(),
+  isActive: z.boolean(),
+});
+export type AnakUsahaProfileFields = z.infer<typeof anakUsahaProfileFieldsSchema>;
+
+/**
+ * The admin shape: every taxonomy entry plus its profile, or `null` when it has none — lets the
+ * new admin screen show every anak usaha entry and offer to create a profile for the ones
+ * without (specs/anak-usaha-presentation/spec.md).
+ */
+export const anakUsahaAdminResponseSchema = anakUsahaResponseSchema.extend({
+  profile: anakUsahaProfileFieldsSchema.nullable(),
+});
+export type AnakUsahaAdminResponse = z.infer<typeof anakUsahaAdminResponseSchema>;
+
+/**
+ * The public shape stays the existing `{id, name, slug}` response for every entry — this is the
+ * same listing article tagging and the `/news` filter already read, and both need every entry
+ * regardless of whether it has a profile. Presentation fields are added only for an entry with an
+ * active profile (design.md - "Public data folded into the existing GET /anak-usaha endpoint");
+ * an entry with none, or an inactive one, keeps the plain shape with no presentation fields at
+ * all, and it is the web app's rendering — not this endpoint — that decides which entries make up
+ * the visible Anak Usaha section (specs/anak-usaha-presentation/spec.md - "The public site
+ * renders only entries with an active profile").
+ */
+export const publicAnakUsahaSchema = anakUsahaResponseSchema.extend({
+  logoUrl: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  kind: anakUsahaKindSchema.optional(),
+  links: z.array(anakUsahaLinkSchema).optional(),
+  sortOrder: z.number().int().optional(),
+});
+export type PublicAnakUsaha = z.infer<typeof publicAnakUsahaSchema>;
