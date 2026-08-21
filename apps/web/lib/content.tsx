@@ -13,10 +13,16 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Home', href: '/' },
   { label: 'News', href: '/news' },
+  { label: 'Team', href: '/team' },
   { label: 'Contact', href: '/contact' },
 ];
 
 export const EDITION = 'Edisi 01';
+
+export interface SubBrandLink {
+  label: string;
+  href: string;
+}
 
 export interface SubBrand {
   name: string;
@@ -24,14 +30,64 @@ export interface SubBrand {
   tile: string;
   tileInk: string;
   logo: string;
+  /** Not every sub-brand has approved copy yet — omitted rather than faked (`SUB_BRANDS` below). */
+  desc?: string;
+  links?: SubBrandLink[];
 }
 
-/** Tile colors match the approved design exactly (`Siders Broadsheet.dc.html` — `subBrands`). */
+/** Matches the approved design exactly (`Siders Broadsheet.dc.html` — `subBrands`). */
 export const SUB_BRANDS: SubBrand[] = [
-  { name: 'SidersVox', kind: 'News & Community', tile: '#000000', tileInk: '#F7F6F2', logo: '/siders_vos.png' },
-  { name: 'Surabaya Siders', kind: 'Media Platform', tile: '#FFFFFF', tileInk: '#141414', logo: '/surabaya_siders.png' },
-  { name: 'Jakarta Siders', kind: 'Media Platform', tile: '#000000', tileInk: '#F7F6F2', logo: '/jakarta_siders.png' },
-  { name: 'Siders Culture', kind: 'News & Community', tile: '#FFFFFF', tileInk: '#141414', logo: '/siders_culture.png' },
+  {
+    name: 'SidersVox',
+    kind: 'News & Community',
+    tile: '#000000',
+    tileInk: '#F7F6F2',
+    logo: '/siders_vos.png',
+    desc: 'Platform media yang menghadirkan perspektif, opini, dan cerita dari suara generasi muda. Membahas isu sosial, lifestyle, hingga topik yang dekat dengan kehidupan sehari-hari.',
+    links: [{ label: 'Instagram', href: 'https://www.instagram.com/sidersvox?igsh=NXFqZGF2MG1kYTk5' }],
+  },
+  {
+    name: 'Surabaya Siders',
+    kind: 'Media Platform',
+    tile: '#FFFFFF',
+    tileInk: '#141414',
+    logo: '/surabaya_siders.png',
+    desc: 'Media lokal yang mengangkat berbagai cerita dan perkembangan seputar Surabaya, mulai dari kuliner, lifestyle, tempat menarik, hingga tren yang sedang ramai di kota.',
+    links: [
+      { label: 'Instagram', href: 'https://www.instagram.com/surabayasiders?igsh=MXNxdXB2N2N4N2th' },
+      { label: 'TikTok', href: 'https://www.tiktok.com/@surabaya.siders?_r=1&_t=ZS-992Gnls45US' },
+    ],
+  },
+  {
+    name: 'Jakarta Siders',
+    kind: 'Media Platform',
+    tile: '#000000',
+    tileInk: '#F7F6F2',
+    logo: '/jakarta_siders.png',
+    desc: 'Media yang mengeksplorasi kehidupan dan dinamika Jakarta, dari lifestyle, kuliner, entertainment, sampai berbagai tren dan tempat menarik yang sedang jadi perhatian.',
+    links: [
+      { label: 'Instagram', href: 'https://www.instagram.com/jakarta_siders?igsh=NGRpNWQ2bXBtanFz' },
+      { label: 'TikTok', href: 'https://www.tiktok.com/@jakartasiders?_r=1&_t=ZS-992GpEooN0f' },
+    ],
+  },
+  {
+    name: 'Siders Culture',
+    kind: 'News & Community',
+    tile: '#FFFFFF',
+    tileInk: '#141414',
+    logo: '/siders_culture.png',
+  },
+];
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export const TEAM: TeamMember[] = [
+  { id: 'mikhael', name: 'Mikhael Jonathan', role: 'Founder' },
+  { id: 'melvin', name: 'Melvin Tenggara', role: 'Comissioner' },
 ];
 
 export const MANIFESTO = {

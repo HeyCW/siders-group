@@ -9,19 +9,25 @@ export function MediaSlot({
   label,
   aspectClassName,
   className = '',
+  fit = 'cover',
 }: {
   src?: string | null;
   alt: string;
   label: string;
   aspectClassName: string;
   className?: string;
+  fit?: 'cover' | 'contain';
 }) {
   return (
     <div className={`relative w-full border border-rule bg-white ${aspectClassName} ${className}`}>
       {src ? (
         // Plain <img>, not next/image: the media host is env-configured (R2/CDN) and not
         // registered in next.config.mjs's image remotePatterns.
-        <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={src}
+          alt={alt}
+          className={`absolute inset-0 h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
+        />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center px-3 text-center font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
           {label}

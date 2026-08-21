@@ -3,6 +3,7 @@ import { Container } from '../components/layout/Container';
 import { Hero } from '../components/home/Hero';
 import { IntroBlurb } from '../components/home/IntroBlurb';
 import { StatsBand } from '../components/home/StatsBand';
+import { ConnectedPlatforms } from '../components/home/ConnectedPlatforms';
 import { GuideOfWeek } from '../components/home/GuideOfWeek';
 import { Showcase } from '../components/home/Showcase';
 import { ReelsRail } from '../components/home/ReelsRail';
@@ -37,6 +38,10 @@ export default async function HomePage() {
       </Container>
 
       <StatsBand />
+
+      <Container>
+        <ConnectedPlatforms />
+      </Container>
 
       <Container>
         <GuideOfWeek guides={guides} />
