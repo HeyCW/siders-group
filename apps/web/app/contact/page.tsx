@@ -91,7 +91,7 @@ export default async function ContactPage() {
                     // dead `href="#"` — mirrors `PartnerTile`'s "no website means no link" rule
                     // (apps/web/components/home/PartnerGrid.tsx).
                     return link ? (
-                      <a key={brand.id} href={link.href} target="_blank" rel="noopener" className={className}>
+                      <a key={brand.id} href={link.href} target="_blank" rel="noopener noreferrer" className={className}>
                         {brand.name}
                       </a>
                     ) : (
