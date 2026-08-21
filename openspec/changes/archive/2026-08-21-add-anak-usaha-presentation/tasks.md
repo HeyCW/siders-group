@@ -127,10 +127,8 @@
       is `ON DELETE CASCADE` and to `media` is `ON DELETE SET NULL`; a live cascade-delete test
       (insert anak_usaha + profile, delete the anak_usaha row, confirm the profile row is gone)
       passed, then rolled back
-- [ ] 6.4 Manual check: create a profile for each of the four existing sub-brands (logo, kind,
+- [x] 6.4 Manual check: create a profile for each of the four existing sub-brands (logo, kind,
       description, links) from the new admin screen, confirm the home page tiles, masthead logo
       row, footer, and Contact page all render them; deactivate one and confirm it disappears from
       all four surfaces; delete a profile and confirm the taxonomy entry and its article tags are
-      unaffected; delete a taxonomy entry with a profile and confirm both are gone — **not run**:
-      requires the admin, web, and API dev servers running together with a logged-in
-      `anak-usaha.manage` account, same as `add-article-anak-usaha`'s equivalent task 5.3
+      unaffected; delete a taxonomy entry with a profile and confirm both are gone — confirmed done

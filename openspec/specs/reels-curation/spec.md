@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the reels capability: a library of short-form vertical videos referenced by recognized third-party provider rather than stored by this system, the provider allowlist and URL normalization that admits them, the required local poster image, the single ordered rail that presents them on the homepage with whole-list replacement write semantics, and the structured public endpoint that serves the rail without ever emitting embed markup.
+Defines the reels capability: a library of short-form vertical videos referenced by recognized third-party provider rather than stored by this system, the provider allowlist and URL normalization that admits them, the optional local poster image, the single ordered rail that presents them on the homepage with whole-list replacement write semantics, and the structured public endpoint that serves the rail without ever emitting embed markup.
 
 ## Requirements
 
@@ -98,18 +98,24 @@ Any embed reference for a reel SHALL be composed from the stored provider and id
 - **THEN** it is rendered exactly as before, as an inert link rather than a frame
 
 ### Requirement: Every reel has a locally stored poster image
-A reel SHALL reference a poster image stored by this system as a media record. A reel SHALL NOT be created or left without one. The poster SHALL be an ordinary image subject to the existing media rules.
+A reel MAY reference a poster image stored by this system as a media record. A reel MAY be created
+and left with no poster. When a poster is supplied, it SHALL be an ordinary image subject to the
+existing media rules.
 
-#### Scenario: Poster is required at creation
-- **WHEN** a staff member attempts to create a reel without a poster image
-- **THEN** the system rejects the request and creates no reel
+#### Scenario: A reel can be created with no poster image
+- **WHEN** a staff member creates a reel and supplies no poster image
+- **THEN** the system accepts the request and creates the reel with no poster
+
+#### Scenario: A reel can be created with a poster image
+- **WHEN** a staff member creates a reel and supplies a poster image
+- **THEN** the system persists the reel with that poster
 
 #### Scenario: Poster is a normal media record
 - **WHEN** a poster image is uploaded
 - **THEN** it is accepted, validated, stored, and its URL derived by the existing media rules, with no reels-specific storage path
 
 #### Scenario: Poster survives provider failure
-- **WHEN** a reel's provider is unreachable or its source video no longer exists
+- **WHEN** a reel's provider is unreachable or its source video no longer exists, and the reel has a poster
 - **THEN** the reel's poster image is still served, because it is stored by this system rather than by the provider
 
 ### Requirement: Reel status governs public visibility
@@ -231,7 +237,9 @@ The admin read endpoint SHALL return every stored entry, including entries whose
 - **THEN** each entry reports its reel's status and whether that reel is currently publicly visible
 
 ### Requirement: Public reels endpoint serves structured data
-The system SHALL expose a public endpoint returning the publicly visible reels in their stored order. Each item SHALL carry its provider, its video identifier, its poster URL, and its caption as structured fields. The endpoint SHALL require no authentication.
+The system SHALL expose a public endpoint returning the publicly visible reels in their stored
+order. Each item SHALL carry its provider, its video identifier, its caption, and its poster URL
+when one is stored, as structured fields. The endpoint SHALL require no authentication.
 
 #### Scenario: Rail is served in stored order
 - **WHEN** a client requests the public reels endpoint and publicly visible ordered reels exist
@@ -239,7 +247,11 @@ The system SHALL expose a public endpoint returning the publicly visible reels i
 
 #### Scenario: Structured fields rather than markup
 - **WHEN** a client reads the public reels endpoint
-- **THEN** each item carries provider, identifier, poster URL, and caption, and carries no HTML or embed markup
+- **THEN** each item carries provider, identifier, caption, and its poster URL when one is stored, and carries no HTML or embed markup
+
+#### Scenario: A reel with no poster is served without one
+- **WHEN** the public reels endpoint includes a reel that has no stored poster
+- **THEN** that reel's entry in the response carries no poster URL, rather than an empty string or placeholder value
 
 #### Scenario: Anonymous and staff callers receive identical output
 - **WHEN** a staff member holding `news.manage` requests the public reels endpoint
@@ -260,22 +272,59 @@ The public reels endpoint SHALL return only the reels present in the stored orde
 - **WHEN** the ordering is empty
 - **THEN** the public reels endpoint returns an empty collection rather than recently added reels
 
-### Requirement: Third-party embeds load only on user activation
-Public rendering of a reel SHALL present the locally stored poster image on initial render and SHALL NOT create a third-party frame, script, or network request for the provider until the visitor activates that reel. Activating one reel SHALL NOT load the embed for any other reel.
+### Requirement: Third-party embeds load only on user activation for poster-bearing reels
+Public rendering of a reel that has a stored poster SHALL present that poster image on initial
+render and SHALL NOT create a third-party frame, script, or network request for the provider
+until the visitor activates that reel. Activating one reel SHALL NOT load the embed for any
+other reel. A reel with no poster is excluded from this requirement — see "A posterless reel's
+tile is a live, non-interactive embed" — and instead renders a live provider embed as its tile
+from initial render.
 
-This requirement constrains the follow-up change that renders the rail on `/` — see `proposal.md` ("Rendering the rail" - Non-Goals) and `design.md` ("Facade rendering: poster first, frame only on user activation"). `add-reels-curation` itself ships no consumer of `buildReelEmbedUrl` outside its own unit test; the rule is recorded here so that follow-up inherits it rather than reaching for a provider's copy-paste embed snippet.
+This requirement constrains the follow-up change that renders the rail on `/` — see `proposal.md`
+("Rendering the rail" - Non-Goals) and `design.md` ("Facade rendering: poster first, frame only
+on user activation"). `add-reels-curation` itself ships no consumer of `buildReelEmbedUrl` outside
+its own unit test; the rule is recorded here so that follow-up inherits it rather than reaching
+for a provider's copy-paste embed snippet.
 
-#### Scenario: Initial render contacts no provider
-- **WHEN** a visitor loads a page carrying the reels rail and does not interact with it
-- **THEN** no frame, script, or request to any provider is created for any reel
+#### Scenario: Initial render contacts no provider for a poster-bearing reel
+- **WHEN** a visitor loads a page carrying the reels rail, at least one rail reel has a poster,
+  and the visitor does not interact with it
+- **THEN** no frame, script, or request to any provider is created for that reel
 
 #### Scenario: Activation loads one embed
-- **WHEN** a visitor activates a single reel
-- **THEN** the embed is created for that reel only, and the other reels remain posters
+- **WHEN** a visitor activates a single poster-bearing reel
+- **THEN** the embed is created for that reel only, and the other poster-bearing reels remain
+  posters
 
-#### Scenario: Poster carries the rail before activation
-- **WHEN** the reels rail renders
-- **THEN** each reel is represented by its locally stored poster image
+#### Scenario: Poster carries a poster-bearing reel's tile before activation
+- **WHEN** the reels rail renders and a reel has a poster
+- **THEN** that reel is represented by its locally stored poster image, and no third-party frame
+  is created for it until it is activated
+
+### Requirement: A posterless reel's tile is a live, non-interactive embed
+A reel with no poster SHALL render its provider embed directly in its rail tile from initial
+render, in place of the poster image. This embed SHALL NOT be autoplaying and SHALL NOT be
+directly interactive — pointer interaction with the tile SHALL activate the same lightbox
+playback every other reel uses, rather than any control native to the embed itself.
+
+#### Scenario: Posterless reel shows its own embed on initial render
+- **WHEN** the reels rail renders and a reel has no poster
+- **THEN** that reel's tile displays a live embed of its provider video rather than a flat
+  fallback tile, without requiring any visitor interaction
+
+#### Scenario: The embed does not autoplay
+- **WHEN** a posterless reel's tile embed loads
+- **THEN** it does not begin video playback on its own
+
+#### Scenario: Clicking a posterless reel's tile opens the same lightbox as any other reel
+- **WHEN** a visitor clicks a posterless reel's tile
+- **THEN** the same lightbox player used for poster-bearing reels opens and plays that reel,
+  and no playback begins inside the tile's own embed
+
+#### Scenario: A poster-bearing reel is unaffected
+- **WHEN** the reels rail renders and a reel has a poster
+- **THEN** that reel's tile shows its poster image exactly as before, with no embed loaded until
+  activation
 
 ### Requirement: The reel lifecycle self-heals the ordering
 Changes to a reel's lifecycle SHALL take effect on the public rail without any ordering write. A reel that stops being published SHALL leave the rail, and a deleted reel's entry SHALL be removed from the stored ordering automatically.

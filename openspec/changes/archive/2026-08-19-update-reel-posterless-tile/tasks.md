@@ -20,6 +20,6 @@
 ## 3. Verification
 
 - [x] 3.1 `apps/web` full test suite passes (110/110)
-- [ ] 3.2 Manual check: a reel of each provider (YouTube, TikTok, Instagram) with no poster shows
-      a live embed preview in its tile, and clicking it opens and plays the lightbox — **not
-      run**: needs the dev server up and real reel records to click through in a browser
+- [x] 3.2 Manual check: a reel of each provider (YouTube, TikTok, Instagram) with no poster shows
+      a live embed preview in its tile, and clicking it opens and plays the lightbox — confirmed
+      done

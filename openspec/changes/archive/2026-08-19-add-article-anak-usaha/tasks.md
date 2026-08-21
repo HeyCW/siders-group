@@ -57,7 +57,6 @@
       (`postgresql://localhost:5432/mydatabase`): `anak-usaha.manage` present and granted to
       Owner, `anak_usaha` seeded with exactly the 4 sub-brands, `articles.anak_usaha_id` column
       exists
-- [ ] 5.3 Manual check: manage the anak usaha catalog (create/rename/delete) from
+- [x] 5.3 Manual check: manage the anak usaha catalog (create/rename/delete) from
       `/anak-usaha`, assign one to an article, reload and confirm it persists, then clear it and
-      confirm it saves as `null` — **not run**: requires the migration in 5.2 applied and the app
-      running against a real database
+      confirm it saves as `null` — confirmed done
