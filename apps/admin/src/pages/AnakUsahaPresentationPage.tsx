@@ -232,6 +232,10 @@ export function AnakUsahaPresentationPage() {
 
   function renderForm() {
     if (!form) return null;
+    // `isActive` has no effect on create — `anakUsahaProfileCreateRequestSchema` has no such
+    // field, so a new profile always starts active (spec: "an active flag defaulting to
+    // active"). Hiding the control here instead of sending a value the API would reject.
+    const hasExistingProfile = entries.find((e) => e.id === editingId)?.profile != null;
     return (
       <div className="space-y-3 border-t border-[var(--rule)] p-4">
         <div>
@@ -322,10 +326,16 @@ export function AnakUsahaPresentationPage() {
           </Button>
         </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
-          Active (visible on the public site)
-        </label>
+        {hasExistingProfile && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+            />
+            Active (visible on the public site)
+          </label>
+        )}
 
         <div className="flex items-center gap-3 pt-1">
           <Button variant="primary" onClick={handleSave} disabled={!canSave}>
