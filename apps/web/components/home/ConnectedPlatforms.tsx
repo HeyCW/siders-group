@@ -20,7 +20,7 @@ export function ConnectedPlatforms() {
               {group.map((brand) => (
                 <span
                   key={brand.name}
-                  className={`flex h-[104px] w-[140px] items-center justify-center p-2.5 ${
+                  className={`flex h-[124px] w-[160px] items-center justify-center p-1.5 ${
                     brand.tile === 'transparent' ? '' : 'border border-rule'
                   }`}
                   style={{ background: brand.tile }}
@@ -29,8 +29,8 @@ export function ConnectedPlatforms() {
                     <Image
                       src={brand.logo}
                       alt={brand.name}
-                      width={120}
-                      height={88}
+                      width={140}
+                      height={104}
                       className="h-full w-full object-contain"
                     />
                   ) : (

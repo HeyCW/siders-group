@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { PublicGuidePick } from '@siders/contracts';
 import { SectionHeading } from '../layout/SectionHeading';
 import { Reveal } from '../ui/Reveal';
@@ -30,11 +30,47 @@ import { groupGuidePicksByCity } from '../../lib/guidePicks';
 export function GuideOfWeek({ guides }: { guides: PublicGuidePick[] }) {
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
+  /**
+   * Muted, looping preview autoplay: a tile plays once at least half of it is on screen and
+   * pauses once it scrolls back out, the same "reel grid" behavior as Instagram/TikTok. Several
+   * tiles can autoplay at once since none of them carry sound — `handlePlay` below only enforces
+   * single-playback once a viewer unmutes one, which is the moment it stops being a silent
+   * preview and starts being a deliberate watch. Falls back to doing nothing when
+   * `IntersectionObserver` isn't available (old browsers, and jsdom in tests) — autoplay is a
+   * progressive enhancement on top of the existing click-to-play `controls`, never a requirement
+   * to see the poster or use the video at all.
+   */
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const video = entry.target;
+          if (!(video instanceof HTMLVideoElement)) continue;
+          if (entry.isIntersecting) {
+            video.play().catch(() => {
+              // Autoplay can be rejected by the browser; the poster/controls remain usable either way.
+            });
+          } else {
+            video.pause();
+          }
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    for (const video of videoRefs.current.values()) observer.observe(video);
+
+    return () => observer.disconnect();
+  }, [guides]);
+
   if (guides.length === 0) return null;
 
   const groups = groupGuidePicksByCity(guides);
 
   function handlePlay(current: HTMLVideoElement) {
+    if (current.muted) return;
     for (const video of videoRefs.current.values()) {
       if (video !== current && !video.paused) video.pause();
     }
@@ -64,6 +100,9 @@ export function GuideOfWeek({ guides }: { guides: PublicGuidePick[] }) {
                     src={guide.videoUrl}
                     poster={guide.photoUrl}
                     preload="none"
+                    muted
+                    loop
+                    playsInline
                     controls
                     className="aspect-[9/16] w-full border border-rule object-cover"
                     onPlay={(e) => handlePlay(e.currentTarget)}

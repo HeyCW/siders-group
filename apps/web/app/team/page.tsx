@@ -18,12 +18,12 @@ export default function TeamPage() {
           </h1>
         </div>
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
-          {TEAM.map((member) => (
-            <div
-              key={member.id}
-              className="border-b border-rule border-r border-r-rule-strong py-[clamp(20px,3vw,32px)] pr-[clamp(20px,3vw,32px)]"
-            >
+        {TEAM.map((member) => (
+          <div
+            key={member.id}
+            className="grid grid-cols-1 gap-[clamp(20px,3vw,40px)] border-b border-rule py-[clamp(24px,4vw,40px)] md:grid-cols-[260px_1fr]"
+          >
+            <div>
               <MediaSlot
                 src={member.photoUrl}
                 alt={member.name}
@@ -39,8 +39,45 @@ export default function TeamPage() {
                 {member.role}
               </div>
             </div>
-          ))}
-        </div>
+
+            {member.message && member.message.length > 0 && (
+              <div className="font-serif text-[clamp(15px,1.6vw,18px)] leading-[1.7]">
+                {member.message.map((block, index) => {
+                  const spacingClassName = index > 0 ? 'mt-4' : '';
+                  if (block.type === 'highlight') {
+                    return (
+                      <p
+                        key={index}
+                        className={`${spacingClassName} text-[clamp(19px,2.2vw,26px)] font-bold italic leading-[1.3]`}
+                      >
+                        {block.text}
+                      </p>
+                    );
+                  }
+                  if (block.type === 'tagline') {
+                    return (
+                      <div key={index} className={`${spacingClassName} font-sans`}>
+                        {block.lines.map((line, lineIndex) => (
+                          <div
+                            key={lineIndex}
+                            className="text-[13px] font-bold uppercase tracking-widest text-muted"
+                          >
+                            {line}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return (
+                    <p key={index} className={spacingClassName}>
+                      {block.text}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
 
         <div className="h-[clamp(24px,4vw,40px)]" />
       </Container>
