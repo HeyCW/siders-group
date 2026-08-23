@@ -15,7 +15,7 @@
     "pg": "^8.12.0"
   },
   "devDependencies": {
-    "@siders/config": "*",
+    "@siders/config": "workspace:*",
     "@types/pg": "^8.11.6",
     "drizzle-kit": "^0.28.1",
     "typescript": "^5.5.3",

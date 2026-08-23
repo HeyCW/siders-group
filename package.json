@@ -14,23 +14,18 @@
   },
   "license": "ISC",
   "author": "",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "concurrently -n api,admin,web \"npm:dev -w apps/api\" \"npm:dev -w apps/admin\" \"npm:dev -w apps/web\"",
-    "build": "npm run build --workspaces --if-present",
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "pnpm -r run typecheck",
     "docs:index": "node scripts/build-docs-index.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
-    "concurrently": "^9.1.0",
     "eslint": "^9.7.0",
     "eslint-plugin-react": "^7.34.4",
     "eslint-plugin-react-hooks": "^5.1.0",
@@ -39,11 +34,5 @@
     "typescript-eslint": "^8.0.0",
     "vitest": "^2.0.2"
   },
-  "allowScripts": {
-    "esbuild@0.18.20": true,
-    "esbuild@0.19.12": true,
-    "esbuild@0.21.5": true,
-    "esbuild@0.28.2": true,
-    "argon2@0.41.1": true
-  }
+  "packageManager": "pnpm@9.5.0"
 }

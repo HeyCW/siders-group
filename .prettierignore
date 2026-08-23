@@ -3,4 +3,4 @@ dist
 .next
 build
 coverage
-package-lock.json
+pnpm-lock.yaml
