@@ -44,6 +44,12 @@ onto a different registrable domain and auth stops working in the browser
   CI (`.github/workflows/ci.yml`) and `apps/api/Dockerfile` both pin Node 20.
   A panel offering only Node 10 or 14 cannot run this project — check the
   version dropdown before anything else.
+
+  Prefer 20 over a newer major, too. `argon2` (staff password hashing) is a
+  native addon: on a Node major it has no prebuilt binary for, install either
+  falls back to compiling from source or the module fails to load at boot with
+  an ABI/`NODE_MODULE_VERSION` mismatch. 20 is the version this repo is built
+  and tested on.
 - **pnpm 9.5.0**, via corepack: `corepack enable && corepack prepare pnpm@9.5.0 --activate`.
   `npm install` does **not** work here: `package.json` files use the
   `workspace:*` protocol and the lockfile is `pnpm-lock.yaml`. A panel's
