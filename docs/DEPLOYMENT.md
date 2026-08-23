@@ -356,12 +356,24 @@ The same thread ceiling as above, hit by pnpm itself rather than by the app. pnp
 packages on a pool of worker threads sized from the visible core count, and each worker carries
 its own V8 threads — on an 80-core host that is far more than a constrained account allows.
 
-Turn every concurrency knob down together; capping only one is usually not enough:
+The direct fix is to stop the process from seeing 80 cores at all. `os.availableParallelism()`
+honours the CPU affinity mask on Linux, and Node sizes V8's pool, libuv's pool, and (through it)
+pnpm's worker pool from that number — so restricting affinity shrinks all of them at once:
+
+```bash
+taskset -c 0,1 nproc          # prints 2 — confirms the mask applies
+taskset -c 0,1 pnpm install --frozen-lockfile --network-concurrency=1 --child-concurrency=1
+```
+
+Note the flags: `install` accepts `--network-concurrency` and `--child-concurrency`;
+`--workspace-concurrency` belongs to the recursive commands (`pnpm -r run`) and is rejected here.
+
+If `taskset` is unavailable, cap Node's pools by hand instead — less thorough, since it does not
+reach pnpm's own worker count:
 
 ```bash
 export UV_THREADPOOL_SIZE=1
 export NODE_OPTIONS="--max-old-space-size=512 --v8-pool-size=1"
-pnpm install --frozen-lockfile --workspace-concurrency=1 --child-concurrency=1
 ```
 
 If even that fails, stop installing on the server. Install on a machine with the same Node
@@ -472,9 +484,12 @@ memory, which is both far over the limit and the wrong thing to run in productio
 If a *build* dies this way, build one app at a time and cap the heap:
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=512 pnpm --filter @siders/admin build
-NODE_OPTIONS=--max-old-space-size=512 pnpm --filter @siders/web build
+taskset -c 0,1 pnpm --filter @siders/admin build
+taskset -c 0,1 pnpm --filter @siders/web build
 ```
+
+(`taskset` for the same reason as above; add `NODE_OPTIONS=--max-old-space-size=512` if the heap
+is the binding constraint rather than the thread count.)
 
 `next build` also parallelises over the visible core count; `experimental.cpus` in
 `apps/web/next.config.mjs` caps that if the heap flags alone are not enough.
