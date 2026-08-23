@@ -359,8 +359,13 @@ startup file by hand, which bypasses Passenger entirely:
 ```bash
 cd /home/<user>/siders-group
 node -v                      # must be 20.x
-node apps/api/passenger.js
+node --env-file=apps/api/.env apps/api/passenger.js
 ```
+
+Environment variables entered in the panel are injected into the Passenger process only — an SSH
+session does not have them. Hence the `--env-file` above: keep a local `apps/api/.env` (gitignored)
+mirroring the panel's values purely for running the app by hand. Nothing in production reads that
+file; `apps/api`'s `dev` script is the only thing that loads one, via `--env-file`.
 
 The likely culprits all print a specific message here:
 
