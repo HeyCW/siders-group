@@ -301,14 +301,36 @@ app. This is never an application bug; the code has not started yet.
 
 On shared hosting it means one of the account's limits was hit:
 
-- **process/thread cap** (`ulimit -u`, or CloudLinux LVE `NPROC`/`EP`)
-- **memory cap** (`ulimit -v`, LVE `PMEM`/`VMEM`) — a thread stack allocation fails the same way
+- **process/thread cap** (`ulimit -u`, or CloudLinux LVE `NPROC`/`EP`, or a cgroup `pids.max`)
+- **memory cap** (`ulimit -v`, LVE `PMEM`/`VMEM`, cgroup `memory.max`) — a failed thread-stack
+  allocation surfaces as exactly the same error
 
-Check with:
+**`ulimit` reporting `unlimited` does not mean there is no limit.** CloudLinux LVE and cgroups
+enforce their caps outside the shell's rlimits, so `ulimit` stays `unlimited` while the kernel
+still refuses the thread. Look at the enforcing layer instead:
 
 ```bash
-ulimit -u; ulimit -v
-ps -u "$(whoami)" -L | wc -l    # threads currently used by this account
+cat /proc/lve/list 2>/dev/null          # CloudLinux, when readable
+cat /sys/fs/cgroup/pids.max /sys/fs/cgroup/memory.max 2>/dev/null      # cgroup v2
+cat /sys/fs/cgroup/pids/pids.max 2>/dev/null                           # cgroup v1
+nproc; free -m
+```
+
+Counting threads *after* the crash proves nothing — measure while something is running:
+
+```bash
+node -e 'setTimeout(() => {}, 10000)' &
+sleep 1; ps -u "$(whoami)" -L | wc -l
+```
+
+`nproc` matters more than it looks: V8 sizes its platform thread pool from the visible core
+count, which on a shared box is the **host's** core count, not the account's share. One idle
+Node can therefore hold dozens of threads, and three at once multiplies that. Cap both pools
+explicitly:
+
+```bash
+export UV_THREADPOOL_SIZE=2
+export NODE_OPTIONS="--max-old-space-size=512 --v8-pool-size=2"
 ```
 
 The usual trigger is starting several Node processes at once. In particular, **do not run
