@@ -152,9 +152,14 @@ on each app:
 ```
 UV_THREADPOOL_SIZE=2
 NODE_OPTIONS=--max-old-space-size=512 --v8-pool-size=2
+GOMAXPROCS=2
 ```
 
-Neither is read by application code — they size Node's own pools. Without them, V8 and libuv
+None is read by application code — they size Node's own pools, and `GOMAXPROCS` sizes esbuild's.
+esbuild is a Go binary that `tsx` spawns as a child process on every boot to transpile the
+TypeScript sources, and the Go runtime sizes its threads from the core count exactly as Node
+does. Without `GOMAXPROCS` the API can install and start fine by hand and still fail under
+Passenger with `spawn … esbuild EAGAIN`. Without them, V8 and libuv
 size themselves from the *host's* core count and total RAM, which on shared hosting is wildly
 larger than the account's real quota. This is the same failure as §9, and it applies to the
 long-running Passenger processes exactly as it does to a build.
@@ -349,6 +354,20 @@ Two consequences worth knowing:
 
 The panel's own "run script" button activates the environment for you — which is why a command
 can work there and fail in a plain SSH session.
+
+### `spawn … esbuild EAGAIN` when starting the API
+
+The thread ceiling again, one layer further in. `tsx` transpiles through **esbuild**, which is a
+separate Go binary, and the Go runtime sizes its thread count from the visible CPUs — 80 here —
+independently of every Node-side cap. `UV_THREADPOOL_SIZE` and `--v8-pool-size` do not reach it.
+
+```bash
+export GOMAXPROCS=2
+taskset -c 0,1 node --env-file=apps/api/.env apps/api/passenger.js
+```
+
+`GOMAXPROCS` belongs in the panel's environment variables too (§4), not just the shell: the
+deployed app runs through the same tsx→esbuild path on every start.
 
 ### `ERR_WORKER_INIT_FAILED EAGAIN` during `pnpm install`
 
