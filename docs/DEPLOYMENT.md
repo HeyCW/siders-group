@@ -307,6 +307,24 @@ cookies across subdomains, CORS, media storage, and ISR revalidation together.
 
 ## 9. Troubleshooting
 
+### `require is not defined in ES module scope` in the startup file
+
+Read the file before assuming it is the one in this repo:
+
+```bash
+head -3 apps/api/passenger.js
+```
+
+If it opens with `var http = require('http');` it is the panel's own placeholder. When the
+startup file named on the form does not exist at that path, the panel **creates a stub** there —
+a CommonJS hello-world — and Passenger dutifully runs it. Under `apps/api`'s `"type": "module"`
+that stub cannot even parse, so the app 503s.
+
+The stub is the symptom; the cause is that the checkout on the server does not contain
+`apps/api/passenger.js` — it is older than, or diverged from, the branch being deployed. Get the
+right code onto the server (§7) instead of editing the stub. Once a real file exists at that
+path, the panel leaves it alone.
+
 ### `node: command not found` over SSH
 
 Panels built on CloudLinux's Node.js Selector install Node **per application**, in a virtualenv
