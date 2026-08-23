@@ -130,7 +130,7 @@ separate checkouts of the same repo.)
 |---|---|
 | **Node.js version** | 20.x. If the highest available is below 18.17, stop — see §2. |
 | **Application mode** | `Production`. This is what sets `NODE_ENV=production`; `Development` leaves pino pretty-printing and Next's dev behaviour in play. |
-| **Application root** | The physical path of the **repository root** on the server, e.g. `/var/www/vhosts/<domain>/siders-group`. Not `apps/api` — see §2. |
+| **Application root** | The **absolute** path of the **repository root** on the server, and it must sit inside the hosting user's home directory — `/home/<user>/siders-group`, not `/siders-group` (read as a filesystem root) and not `apps/api` (see §2). Keep it *outside* the domain's document root, or `.git/` and any `.env` become downloadable over HTTP. |
 | **Application URL** | The hostname this app answers on: `api.<domain>` for the API, the bare domain for web. |
 | **Application startup file** | A path to a real file relative to the application root: `apps/api/passenger.js` or `apps/web/server.js` (§3). A bare project name like `siders-group` is not a startup file and the app will not boot. |
 | **Environment variables** | See §5. |
@@ -164,7 +164,7 @@ value fails startup with an explicit list, it does not degrade silently.
 | `GOOGLE_CLIENT_SECRET` | **yes** | |
 | `GOOGLE_REDIRECT_URI` | **yes** | `https://api.<domain>/auth/google/callback`, byte-identical to the Google Console entry, trailing slash included (ARCHITECTURE.md §12 pitfall #3). |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | **yes** | Currently **unused** — media is stored on the local filesystem — but still `.min(1)` in the schema, so boot fails if they are absent. Set placeholders until R2 is wired up. |
-| `MEDIA_STORAGE_PATH` | **yes** | **Absolute** path, writable by the app user. Put it *outside* the deployed tree (e.g. `/var/www/vhosts/<domain>/media`) so a redeploy cannot wipe uploads. |
+| `MEDIA_STORAGE_PATH` | **yes** | **Absolute** path, writable by the app user. Put it *outside* the deployed tree (e.g. `/home/<user>/media`, sibling to the checkout) so a redeploy cannot wipe uploads. |
 | `MEDIA_PUBLIC_BASE_URL` | **yes** | Public URL the stored files are served from: `https://api.<domain>/media-files`. |
 | `MEDIA_MAX_IMAGE_BYTES` | default 10 MB | Raise the reverse proxy's own body limit to match, or large uploads are rejected before reaching Express. |
 | `MEDIA_MAX_VIDEO_BYTES` | default 200 MB | Same. |
@@ -287,7 +287,7 @@ cookies across subdomains, CORS, media storage, and ISR revalidation together.
 
 - [ ] Node 20 available on the host
 - [ ] Application mode set to Production
-- [ ] Application root points at the repo root, not `apps/api`
+- [ ] Application root is an absolute path under the hosting user's home, pointing at the repo root (not `apps/api`, not inside the document root)
 - [ ] Startup file is a real file path (§3), not a project name
 - [ ] `pnpm install --frozen-lockfile` run over SSH, not the panel's npm button
 - [ ] All three hostnames under one registrable domain, HTTPS on each
