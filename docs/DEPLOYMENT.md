@@ -301,6 +301,31 @@ cookies across subdomains, CORS, media storage, and ISR revalidation together.
 
 ## 9. Troubleshooting
 
+### `node: command not found` over SSH
+
+Panels built on CloudLinux's Node.js Selector install Node **per application**, in a virtualenv
+named after the application root's path relative to the home directory — not system-wide. An SSH
+session starts outside it, so `node`, `npm`, and `pnpm` are all missing until it is activated:
+
+```bash
+ls -d ~/nodevenv/*/*/ 2>/dev/null                       # available app environments
+source ~/nodevenv/siders-group/20/bin/activate          # the one matching this app root
+node -v
+```
+
+The panel's application page usually shows this exact command. The interpreters themselves also
+sit at `/opt/alt/alt-nodejs<major>/root/usr/bin/node` if the virtualenv is missing.
+
+Two consequences worth knowing:
+
+- Changing the Node version in the panel creates a **different** virtualenv path, so an
+  activation command that worked before will point at the old version afterwards.
+- Inside the virtualenv, `npm install -g` installs into that environment rather than the system,
+  which is how to get pnpm: `npm install -g pnpm@9.5.0`.
+
+The panel's own "run script" button activates the environment for you — which is why a command
+can work there and fail in a plain SSH session.
+
 ### 503 from the deployed URL
 
 Passenger reached the app and the app failed to start. The status says nothing about *why*;
