@@ -350,6 +350,36 @@ Two consequences worth knowing:
 The panel's own "run script" button activates the environment for you — which is why a command
 can work there and fail in a plain SSH session.
 
+### `ERR_WORKER_INIT_FAILED EAGAIN` during `pnpm install`
+
+The same thread ceiling as above, hit by pnpm itself rather than by the app. pnpm extracts
+packages on a pool of worker threads sized from the visible core count, and each worker carries
+its own V8 threads — on an 80-core host that is far more than a constrained account allows.
+
+Turn every concurrency knob down together; capping only one is usually not enough:
+
+```bash
+export UV_THREADPOOL_SIZE=1
+export NODE_OPTIONS="--max-old-space-size=512 --v8-pool-size=1"
+pnpm install --frozen-lockfile --workspace-concurrency=1 --child-concurrency=1
+```
+
+If even that fails, stop installing on the server. Install on a machine with the same Node
+major and a flat layout, then copy the result up:
+
+```bash
+pnpm install --frozen-lockfile --node-linker=hoisted
+tar czf node_modules.tgz node_modules apps/*/node_modules packages/*/node_modules
+```
+
+`--node-linker=hoisted` matters: pnpm's default layout is a tree of symlinks into a
+content-addressed store that does not survive being copied to another machine. Hoisted output is
+flat and self-contained, like npm's.
+
+A host this constrained is worth questioning rather than working around indefinitely — the
+architecture assumes a platform sized for the app (ARCHITECTURE.md §10), and every step here has
+cost a workaround.
+
 ### 503 from the deployed URL
 
 Passenger reached the app and the app failed to start. The status says nothing about *why*;
