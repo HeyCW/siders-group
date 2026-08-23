@@ -11,38 +11,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.5.0
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          cache: npm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Lint
-        run: pnpm lint
+        run: npm run lint
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: npm run typecheck
 
       - name: Test
-        run: pnpm test
+        run: npm test
 
       - name: Start mock API (apps/web's `/` needs a reachable API to statically render at build time)
         run: |
@@ -58,7 +42,7 @@ jobs:
       - name: Build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4310
-        run: pnpm build
+        run: npm run build
 
       - name: Stop mock API
         if: always()

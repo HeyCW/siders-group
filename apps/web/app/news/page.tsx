@@ -13,6 +13,13 @@ function splitSlugs(value: string | undefined): string[] {
   return value ? value.split(',').filter((slug) => slug.length > 0) : [];
 }
 
+/**
+ * Of the four anak usaha sub-brands (`0010_bored_silhouette.sql`), only Surabaya Siders and
+ * Jakarta Siders publish news articles — Siders Culture and SidersVox never carry articles, so
+ * they're excluded from the "Group Companies" filter on this page.
+ */
+const ARTICLE_ANAK_USAHA_SLUGS = ['surabaya-siders', 'jakarta-siders'];
+
 interface NewsSearchParams {
   category?: string;
   anakUsaha?: string;
@@ -37,7 +44,7 @@ export default async function NewsPage({ searchParams }: { searchParams: NewsSea
     new Date(),
   );
 
-  const [categories, anakUsahaOptions, articles] = await Promise.all([
+  const [categories, anakUsahaList, articles] = await Promise.all([
     getCategories({ cache: 'no-store' }),
     getAnakUsahaList({ cache: 'no-store' }),
     getArticles(
@@ -45,6 +52,10 @@ export default async function NewsPage({ searchParams }: { searchParams: NewsSea
       { cache: 'no-store' },
     ),
   ]);
+
+  const anakUsahaOptions = anakUsahaList.filter((entry) =>
+    ARTICLE_ANAK_USAHA_SLUGS.includes(entry.slug),
+  );
 
   const explorerKey = [
     categorySlugs.join(','),
@@ -58,7 +69,7 @@ export default async function NewsPage({ searchParams }: { searchParams: NewsSea
     <Container className="pt-[clamp(24px,4vw,44px)]">
       <div className="flex items-baseline justify-between gap-4 border-b-[3px] border-ink pb-2.5">
         <h1 className="font-serif text-[clamp(28px,4vw,44px)] font-bold uppercase tracking-[0.02em]">
-          News
+          Hyperlocal News
         </h1>
         <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
           Archive

@@ -19,5 +19,5 @@ intended writer per `docs/ARCHITECTURE.md` §1.
 ## Migrations
 
 - `migrations/` is empty until a feature change supplies SQL via
-  `pnpm --filter @siders/db db:generate`.
-- Apply with `pnpm --filter @siders/db db:migrate` against `DIRECT_URL`.
+  `npm run db:generate -w @siders/db`.
+- Apply with `npm run db:migrate -w @siders/db` against `DIRECT_URL`.

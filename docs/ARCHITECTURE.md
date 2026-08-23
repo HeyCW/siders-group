@@ -65,7 +65,7 @@ No transactional email provider appears here, and that is deliberate: staff onbo
 
 ## 3. Repository layout
 
-A pnpm monorepo. One schema definition, one set of contracts, no drift between three codebases.
+An npm workspaces monorepo. One schema definition, one set of contracts, no drift between three codebases.
 
 ```
 siders/
