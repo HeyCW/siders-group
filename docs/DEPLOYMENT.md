@@ -301,6 +301,41 @@ cookies across subdomains, CORS, media storage, and ISR revalidation together.
 
 ## 9. Troubleshooting
 
+### 503 from the deployed URL
+
+Passenger reached the app and the app failed to start. The status says nothing about *why*;
+the actual error went to the app's stderr. Get it directly rather than guessing — run the
+startup file by hand, which bypasses Passenger entirely:
+
+```bash
+cd /home/<user>/siders-group
+node -v                      # must be 20.x
+node apps/api/passenger.js
+```
+
+The likely culprits all print a specific message here:
+
+- **`Invalid environment configuration:`** followed by a list — `loadEnv` rejected the
+  environment (§5). Nothing was set on the app yet, or `MEDIA_STORAGE_PATH` is not absolute, or
+  a PEM key lost its `\n` encoding. This is by far the most common 503 on a first deploy.
+- **A syntax error on `await` or `import`** — the panel is still on an old Node (§2).
+- **A database error from `assertDatabaseRoleCanReadNewsTables`** — `DATABASE_URL` is wrong or
+  Postgres is unreachable from this host.
+- **`Cannot find module`** — dependencies were never installed with pnpm, or the checkout does
+  not contain the startup file.
+
+Passenger's own copy of that output lands in the domain's error log:
+
+```bash
+ls ~/logs 2>/dev/null
+find /home/<user> -maxdepth 4 -name '*error*log*' 2>/dev/null | head
+```
+
+### 404 at the API's base URL
+
+Not a fault. The API registers no route at `/` — the shallowest ones are `/health`, `/articles`,
+`/categories` (`apps/api/src/server.ts`). Test with `/health`, not the bare base URL.
+
 ### `pthread_create: Resource temporarily unavailable`, then SIGABRT
 
 ```
