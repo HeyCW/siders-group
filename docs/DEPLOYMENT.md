@@ -235,6 +235,9 @@ committed and never needed on disk.
 corepack enable && corepack prepare pnpm@9.5.0 --activate
 pnpm install --frozen-lockfile
 
+# On memory- or process-limited shared hosting, run these one at a time
+# rather than in parallel — see §9.
+
 # 1. API — no build step; it runs from source via tsx.
 #    Start it now: the web build needs it reachable (see below).
 
@@ -283,7 +286,50 @@ cookies across subdomains, CORS, media storage, and ISR revalidation together.
 
 ---
 
-## 9. Checklist
+## 9. Troubleshooting
+
+### `pthread_create: Resource temporarily unavailable`, then SIGABRT
+
+```
+node[2582412]: pthread_create: Resource temporarily unavailable
+… exited with code SIGABRT
+```
+
+The kernel refused to create a thread (`EAGAIN`). Node needs several at startup — the libuv
+threadpool, V8's platform and GC threads — so it aborts before running a single line of the
+app. This is never an application bug; the code has not started yet.
+
+On shared hosting it means one of the account's limits was hit:
+
+- **process/thread cap** (`ulimit -u`, or CloudLinux LVE `NPROC`/`EP`)
+- **memory cap** (`ulimit -v`, LVE `PMEM`/`VMEM`) — a thread stack allocation fails the same way
+
+Check with:
+
+```bash
+ulimit -u; ulimit -v
+ps -u "$(whoami)" -L | wc -l    # threads currently used by this account
+```
+
+The usual trigger is starting several Node processes at once. In particular, **do not run
+`pnpm dev` on the server**: it starts three watchers (tsx, Vite, Next) that each compile in
+memory, which is both far over the limit and the wrong thing to run in production anyway.
+
+If a *build* dies this way, build one app at a time and cap the heap:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=512 pnpm --filter @siders/admin build
+NODE_OPTIONS=--max-old-space-size=512 pnpm --filter @siders/web build
+```
+
+If `next build` still cannot finish inside the account's limits, build off-server — locally or
+in CI, with the same Node 20 and the same `NEXT_PUBLIC_API_URL` — and upload the resulting
+`apps/web/.next` and `apps/admin/dist`. Runtime is much lighter than build time: only two Node
+processes (api and web), both started by the panel.
+
+---
+
+## 10. Checklist
 
 - [ ] Node 20 available on the host
 - [ ] Application mode set to Production
