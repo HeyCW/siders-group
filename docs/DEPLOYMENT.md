@@ -83,58 +83,16 @@ point. Two extra things bite here:
    (`isMainModule`). Imported from a shim, it defines the server and never
    listens — the app boots and serves nothing.
 
-So the shim has to reproduce the boot sequence. Create `apps/api/passenger.js`
-(the package is ESM, so top-level `await` is available):
+So the shim has to reproduce the boot sequence. Both shims are committed:
 
-```js
-import { register } from 'tsx/esm/api';
+- **`apps/api/passenger.js`** — registers tsx's ESM loader, then repeats the boot steps from
+  the `isMainModule` block at the bottom of `apps/api/src/server.ts` (media dir, RLS
+  assertion, scheduler, `listen`). If a boot step is ever added there, add it here too.
+- **`apps/web/server.js`** — `next start` is a command, not a file, so this is the equivalent
+  custom server over the prebuilt `.next` output.
 
-register();
-
-const { loadEnv } = await import('./src/config/env.ts');
-const { createLogger } = await import('./src/lib/logger.ts');
-const { getDatabase } = await import('./src/lib/db.ts');
-const { ensureMediaStorageDir } = await import('./src/lib/mediaStorage.ts');
-const { assertDatabaseRoleCanReadNewsTables } = await import('./src/lib/assertDatabaseRole.ts');
-const { startScheduler } = await import('./src/lib/scheduler.ts');
-const { createServer } = await import('./src/server.ts');
-const { createArticleRepository } = await import('./src/modules/articles/article.repository.ts');
-const { createScheduledPublishJob } = await import('./src/modules/articles/scheduledPublishWorker.ts');
-
-const env = loadEnv();
-const logger = createLogger(env);
-
-await ensureMediaStorageDir(env);
-await assertDatabaseRoleCanReadNewsTables(getDatabase(env), logger);
-
-const app = createServer();
-const scheduler = startScheduler(logger);
-scheduler.registerJob(
-  '* * * * *',
-  createScheduledPublishJob(createArticleRepository(getDatabase(env)), env, logger),
-);
-
-app.listen(env.PORT, () => logger.info({ port: env.PORT }, 'api listening'));
-```
-
-Keep this in sync with the `isMainModule` block at the bottom of
-`apps/api/src/server.ts` — if a boot step is added there, add it here too.
-
-`apps/web` has the same shape of problem: `next start` is a command, not a file.
-Passenger needs `apps/web/server.js`:
-
-```js
-import { createServer } from 'node:http';
-import next from 'next';
-
-// `import.meta.dirname` needs Node >= 20.11; this form works on any Node 20.
-const dir = new URL('.', import.meta.url).pathname;
-const app = next({ dev: false, dir });
-const handle = app.getRequestHandler();
-
-await app.prepare();
-createServer((req, res) => handle(req, res)).listen(process.env.PORT ?? 3000);
-```
+Neither is used by local development or by `apps/api/Dockerfile`; they exist only for hosts
+that start an app by running a file.
 
 ### Run exactly one API process
 
@@ -154,7 +112,19 @@ with a Postgres advisory lock first — that is the documented next step in
 
 ## 4. Filling in the "Create Application" form
 
-One pass per Node app (API, then web).
+One pass per Node app (API, then web). `apps/admin` never goes through this form — it is
+static output, so its hostname just needs a document root pointing at `apps/admin/dist` plus
+the SPA fallback in §7.
+
+**Create the subdomains first.** The Application URL control offers a dropdown of hostnames the
+panel already knows about plus a URI path; `api.<domain>` and `admin.<domain>` only appear there
+once they exist as subdomains. Deploying under a path (`<domain>/api`) instead works, but then
+`APP_ORIGIN` and `ADMIN_ORIGIN` collapse to the same origin and every absolute URL in §5 changes
+— prefer subdomains, which is also what ARCHITECTURE.md §10 assumes.
+
+Both Node apps share one application root: upload the repository once and point each app at it,
+differing only in startup file. (If the panel refuses to reuse a root across two apps, use two
+separate checkouts of the same repo.)
 
 | Field | Value |
 |---|---|
