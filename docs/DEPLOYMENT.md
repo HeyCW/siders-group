@@ -140,6 +140,19 @@ expects the app to listen on it. `PORT` is read through
 `z.coerce.number().default(4000)`, so an injected value is picked up
 automatically.
 
+**On a shared box, add the thread and heap caps here too**, as ordinary environment variables
+on each app:
+
+```
+UV_THREADPOOL_SIZE=2
+NODE_OPTIONS=--max-old-space-size=512 --v8-pool-size=2
+```
+
+Neither is read by application code — they size Node's own pools. Without them, V8 and libuv
+size themselves from the *host's* core count and total RAM, which on shared hosting is wildly
+larger than the account's real quota. This is the same failure as §9, and it applies to the
+long-running Passenger processes exactly as it does to a build.
+
 ---
 
 ## 5. Environment variables
@@ -343,6 +356,9 @@ If a *build* dies this way, build one app at a time and cap the heap:
 NODE_OPTIONS=--max-old-space-size=512 pnpm --filter @siders/admin build
 NODE_OPTIONS=--max-old-space-size=512 pnpm --filter @siders/web build
 ```
+
+`next build` also parallelises over the visible core count; `experimental.cpus` in
+`apps/web/next.config.mjs` caps that if the heap flags alone are not enough.
 
 If `next build` still cannot finish inside the account's limits, build off-server — locally or
 in CI, with the same Node 20 and the same `NEXT_PUBLIC_API_URL` — and upload the resulting
