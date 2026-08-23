@@ -24,7 +24,6 @@ function article(overrides: Partial<ArticleWithRelations> & Pick<ArticleWithRela
     authorName: 'Jane Author',
     featuredMediaStoragePath: null,
     categories: [],
-    tags: [],
     anakUsaha: null,
     ...overrides,
   };

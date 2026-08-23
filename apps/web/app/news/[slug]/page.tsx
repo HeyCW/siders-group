@@ -57,6 +57,8 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         ← Back to news
       </Link>
 
+      {/* The rail sits beside the headline and lead image only; the body below spans the whole
+          container so the prose is not capped at two thirds of the width. */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] items-start gap-[clamp(24px,4vw,56px)] pt-[clamp(20px,3vw,32px)]">
         <div className="col-span-2 min-w-0">
           <div className="border-b border-rule pb-2 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
@@ -80,17 +82,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
               Foto: Siders Archive
             </div>
           )}
-
-          <div
-            className="article-body max-w-[66ch] pt-[clamp(18px,2.5vw,28px)] text-[15px] leading-[1.72] [&_p]:mb-4 [&_h2]:mb-2.5 [&_h2]:mt-6 [&_h2]:border-b [&_h2]:border-ink [&_h2]:pb-1.5 [&_h2]:font-serif [&_h2]:text-xl [&_h2]:font-black [&_h2]:uppercase [&_h2]:tracking-wide [&_h3]:mb-2.5 [&_h3]:mt-6 [&_h3]:border-b [&_h3]:border-ink [&_h3]:pb-1.5 [&_h3]:font-serif [&_h3]:text-xl [&_h3]:font-black [&_h3]:uppercase [&_h3]:tracking-wide [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: article.bodyHtml }}
-          />
-
-          {/* A Client Component island. `articleId` is the only thing it needs from the server,
-              so the route stays ISR — nothing engagement-related is fetched during server
-              rendering (specs/web-public-site/spec.md - "The route stays statically
-              regenerated"). */}
-          <EngagementBar articleId={article.id} />
         </div>
 
         <div className="min-w-0">
@@ -101,6 +92,17 @@ export default async function ArticlePage({ params }: { params: { slug: string }
           <RelatedArticles categorySlug={article.categories[0]?.slug} excludeId={article.id} />
         </div>
       </div>
+
+      <div
+        className="article-body pt-[clamp(18px,2.5vw,28px)] text-[15px] leading-[1.72] [&_p]:mb-4 [&_h2]:mb-2.5 [&_h2]:mt-6 [&_h2]:border-b [&_h2]:border-ink [&_h2]:pb-1.5 [&_h2]:font-serif [&_h2]:text-xl [&_h2]:font-black [&_h2]:uppercase [&_h2]:tracking-wide [&_h3]:mb-2.5 [&_h3]:mt-6 [&_h3]:border-b [&_h3]:border-ink [&_h3]:pb-1.5 [&_h3]:font-serif [&_h3]:text-xl [&_h3]:font-black [&_h3]:uppercase [&_h3]:tracking-wide [&_a]:underline"
+        dangerouslySetInnerHTML={{ __html: article.bodyHtml }}
+      />
+
+      {/* A Client Component island. `articleId` is the only thing it needs from the server,
+          so the route stays ISR — nothing engagement-related is fetched during server
+          rendering (specs/web-public-site/spec.md - "The route stays statically
+          regenerated"). */}
+      <EngagementBar articleId={article.id} />
     </Container>
   );
 }

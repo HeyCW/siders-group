@@ -30,7 +30,6 @@ function baseRow(overrides: Partial<ArticleWithRelations> = {}): ArticleWithRela
     authorName: 'Jane Author',
     featuredMediaStoragePath: null,
     categories: [],
-    tags: [],
     anakUsaha: null,
     ...overrides,
   };

@@ -1,4 +1,6 @@
-import { asc, eq, sql } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { isVideoMimeType } from '@siders/contracts';
 import { media, guidePicks, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
@@ -13,6 +15,11 @@ export interface GuidePickRow {
   /** Joined from `app.media` at read time so the mapper can derive a photo URL without a second
    *  round trip — mirrors `PartnerRow.logoStoragePath` (partner.repository.ts). */
   photoStoragePath: string;
+  videoMediaId: string;
+  /** Joined from a second, aliased reference to `app.media` — a guide pick's photo now serves as
+   *  its video's poster, so both references are resolved in the same read
+   *  (openspec/changes/self-hosted-guideline-videos/design.md). */
+  videoStoragePath: string;
   sortOrder: number;
   isActive: boolean;
   createdAt: Date;
@@ -24,6 +31,7 @@ export interface CreateGuidePickInput {
   place: string;
   description: string;
   photoMediaId: string;
+  videoMediaId: string;
   isActive?: boolean | undefined;
 }
 
@@ -32,6 +40,7 @@ export interface UpdateGuidePickInput {
   place?: string | undefined;
   description?: string | undefined;
   photoMediaId?: string | undefined;
+  videoMediaId?: string | undefined;
   isActive?: boolean | undefined;
 }
 
@@ -73,6 +82,14 @@ function invalidGuidePickSetError(): AppError {
   );
 }
 
+function photoMustBeImageError(): AppError {
+  return new AppError('photoMediaId must reference an image, not a video', 400, 'photo_must_be_image');
+}
+
+function videoMustBeVideoError(): AppError {
+  return new AppError('videoMediaId must reference a video, not an image', 400, 'video_must_be_video');
+}
+
 /**
  * The rule `reorder` enforces: the submitted collection must name every existing guide pick,
  * nothing more and nothing fewer
@@ -82,6 +99,10 @@ function invalidGuidePickSetError(): AppError {
  */
 export const isExactGuidePickIdSet = isExactIdSet;
 
+/** Second reference to `app.media` for the video join — `photoMediaId` and `videoMediaId` both
+ *  point at the same table, so one of the two joins must be aliased. */
+const videoMedia = alias(media, 'video_media');
+
 const SELECT_COLUMNS = {
   id: guidePicks.id,
   city: guidePicks.city,
@@ -89,11 +110,41 @@ const SELECT_COLUMNS = {
   description: guidePicks.description,
   photoMediaId: guidePicks.photoMediaId,
   photoStoragePath: media.storagePath,
+  videoMediaId: guidePicks.videoMediaId,
+  videoStoragePath: videoMedia.storagePath,
   sortOrder: guidePicks.sortOrder,
   isActive: guidePicks.isActive,
   createdAt: guidePicks.createdAt,
   updatedAt: guidePicks.updatedAt,
 };
+
+/**
+ * Rejects a photo/video pair whose kinds are swapped or otherwise wrong, ahead of the insert or
+ * update (specs/guide-of-the-week-management/spec.md - "Photo must be an image, not a video" /
+ * "Video must be a video, not an image"). A media id that doesn't exist at all is left alone here
+ * — that case is reported by the foreign-key violation the subsequent write raises, translated by
+ * the service into `invalid_photo_media`/`invalid_video_media`, so existence and kind stay two
+ * separate failures.
+ */
+async function assertMediaKinds(
+  db: Database,
+  input: { photoMediaId?: string | undefined; videoMediaId?: string | undefined },
+): Promise<void> {
+  const ids = [input.photoMediaId, input.videoMediaId].filter((id): id is string => id !== undefined);
+  if (ids.length === 0) return;
+
+  const rows = await db.select({ id: media.id, mime: media.mime }).from(media).where(inArray(media.id, ids));
+  const mimeById = new Map(rows.map((row) => [row.id, row.mime]));
+
+  if (input.photoMediaId !== undefined) {
+    const mime = mimeById.get(input.photoMediaId);
+    if (mime !== undefined && isVideoMimeType(mime)) throw photoMustBeImageError();
+  }
+  if (input.videoMediaId !== undefined) {
+    const mime = mimeById.get(input.videoMediaId);
+    if (mime !== undefined && !isVideoMimeType(mime)) throw videoMustBeVideoError();
+  }
+}
 
 export function createGuidePickRepository(db: Database): GuidePickRepository {
   async function findByIdJoined(id: string): Promise<GuidePickRow | null> {
@@ -101,6 +152,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
       .select(SELECT_COLUMNS)
       .from(guidePicks)
       .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+      .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
       .where(eq(guidePicks.id, id))
       .limit(1);
     return row ?? null;
@@ -111,6 +163,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
       .select(SELECT_COLUMNS)
       .from(guidePicks)
       .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+      .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
       .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt));
   }
 
@@ -119,12 +172,14 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
       .select(SELECT_COLUMNS)
       .from(guidePicks)
       .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+      .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
       .where(eq(guidePicks.isActive, true))
       .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt));
   }
 
   return {
     async create(input) {
+      await assertMediaKinds(db, input);
       // Read-then-write on `max(sort_order)`, so it has to be one transaction — see
       // `partner.repository.ts`'s `create` for why the SHARE lock is what makes the aggregate
       // hold for the insert.
@@ -141,6 +196,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
             place: input.place,
             description: input.description,
             photoMediaId: input.photoMediaId,
+            videoMediaId: input.videoMediaId,
             isActive: input.isActive ?? true,
             sortOrder: maxRow.nextSortOrder,
           })
@@ -160,6 +216,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
     },
 
     async update(id, input) {
+      await assertMediaKinds(db, input);
       const [updated] = await db
         .update(guidePicks)
         .set({ ...stripUndefined(input), updatedAt: new Date() })
@@ -187,6 +244,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
             .select(SELECT_COLUMNS)
             .from(guidePicks)
             .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+            .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
             .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt)),
         onInvalidSet: invalidGuidePickSetError,
       });

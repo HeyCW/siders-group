@@ -5,8 +5,8 @@ function fixture(): DashboardData {
   return {
     pipeline: { draft: 1, scheduled: 2, published: 30 },
     cadence: [{ weekStart: '2026-08-10', count: 5 }],
-    contentDebt: { missingSeoDescription: 1, missingExcerpt: 2, missingFeaturedImage: 0, uncategorized: 3, unusedTags: 4 },
-    curationIntegrity: { home: { total: 5, visible: 4 }, reels: { total: 3, visible: 3 } },
+    contentDebt: { missingSeoDescription: 1, missingExcerpt: 2, missingFeaturedImage: 0, uncategorized: 3 },
+    curationIntegrity: { home: { total: 5, visible: 4 } },
     upNext: {
       dueWithin48h: [
         { id: '11111111-1111-1111-1111-111111111111', title: 'Election results', slug: 'election-results', publishedAt: new Date('2026-08-14T10:30:00.000Z') },

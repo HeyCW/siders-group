@@ -3,7 +3,7 @@ import { publicUrlFor } from '../../lib/mediaStorage.js';
 import type { PartnerRow } from './partner.repository.js';
 
 /** `logoUrl` is derived from the joined media's `storage_path` here, at map time — never stored
- *  on the row, mirroring `reel.mapper.ts`'s `toReelResponse`. */
+ *  on the row, mirroring `guidePick.mapper.ts`'s `toGuidePickResponse`. */
 export function toPartnerResponse(env: { MEDIA_PUBLIC_BASE_URL: string }, row: PartnerRow): PartnerResponse {
   return {
     id: row.id,

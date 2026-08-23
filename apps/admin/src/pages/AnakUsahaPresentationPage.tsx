@@ -40,9 +40,13 @@ function emptyLink(): EditableLink {
   return { key: crypto.randomUUID(), label: '', href: '' };
 }
 
+/** Matches `paper` in `apps/web/tailwind.config.ts` — the tile's look with no color chosen. */
+const DEFAULT_BACKGROUND_COLOR = '#F7F6F2';
+
 interface ProfileFormState {
   description: string;
   kind: string;
+  backgroundColor: string;
   links: EditableLink[];
   isActive: boolean;
   /** `undefined` = leave the stored logo as it is, `null` = clear it, a string = replace it with
@@ -59,6 +63,7 @@ function formFromEntry(entry: AnakUsahaAdminResponse): ProfileFormState {
   return {
     description: profile?.description ?? '',
     kind: profile?.kind ?? KIND_OPTIONS[0],
+    backgroundColor: profile?.backgroundColor ?? DEFAULT_BACKGROUND_COLOR,
     links: (profile?.links ?? []).map((link) => ({ ...link, key: crypto.randomUUID() })),
     isActive: profile?.isActive ?? true,
     logoMediaId: undefined,
@@ -150,7 +155,8 @@ export function AnakUsahaPresentationPage() {
   }
 
   const linksAreValid = form?.links.every((l) => l.label.trim().length > 0 && isHttpUrl(l.href.trim())) ?? true;
-  const canSave = form !== null && linksAreValid && !form.uploadingLogo;
+  const backgroundColorIsValid = form ? /^#[0-9a-fA-F]{6}$/.test(form.backgroundColor) : true;
+  const canSave = form !== null && linksAreValid && backgroundColorIsValid && !form.uploadingLogo;
 
   async function handleSave() {
     if (!editingId || !form || !canSave) return;
@@ -162,6 +168,7 @@ export function AnakUsahaPresentationPage() {
         updated = await runUpdate(editingId, {
           description: form.description.trim() || null,
           kind: form.kind as (typeof KIND_OPTIONS)[number],
+          backgroundColor: form.backgroundColor,
           links,
           isActive: form.isActive,
           ...(form.logoMediaId !== undefined ? { logoMediaId: form.logoMediaId } : {}),
@@ -170,6 +177,7 @@ export function AnakUsahaPresentationPage() {
         updated = await runCreate(editingId, {
           description: form.description.trim() || null,
           kind: form.kind as (typeof KIND_OPTIONS)[number],
+          backgroundColor: form.backgroundColor,
           links,
           ...(form.logoMediaId ? { logoMediaId: form.logoMediaId } : {}),
         });
@@ -283,6 +291,27 @@ export function AnakUsahaPresentationPage() {
         </div>
 
         <div>
+          <label className={FIELD_LABEL}>Tile background color</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={form.backgroundColor}
+              onChange={(e) => setForm({ ...form, backgroundColor: e.target.value })}
+              className="h-9 w-14 cursor-pointer rounded-md border border-[var(--rule)] bg-transparent p-1"
+            />
+            <input
+              value={form.backgroundColor}
+              onChange={(e) => setForm({ ...form, backgroundColor: e.target.value })}
+              placeholder="#F7F6F2"
+              className={`${TEXT_INPUT} w-32 font-mono`}
+            />
+          </div>
+          {!backgroundColorIsValid && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">Must be a hex color like #F7F6F2.</p>
+          )}
+        </div>
+
+        <div>
           <label className={FIELD_LABEL}>Description (optional)</label>
           <textarea
             value={form.description}
@@ -299,12 +328,14 @@ export function AnakUsahaPresentationPage() {
               const hrefInvalid = link.href.trim().length > 0 && !isHttpUrl(link.href.trim());
               return (
                 <div key={link.key} className="flex gap-2">
-                  <input
-                    value={link.label}
-                    onChange={(e) => updateLink(link.key, 'label', e.target.value)}
-                    placeholder="Instagram"
-                    className={`${TEXT_INPUT} w-1/3`}
-                  />
+                  <div className="w-1/3">
+                    <input
+                      value={link.label}
+                      onChange={(e) => updateLink(link.key, 'label', e.target.value)}
+                      placeholder="Instagram"
+                      className={TEXT_INPUT}
+                    />
+                  </div>
                   <div className="flex-1">
                     <input
                       value={link.href}

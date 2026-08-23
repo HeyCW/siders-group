@@ -20,11 +20,9 @@ function wellFormedPayload() {
       missingExcerpt: 1,
       missingFeaturedImage: 2,
       uncategorized: 0,
-      unusedTags: 4,
     },
     curationIntegrity: {
       home: { total: 8, visible: 7 },
-      reels: { total: 5, visible: 5 },
     },
     upNext: {
       dueWithin48h: [{ id: id(1), title: 'Election results', slug: 'election-results', publishedAt: '2026-08-14T00:00:00.000Z' }],

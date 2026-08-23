@@ -26,11 +26,12 @@ function IconGrip({ className }: { className?: string }) {
 
 /**
  * The guide-pick list: create, edit, delete, reorder, and toggle active picks backing the public
- * home page's "Siders Guide of the Week" section. A photo is required before a pick can be
- * created (specs/guide-of-the-week-management/spec.md - "A guide pick requires a photo"),
- * mirroring `PartnersPage.tsx`'s required-logo upload. Reordering saves immediately on drop — a
- * guide pick has no separate "pick from a pool" step to batch with the reorder, so there is
- * nothing to gain by deferring the write behind an explicit save button
+ * home page's "Siders Guideline of the Week" section. A photo and a video are both required
+ * before a pick can be created (specs/guide-of-the-week-management/spec.md - "A guide pick
+ * requires a photo", "A guide pick requires a self-hosted video") — the photo now serves as the
+ * video's poster — mirroring `PartnersPage.tsx`'s required-logo upload. Reordering saves
+ * immediately on drop — a guide pick has no separate "pick from a pool" step to batch with the
+ * reorder, so there is nothing to gain by deferring the write behind an explicit save button
  * (design.md - "Guide picks are directly-owned entities, not a curated selection"). No UI-side
  * limit on how many picks can be added (design.md - "No maximum pick count").
  */
@@ -51,6 +52,12 @@ export function GuidePicksPage() {
    *  the previous selection and re-picking the same file fires no `change` event. */
   const [photoInputKey, setPhotoInputKey] = useState(0);
 
+  const [videoMediaId, setVideoMediaId] = useState<string | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [videoUploadError, setVideoUploadError] = useState<string | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoInputKey, setVideoInputKey] = useState(0);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCity, setEditCity] = useState('');
   const [editPlace, setEditPlace] = useState('');
@@ -59,6 +66,11 @@ export function GuidePicksPage() {
   const [editPhotoPreviewUrl, setEditPhotoPreviewUrl] = useState<string | null>(null);
   const [editPhotoUploadError, setEditPhotoUploadError] = useState<string | null>(null);
   const [editUploadingPhoto, setEditUploadingPhoto] = useState(false);
+
+  const [editVideoMediaId, setEditVideoMediaId] = useState<string | null>(null);
+  const [editVideoPreviewUrl, setEditVideoPreviewUrl] = useState<string | null>(null);
+  const [editVideoUploadError, setEditVideoUploadError] = useState<string | null>(null);
+  const [editUploadingVideo, setEditUploadingVideo] = useState(false);
 
   const [createState, runCreate] = useAsyncAction(guidePicksApi.create);
   const [updateState, runUpdate] = useAsyncAction((id: string, input: Parameters<typeof guidePicksApi.update>[1]) =>
@@ -83,15 +95,18 @@ export function GuidePicksPage() {
     place.trim().length > 0 &&
     description.trim().length > 0 &&
     photoMediaId !== null &&
+    videoMediaId !== null &&
     !createState.loading &&
-    !uploadingPhoto;
+    !uploadingPhoto &&
+    !uploadingVideo;
 
   const canSaveEdit =
     editCity.trim().length > 0 &&
     editPlace.trim().length > 0 &&
     editDescription.trim().length > 0 &&
     !updateState.loading &&
-    !editUploadingPhoto;
+    !editUploadingPhoto &&
+    !editUploadingVideo;
 
   async function handlePhotoSelected(file: File | null) {
     setPhotoUploadError(null);
@@ -114,14 +129,36 @@ export function GuidePicksPage() {
     }
   }
 
+  async function handleVideoSelected(file: File | null) {
+    setVideoUploadError(null);
+    if (!file) {
+      setVideoPreviewUrl(null);
+      setVideoMediaId(null);
+      return;
+    }
+    setUploadingVideo(true);
+    try {
+      const uploaded = await mediaApi.upload(file);
+      setVideoPreviewUrl(uploaded.url);
+      setVideoMediaId(uploaded.id);
+    } catch (err) {
+      setVideoUploadError(err instanceof ApiError ? err.message : 'Video upload failed');
+      setVideoPreviewUrl(null);
+      setVideoMediaId(null);
+    } finally {
+      setUploadingVideo(false);
+    }
+  }
+
   async function handleCreate() {
-    if (!photoMediaId || !canCreate) return;
+    if (!photoMediaId || !videoMediaId || !canCreate) return;
     try {
       const created = await runCreate({
         city: city.trim(),
         place: place.trim(),
         description: description.trim(),
         photoMediaId,
+        videoMediaId,
       });
       setGuidePicks((prev) => [...prev, created]);
       setCity('');
@@ -130,6 +167,9 @@ export function GuidePicksPage() {
       setPhotoPreviewUrl(null);
       setPhotoMediaId(null);
       setPhotoInputKey((k) => k + 1);
+      setVideoPreviewUrl(null);
+      setVideoMediaId(null);
+      setVideoInputKey((k) => k + 1);
     } catch {
       /* surfaced via createState.errorMessage */
     }
@@ -143,6 +183,9 @@ export function GuidePicksPage() {
     setEditPhotoMediaId(null);
     setEditPhotoPreviewUrl(pick.photoUrl);
     setEditPhotoUploadError(null);
+    setEditVideoMediaId(null);
+    setEditVideoPreviewUrl(pick.videoUrl);
+    setEditVideoUploadError(null);
   }
 
   function cancelEdit() {
@@ -153,6 +196,9 @@ export function GuidePicksPage() {
     setEditPhotoMediaId(null);
     setEditPhotoPreviewUrl(null);
     setEditPhotoUploadError(null);
+    setEditVideoMediaId(null);
+    setEditVideoPreviewUrl(null);
+    setEditVideoUploadError(null);
   }
 
   async function handleEditPhotoSelected(file: File | null) {
@@ -172,6 +218,23 @@ export function GuidePicksPage() {
     }
   }
 
+  async function handleEditVideoSelected(file: File | null) {
+    setEditVideoUploadError(null);
+    if (!file) return;
+    setEditUploadingVideo(true);
+    try {
+      const uploaded = await mediaApi.upload(file);
+      setEditVideoPreviewUrl(uploaded.url);
+      setEditVideoMediaId(uploaded.id);
+    } catch (err) {
+      setEditVideoUploadError(err instanceof ApiError ? err.message : 'Video upload failed');
+      setEditVideoPreviewUrl(editingId ? (guidePicks.find((p) => p.id === editingId)?.videoUrl ?? null) : null);
+      setEditVideoMediaId(null);
+    } finally {
+      setEditUploadingVideo(false);
+    }
+  }
+
   async function handleSaveEdit() {
     if (!editingId || !canSaveEdit) return;
     try {
@@ -180,6 +243,7 @@ export function GuidePicksPage() {
         place: editPlace.trim(),
         description: editDescription.trim(),
         ...(editPhotoMediaId ? { photoMediaId: editPhotoMediaId } : {}),
+        ...(editVideoMediaId ? { videoMediaId: editVideoMediaId } : {}),
       });
       setGuidePicks((prev) => prev.map((p) => (p.id === editingId ? updated : p)));
       cancelEdit();
@@ -314,6 +378,27 @@ export function GuidePicksPage() {
             {photoUploadError && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{photoUploadError}</p>}
           </div>
 
+          <div>
+            <label className={FIELD_LABEL}>Video (required, MP4)</label>
+            <div className="flex items-center gap-3">
+              <label className={FILE_LABEL}>
+                Choose file
+                <input
+                  key={videoInputKey}
+                  type="file"
+                  accept="video/mp4"
+                  onChange={(e) => handleVideoSelected(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+              </label>
+              {uploadingVideo && <span className="font-mono text-xs text-[var(--muted)]">Uploading…</span>}
+              {videoPreviewUrl && (
+                <video src={videoPreviewUrl} className="h-14 w-14 rounded-md object-cover" muted />
+              )}
+            </div>
+            {videoUploadError && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{videoUploadError}</p>}
+          </div>
+
           <div className="flex items-center gap-3 pt-1">
             <button
               type="button"
@@ -403,6 +488,27 @@ export function GuidePicksPage() {
                     </div>
                     {editPhotoUploadError && (
                       <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{editPhotoUploadError}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className={FIELD_LABEL}>Replace video (optional, MP4)</label>
+                    <div className="flex items-center gap-3">
+                      <label className={FILE_LABEL}>
+                        Choose file
+                        <input
+                          type="file"
+                          accept="video/mp4"
+                          onChange={(e) => handleEditVideoSelected(e.target.files?.[0] ?? null)}
+                          className="hidden"
+                        />
+                      </label>
+                      {editUploadingVideo && <span className="font-mono text-xs text-[var(--muted)]">Uploading…</span>}
+                      {editVideoPreviewUrl && (
+                        <video src={editVideoPreviewUrl} className="h-14 w-14 rounded-md object-cover" muted />
+                      )}
+                    </div>
+                    {editVideoUploadError && (
+                      <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{editVideoUploadError}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-3 pt-1">

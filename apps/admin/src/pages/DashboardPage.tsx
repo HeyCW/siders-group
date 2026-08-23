@@ -179,26 +179,16 @@ export function DashboardPage() {
                 <span>Uncategorized</span>
                 <span className="font-mono text-[var(--muted)]">{data.contentDebt.uncategorized}</span>
               </li>
-              <li className="flex justify-between">
-                <span>Unused tags</span>
-                <span className="font-mono text-[var(--muted)]">{data.contentDebt.unusedTags}</span>
-              </li>
             </ul>
           </Tile>
 
-          <Tile title="Homepage & reels integrity">
+          <Tile title="Homepage integrity">
             <div className="flex gap-6">
               <div>
                 <p className="font-display text-2xl">
                   {data.curationIntegrity.home.visible} / {data.curationIntegrity.home.total}
                 </p>
                 <p className="font-mono text-xs text-[var(--muted)]">Homepage curation visible</p>
-              </div>
-              <div>
-                <p className="font-display text-2xl">
-                  {data.curationIntegrity.reels.visible} / {data.curationIntegrity.reels.total}
-                </p>
-                <p className="font-mono text-xs text-[var(--muted)]">Reels curation visible</p>
               </div>
             </div>
           </Tile>

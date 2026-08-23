@@ -36,6 +36,9 @@ export const anakUsahaProfile = app.table('anak_usaha_profile', {
     .primaryKey()
     .references(() => anakUsaha.id, { onDelete: 'cascade' }),
   logoMediaId: uuid('logo_media_id').references(() => media.id, { onDelete: 'set null' }),
+  /** Hex color (`#rrggbb`) behind the logo on the home page tile, admin-picked per entry. `null`
+   *  falls back to the tile's default paper background (`AnakUsahaTiles.tsx`). */
+  backgroundColor: text('background_color'),
   description: text('description'),
   kind: text('kind').notNull(),
   links: jsonb('links').notNull().default([]),

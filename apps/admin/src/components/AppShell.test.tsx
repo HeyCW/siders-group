@@ -47,7 +47,6 @@ describe('AppShell navigation', () => {
     expect(screen.getByText('Articles')).toBeTruthy();
     expect(screen.getByText('Curation')).toBeTruthy();
     expect(screen.queryByText('Categories')).toBeNull();
-    expect(screen.queryByText('Tags')).toBeNull();
   });
 
   it('hides every permission-gated item when the caller holds none of them', () => {
@@ -64,7 +63,6 @@ describe('AppShell navigation', () => {
 
     expect(screen.getByText('Articles')).toBeTruthy();
     expect(screen.getByText('Categories')).toBeTruthy();
-    expect(screen.getByText('Tags')).toBeTruthy();
     expect(screen.getByText('Curation')).toBeTruthy();
   });
 });

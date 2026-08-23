@@ -130,10 +130,10 @@ const PUBLIC_READ_RATE_LIMIT = { windowMs: 60 * 1000, max: 120 };
 
 /**
  * Shared config for every public, unauthenticated read endpoint (articles, curation/home feed,
- * reels, …) — window and ceiling in common, namespaced per caller via `name` so each endpoint
- * still counts only its own traffic (see `name` above). Previously redefined verbatim in
- * `article.routes.ts`, `curation.routes.ts`, and `reels.routes.ts`; consolidated here so the
- * window/max and the 429 response shape have one definition instead of three.
+ * guide picks, …) — window and ceiling in common, namespaced per caller via `name` so each
+ * endpoint still counts only its own traffic (see `name` above). Previously redefined verbatim in
+ * `article.routes.ts` and `curation.routes.ts`; consolidated here so the window/max and the 429
+ * response shape have one definition instead of many.
  */
 export function publicReadRateLimiter(name: string) {
   return rateLimit({

@@ -7,8 +7,6 @@ import { TaxonomyManagementPage } from './pages/TaxonomyManagementPage.js';
 import { HomeCurationPage } from './pages/HomeCurationPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { ChangePasswordPage } from './pages/ChangePasswordPage.js';
-import { ReelLibraryPage } from './pages/ReelLibraryPage.js';
-import { ReelsCurationPage } from './pages/ReelsCurationPage.js';
 import { PartnersPage } from './pages/PartnersPage.js';
 import { AnakUsahaPresentationPage } from './pages/AnakUsahaPresentationPage.js';
 import { GuidePicksPage } from './pages/GuidePicksPage.js';
@@ -17,7 +15,7 @@ import { CommentModerationPage } from './pages/CommentModerationPage.js';
 import { ReaderModerationPage } from './pages/ReaderModerationPage.js';
 import { RolesPage } from './pages/RolesPage.js';
 import { StaffPage } from './pages/StaffPage.js';
-import { anakUsahaApi, categoriesApi, tagsApi } from './lib/taxonomyApi.js';
+import { anakUsahaApi, categoriesApi } from './lib/taxonomyApi.js';
 import { SessionProvider } from './session/SessionContext.js';
 import { RedirectIfAuthenticated, RequireSession } from './session/RouteGuards.js';
 import { AppShell } from './components/AppShell.js';
@@ -68,7 +66,6 @@ export default function App() {
               path="/categories"
               element={<TaxonomyManagementPage title="Categories" singularLabel="category" api={categoriesApi} />}
             />
-            <Route path="/tags" element={<TaxonomyManagementPage title="Tags" singularLabel="tag" api={tagsApi} />} />
             <Route
               path="/anak-usaha"
               element={<TaxonomyManagementPage title="Anak Perusahaan" singularLabel="anak perusahaan" api={anakUsahaApi} />}
@@ -77,8 +74,6 @@ export default function App() {
                 a nested path would also light up the plain taxonomy nav item above it. */}
             <Route path="/anak-usaha-presentation" element={<AnakUsahaPresentationPage />} />
             <Route path="/curation" element={<HomeCurationPage />} />
-            <Route path="/reels" element={<ReelLibraryPage />} />
-            <Route path="/reels-curation" element={<ReelsCurationPage />} />
             <Route path="/partners" element={<PartnersPage />} />
             <Route path="/guide-picks" element={<GuidePicksPage />} />
             <Route path="/messages" element={<ContactMessagesPage />} />

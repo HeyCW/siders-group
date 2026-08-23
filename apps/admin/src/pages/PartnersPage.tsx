@@ -44,7 +44,7 @@ const isPngFile = (file: File) => file.type === 'image/png';
  * The partner directory: create, edit, delete, reorder, and toggle active partners backing the
  * public home page's partner ticker. A logo is required before a partner can be created
  * (specs/partner-management/spec.md - "A partner requires a logo"), mirroring
- * `ReelLibraryPage.tsx`'s required-poster upload. Reordering saves immediately on drop — unlike
+ * `GuidePicksPage.tsx`'s required-photo upload. Reordering saves immediately on drop — unlike
  * `HomeCurationPage.tsx`, there is no separate "pick from a pool" step to batch with the reorder,
  * so there is nothing to gain by deferring the write behind an explicit save button
  * (design.md - "Partners are directly-owned entities, not a curated selection").

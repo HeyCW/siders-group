@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ArticlePublicCard } from '@siders/contracts';
 import { MediaSlot } from '../ui/MediaSlot';
+import { AnakUsahaTag } from './AnakUsahaTag';
 
 function formatMeta(article: ArticlePublicCard): string {
   const cats = article.categories.map((c) => c.name).join(', ');
@@ -32,6 +33,11 @@ export function ArticleCard({
           aspectClassName="aspect-[4/3]"
         />
         <span className="block">
+          {article.anakUsaha && (
+            <span className="mb-1.5 block">
+              <AnakUsahaTag name={article.anakUsaha.name} slug={article.anakUsaha.slug} />
+            </span>
+          )}
           <span className="block font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
             Featured · {formatMeta(article)}
           </span>
@@ -61,6 +67,11 @@ export function ArticleCard({
         label="No image"
         aspectClassName="aspect-[3/2]"
       />
+      {article.anakUsaha && (
+        <span className="mt-1.5 block">
+          <AnakUsahaTag name={article.anakUsaha.name} slug={article.anakUsaha.slug} />
+        </span>
+      )}
       <span className="my-1.5 block font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
         {formatMeta(article)}
       </span>

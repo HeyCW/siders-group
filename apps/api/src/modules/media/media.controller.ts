@@ -23,7 +23,8 @@ export function createMediaController(service: MediaService, env: Pick<Env, 'MED
         const metadata = mediaUploadMetadataSchema.parse(req.body);
         const caller = requireCaller(req);
         const row = await service.upload({
-          buffer: req.file.buffer,
+          tempPath: req.file.path,
+          sizeBytes: req.file.size,
           declaredMime: req.file.mimetype,
           originalFilename: req.file.originalname,
           alt: metadata.alt,

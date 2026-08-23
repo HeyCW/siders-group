@@ -1,4 +1,4 @@
-import { getAnakUsahaList, getGuidePicks, getHomeFeed, getPartners, getReels } from '../lib/api';
+import { getAnakUsahaList, getGuidePicks, getHomeFeed, getPartners } from '../lib/api';
 import { presentedAnakUsaha } from '../lib/anakUsaha';
 import { Container } from '../components/layout/Container';
 import { Hero } from '../components/home/Hero';
@@ -7,7 +7,6 @@ import { StatsBand } from '../components/home/StatsBand';
 import { ConnectedPlatforms } from '../components/home/ConnectedPlatforms';
 import { GuideOfWeek } from '../components/home/GuideOfWeek';
 import { Showcase } from '../components/home/Showcase';
-import { ReelsRail } from '../components/home/ReelsRail';
 import { AnakUsahaTiles } from '../components/home/AnakUsahaTiles';
 import { PartnerGrid } from '../components/home/PartnerGrid';
 import { CtaBand } from '../components/home/CtaBand';
@@ -15,14 +14,13 @@ import { CtaBand } from '../components/home/CtaBand';
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [articles, reels, partners, guides, anakUsahaList] = await Promise.all([
+  const [articles, partners, guides, anakUsahaList] = await Promise.all([
     getHomeFeed(3, { next: { revalidate: 60 } }),
-    getReels({ next: { revalidate: 60 } }),
     // The partner strip is the one section on this page with a defined empty state — it renders
     // nothing at all when the list is empty (specs/web-public-site/spec.md - "No partners means no
     // section"). So a failing `/partners` degrades to a hidden section instead of taking the
-    // articles and reels down with it through `Promise.all`; there is no `error.tsx` here to catch
-    // it otherwise.
+    // articles down with it through `Promise.all`; there is no `error.tsx` here to catch it
+    // otherwise.
     getPartners({ next: { revalidate: 60 } }).catch(() => []),
     // Same treatment as partners: a failed or empty guide-picks fetch hides the section rather
     // than failing the whole home page (specs/web-public-site/spec.md - "No guide picks means no
@@ -47,7 +45,7 @@ export default async function HomePage() {
       <StatsBand />
 
       <Container>
-        <ConnectedPlatforms brands={anakUsahaBrands} />
+        <ConnectedPlatforms />
       </Container>
 
       <Container>
@@ -55,9 +53,6 @@ export default async function HomePage() {
       </Container>
       <Container>
         <Showcase articles={articles} />
-      </Container>
-      <Container>
-        <ReelsRail reels={reels} />
       </Container>
       <Container>
         <AnakUsahaTiles brands={anakUsahaBrands} />

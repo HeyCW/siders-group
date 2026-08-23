@@ -79,13 +79,3 @@
   line-height: 0.82;
   padding-right: 8px;
 }
-
-/* Hides the scrollbar on horizontally-scrolling rails (the Reels rail) while keeping the
-   element scrollable — the design treats the rail as swipeable, not as a visible scroll list. */
-.no-scrollbar {
-  scrollbar-width: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}

@@ -10,7 +10,6 @@ const EMPTY_LIST = { success: true, data: [] };
 
 const ROUTES = {
   '/home': EMPTY_LIST,
-  '/reels': EMPTY_LIST,
   '/articles': EMPTY_LIST,
   '/categories': EMPTY_LIST,
 };

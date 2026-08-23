@@ -17,6 +17,8 @@ function row(overrides: Partial<GuidePickRow> & Pick<GuidePickRow, 'id'>): Guide
     description: 'Wifi kuat dan buka sampai tengah malam.',
     photoMediaId: '11111111-1111-1111-1111-000000000001',
     photoStoragePath: '2026/08/photo.webp',
+    videoMediaId: '11111111-1111-1111-1111-000000000002',
+    videoStoragePath: '2026/08/video.mp4',
     sortOrder: 0,
     isActive: true,
     createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -25,21 +27,24 @@ function row(overrides: Partial<GuidePickRow> & Pick<GuidePickRow, 'id'>): Guide
   };
 }
 
-function foreignKeyViolation(): Error {
-  return Object.assign(new Error('violates foreign key constraint'), { code: '23503' });
+/** `constraint` mirrors what `node-postgres` reports for a 23503 — the name distinguishes which
+ *  of the two media foreign keys fired (guidePick.service.ts - `invalidMediaReferenceError`). */
+function foreignKeyViolation(constraint: 'guide_picks_photo_media_id_media_id_fk' | 'guide_picks_video_media_id_media_id_fk'): Error {
+  return Object.assign(new Error('violates foreign key constraint'), { code: '23503', constraint });
 }
 
 function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
   let stored = [...initial];
-  let rejectNextCreate = false;
-  let rejectNextUpdate = false;
+  let rejectNextCreate: 'photo' | 'video' | undefined;
+  let rejectNextUpdate: 'photo' | 'video' | undefined;
   let rejectNextReorder: AppError | undefined;
 
   const repository: GuidePickRepository = {
     async create(input) {
       if (rejectNextCreate) {
-        rejectNextCreate = false;
-        throw foreignKeyViolation();
+        const kind = rejectNextCreate;
+        rejectNextCreate = undefined;
+        throw foreignKeyViolation(kind === 'video' ? 'guide_picks_video_media_id_media_id_fk' : 'guide_picks_photo_media_id_media_id_fk');
       }
       const created = row({
         id: `generated-${stored.length}`,
@@ -48,6 +53,7 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
         place: input.place,
         description: input.description,
         photoMediaId: input.photoMediaId,
+        videoMediaId: input.videoMediaId,
         isActive: input.isActive ?? true,
       });
       stored.push(created);
@@ -61,8 +67,9 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
     },
     async update(id, input) {
       if (rejectNextUpdate) {
-        rejectNextUpdate = false;
-        throw foreignKeyViolation();
+        const kind = rejectNextUpdate;
+        rejectNextUpdate = undefined;
+        throw foreignKeyViolation(kind === 'video' ? 'guide_picks_video_media_id_media_id_fk' : 'guide_picks_photo_media_id_media_id_fk');
       }
       const existing = stored.find((r) => r.id === id);
       if (!existing) throw new Error('not found');
@@ -72,6 +79,7 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
         place: input.place ?? existing.place,
         description: input.description ?? existing.description,
         photoMediaId: input.photoMediaId ?? existing.photoMediaId,
+        videoMediaId: input.videoMediaId ?? existing.videoMediaId,
         isActive: input.isActive ?? existing.isActive,
         updatedAt: new Date(),
       };
@@ -98,8 +106,10 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
 
   return {
     repository,
-    forceNextCreateToRejectAsInvalidPhoto: () => (rejectNextCreate = true),
-    forceNextUpdateToRejectAsInvalidPhoto: () => (rejectNextUpdate = true),
+    forceNextCreateToRejectAsInvalidPhoto: () => (rejectNextCreate = 'photo'),
+    forceNextCreateToRejectAsInvalidVideo: () => (rejectNextCreate = 'video'),
+    forceNextUpdateToRejectAsInvalidPhoto: () => (rejectNextUpdate = 'photo'),
+    forceNextUpdateToRejectAsInvalidVideo: () => (rejectNextUpdate = 'video'),
     forceNextReorderToRejectAsInvalidSet: () =>
       (rejectNextReorder = new AppError('bad set', 400, 'invalid_guide_pick_set')),
   };
@@ -107,6 +117,8 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
 
 const revalidateEnv = { APP_ORIGIN: 'https://example.com', REVALIDATE_SECRET: 'x'.repeat(16) };
 const logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), fatal: vi.fn() } as unknown as Logger;
+
+const VIDEO_ID = '11111111-1111-1111-1111-000000000002';
 
 describe('GuidePickService.create', () => {
   it('rejects with invalid_photo_media when the photo does not reference an existing media item', async () => {
@@ -116,8 +128,26 @@ describe('GuidePickService.create', () => {
     const service = createGuidePickService(repository, revalidateEnv, logger);
 
     await expect(
-      service.create({ city: 'Surabaya', place: 'Seven Cafe', description: 'desc', photoMediaId: 'missing' }),
+      service.create({ city: 'Surabaya', place: 'Seven Cafe', description: 'desc', photoMediaId: 'missing', videoMediaId: VIDEO_ID }),
     ).rejects.toMatchObject({ code: 'invalid_photo_media' });
+    expect(revalidateHomePathMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects with invalid_video_media when the video does not reference an existing media item', async () => {
+    revalidateHomePathMock.mockClear();
+    const { repository, forceNextCreateToRejectAsInvalidVideo } = createFakeGuidePickRepository();
+    forceNextCreateToRejectAsInvalidVideo();
+    const service = createGuidePickService(repository, revalidateEnv, logger);
+
+    await expect(
+      service.create({
+        city: 'Surabaya',
+        place: 'Seven Cafe',
+        description: 'desc',
+        photoMediaId: '11111111-1111-1111-1111-000000000001',
+        videoMediaId: 'missing',
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_video_media' });
     expect(revalidateHomePathMock).not.toHaveBeenCalled();
   });
 
@@ -131,6 +161,7 @@ describe('GuidePickService.create', () => {
       place: 'Seven Cafe',
       description: 'desc',
       photoMediaId: '11111111-1111-1111-1111-000000000001',
+      videoMediaId: VIDEO_ID,
     });
 
     expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
@@ -152,6 +183,16 @@ describe('GuidePickService.update', () => {
 
     await expect(service.update('a', { photoMediaId: 'missing' })).rejects.toMatchObject({
       code: 'invalid_photo_media',
+    });
+  });
+
+  it('rejects with invalid_video_media when the new video does not reference an existing media item', async () => {
+    const { repository, forceNextUpdateToRejectAsInvalidVideo } = createFakeGuidePickRepository([row({ id: 'a' })]);
+    forceNextUpdateToRejectAsInvalidVideo();
+    const service = createGuidePickService(repository, revalidateEnv, logger);
+
+    await expect(service.update('a', { videoMediaId: 'missing' })).rejects.toMatchObject({
+      code: 'invalid_video_media',
     });
   });
 

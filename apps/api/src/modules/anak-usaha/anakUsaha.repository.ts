@@ -17,6 +17,7 @@ export interface AnakUsahaProfileFields {
   /** Joined from `app.media` at read time, mirrors `PartnerRow.logoStoragePath`. `null` exactly
    *  when `logoMediaId` is `null` (design.md - "Logo FK is nullable"). */
   logoStoragePath: string | null;
+  backgroundColor: string | null;
   description: string | null;
   kind: string;
   links: AnakUsahaLink[];
@@ -32,6 +33,7 @@ export interface AnakUsahaWithProfileRow extends AnakUsahaRow {
 export interface CreateAnakUsahaProfileInput {
   anakUsahaId: string;
   logoMediaId?: string | null | undefined;
+  backgroundColor?: string | null | undefined;
   description?: string | null | undefined;
   kind: string;
   links?: AnakUsahaLink[] | undefined;
@@ -39,6 +41,7 @@ export interface CreateAnakUsahaProfileInput {
 
 export interface UpdateAnakUsahaProfileInput {
   logoMediaId?: string | null | undefined;
+  backgroundColor?: string | null | undefined;
   description?: string | null | undefined;
   kind?: string | undefined;
   links?: AnakUsahaLink[] | undefined;
@@ -108,6 +111,7 @@ const JOINED_COLUMNS = {
   profileAnakUsahaId: anakUsahaProfile.anakUsahaId,
   logoMediaId: anakUsahaProfile.logoMediaId,
   logoStoragePath: media.storagePath,
+  backgroundColor: anakUsahaProfile.backgroundColor,
   description: anakUsahaProfile.description,
   kind: anakUsahaProfile.kind,
   links: anakUsahaProfile.links,
@@ -122,6 +126,7 @@ function toWithProfileRow(row: {
   profileAnakUsahaId: string | null;
   logoMediaId: string | null;
   logoStoragePath: string | null;
+  backgroundColor: string | null;
   description: string | null;
   kind: string | null;
   links: unknown;
@@ -138,6 +143,7 @@ function toWithProfileRow(row: {
         : {
             logoMediaId: row.logoMediaId,
             logoStoragePath: row.logoStoragePath,
+            backgroundColor: row.backgroundColor,
             description: row.description,
             kind: row.kind ?? '',
             links: (row.links ?? []) as AnakUsahaLink[],
@@ -179,6 +185,7 @@ async function findProfileJoined(
     .select({
       logoMediaId: anakUsahaProfile.logoMediaId,
       logoStoragePath: media.storagePath,
+      backgroundColor: anakUsahaProfile.backgroundColor,
       description: anakUsahaProfile.description,
       kind: anakUsahaProfile.kind,
       links: anakUsahaProfile.links,
@@ -193,6 +200,7 @@ async function findProfileJoined(
   return {
     logoMediaId: row.logoMediaId,
     logoStoragePath: row.logoStoragePath,
+    backgroundColor: row.backgroundColor,
     description: row.description,
     kind: row.kind,
     links: (row.links ?? []) as AnakUsahaLink[],
@@ -272,6 +280,7 @@ export function createAnakUsahaRepository(db: Database): AnakUsahaRepository {
           await tx.insert(anakUsahaProfile).values({
             anakUsahaId: input.anakUsahaId,
             logoMediaId: input.logoMediaId ?? null,
+            backgroundColor: input.backgroundColor ?? null,
             description: input.description ?? null,
             kind: input.kind,
             links: input.links ?? [],

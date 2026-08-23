@@ -23,10 +23,9 @@ function invalidLogoMediaError(): AppError {
 
 /**
  * Every admin write revalidates `/` unconditionally (specs/partner-management/spec.md - "Partner
- * writes revalidate the home page") — unlike reels, where only a visibility-crossing edit
- * revalidates, a partner has no non-visible-but-stored state for an edit to be indifferent to:
- * every field on the row (name, logo, url, active flag, order) is either shown or governs whether
- * the row is shown at all.
+ * writes revalidate the home page") — a partner has no non-visible-but-stored state for an edit to
+ * be indifferent to: every field on the row (name, logo, url, active flag, order) is either shown
+ * or governs whether the row is shown at all.
  */
 export function createPartnerService(
   repository: PartnerRepository,
@@ -85,8 +84,8 @@ export interface PublicPartnerService {
 
 /**
  * The public listing needs no `RevalidateEnv` or `Logger` — it never writes — so it gets its own
- * minimal service rather than sharing `PartnerService`, mirroring `publicReels.service.ts`
- * alongside `reel.service.ts`.
+ * minimal service rather than sharing `PartnerService`, mirroring `createPublicGuidePickService`
+ * alongside `createGuidePickService` (guidePick.service.ts).
  */
 export function createPublicPartnerService(repository: PartnerRepository): PublicPartnerService {
   return {

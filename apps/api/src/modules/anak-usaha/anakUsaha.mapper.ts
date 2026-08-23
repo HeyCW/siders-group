@@ -23,6 +23,7 @@ export function toAnakUsahaAdminResponse(
     profile: row.profile
       ? {
           logoUrl: row.profile.logoStoragePath ? publicUrlFor(env, row.profile.logoStoragePath) : null,
+          backgroundColor: row.profile.backgroundColor,
           description: row.profile.description,
           kind: row.profile.kind as AnakUsahaKind,
           links: row.profile.links,
@@ -51,6 +52,7 @@ export function toPublicAnakUsaha(
     name: row.name,
     slug: row.slug,
     logoUrl: row.profile.logoStoragePath ? publicUrlFor(env, row.profile.logoStoragePath) : null,
+    backgroundColor: row.profile.backgroundColor,
     description: row.profile.description,
     kind: row.profile.kind as AnakUsahaKind,
     links: row.profile.links,

@@ -7,10 +7,11 @@ import { createMediaService } from './media.service.js';
 import { createMediaController } from './media.controller.js';
 import { requirePermission, requirePublic } from '../../middleware/authorize.js';
 import { rateLimit, respondWithTooManyRequests, clientIp } from '../../middleware/rateLimit.js';
+import { MEDIA_TEMP_SUBDIR } from '../../lib/mediaStorage.js';
 
 /**
  * Every other write-heavy endpoint in this API carries a rate limit; this one was missed, and
- * an uploader holding `media.manage` could otherwise loop uploads up to `MEDIA_MAX_BYTES` each
+ * an uploader holding `media.manage` could otherwise loop uploads up to the video maximum each
  * until the storage volume fills. Keyed on the caller's own session, not IP — this is an
  * authenticated endpoint, so there is no anonymous-spraying angle to cover the way public reads
  * or sign-in have.
@@ -31,14 +32,29 @@ function mediaUploadRateLimiter() {
 }
 
 /**
- * `limits.fileSize` is the request-body-level check (rejected before the buffer is ever fully
- * read); `storeUpload`'s own `MEDIA_MAX_BYTES` check is the second, explicit one
- * (specs/media-management/spec.md - "Maximum file size" SHALL be "enforced server-side and
- * SHALL NOT rely on any client-side check"). `memoryStorage` is deliberate — `mediaStorage.ts`
- * validates and writes the buffer itself; multer never touches the filesystem.
+ * `limits.fileSize` is an outer bound applied during transfer, before the file's kind is known —
+ * it is set to the larger of the two configured maxima so neither an image nor a video is
+ * rejected here on size alone. `storeUpload`'s own per-kind check is the real, explicit one
+ * (specs/media-management/spec.md - "Maximum file size" SHALL be "enforced server-side and SHALL
+ * NOT rely on any client-side check"). `diskStorage` — rather than `memoryStorage` — is
+ * deliberate: a video-sized upload held whole in memory would scale the process's heap with
+ * upload size, which several uploads in flight at once can exhaust
+ * (specs/media-management/spec.md - "An upload is not held entirely in memory"). Multer writes
+ * the file to `MEDIA_STORAGE_PATH/.tmp/`, a location `mediaFileRoutes` never serves, and
+ * `storeUpload` sniffs and validates from there before moving the file into its final location.
  */
-function createUploadMiddleware(env: Pick<Env, 'MEDIA_MAX_BYTES'>) {
-  return multer({ storage: multer.memoryStorage(), limits: { fileSize: env.MEDIA_MAX_BYTES } });
+function createUploadMiddleware(env: Pick<Env, 'MEDIA_MAX_IMAGE_BYTES' | 'MEDIA_MAX_VIDEO_BYTES' | 'MEDIA_STORAGE_PATH'>) {
+  const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, `${env.MEDIA_STORAGE_PATH}/${MEDIA_TEMP_SUBDIR}`),
+    // The generated name is never trusted as the final stored name — `storeUpload` renames from
+    // here using its own server-generated identifier and sniffed extension. This name only needs
+    // to be collision-free within the temp directory for the lifetime of one request.
+    filename: (_req, _file, cb) => cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+  });
+  return multer({
+    storage,
+    limits: { fileSize: Math.max(env.MEDIA_MAX_IMAGE_BYTES, env.MEDIA_MAX_VIDEO_BYTES) },
+  });
 }
 
 export function mediaRoutes(db: Database, env: Env) {
@@ -83,6 +99,10 @@ export function mediaRoutes(db: Database, env: Env) {
  * AVIF upload would render broken. `image/avif` is an explicitly accepted upload type
  * (`mediaStorage.ts` - SIGNATURES; specs/media-management/spec.md - "Accepted media types"), so
  * the table has to know it before `nosniff` can be safe.
+ *
+ * `video/mp4` needed no equivalent fix when it was added: `mime@1.6.0`'s bundled table already
+ * maps `.mp4` to `video/mp4` (checked directly against the installed table before relying on it),
+ * so this `.define()` call stays AVIF-only rather than growing a second entry.
  */
 // No `force` flag: `avif` has no mapping at all in that table (it falls through to the
 // `application/octet-stream` default), so this adds one rather than overriding one.
@@ -91,9 +111,11 @@ express.static.mime.define({ 'image/avif': ['avif'] });
 export function mediaFileRoutes(env: Pick<Env, 'MEDIA_STORAGE_PATH'>) {
   const router = Router();
   router.use(requirePublic());
-  // Every stored file is one of the allowlisted image types, verified by magic-byte sniffing at
-  // upload time, and the extension is derived from that sniff — so the declared `Content-Type`
-  // is trustworthy here and a browser must not second-guess it.
+  // Every stored file is one of the allowlisted image or video types, verified by magic-byte
+  // sniffing at upload time, and the extension is derived from that sniff — so the declared
+  // `Content-Type` is trustworthy here and a browser must not second-guess it. `express.static`
+  // also answers Range requests natively, which is what gives a served video its seek bar
+  // (specs/media-management/spec.md - "Stored video supports seeking").
   router.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     next();

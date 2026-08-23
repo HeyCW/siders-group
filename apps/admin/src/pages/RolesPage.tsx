@@ -101,7 +101,7 @@ export function RolesPage() {
   );
   const [removeState, runRemove] = useAsyncAction(rolesApi.remove);
 
-  // One `load()`, matching `HomeCurationPage`/`ReelsCurationPage`/`StaffPage`'s
+  // One `load()`, matching `HomeCurationPage`/`StaffPage`'s
   // `Promise.all` + single `loadError` pattern — the permission catalog is as load-bearing as
   // the role list itself (neither create nor edit works without it), so a failure to fetch it
   // is surfaced the same way a failure to fetch roles is, rather than silently rendering an

@@ -36,6 +36,13 @@ export type AnakUsahaKind = z.infer<typeof anakUsahaKindSchema>;
  * hazard as a partner website URL: this value reaches a public `href`
  * (specs/anak-usaha-presentation/spec.md - "A profile link must be http or https").
  */
+/**
+ * The tile background color an admin picks for the entry's logo box (`AnakUsahaTiles.tsx`).
+ * `#rrggbb` only — no shorthand, no alpha, no named colors — so the web app never has to guess a
+ * format when it hands the value straight to an inline `style.backgroundColor`.
+ */
+export const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a hex color like #RRGGBB');
+
 export const anakUsahaLinkSchema = z
   .object({
     label: z.string().min(1).max(100),
@@ -55,6 +62,7 @@ export type AnakUsahaLink = z.infer<typeof anakUsahaLinkSchema>;
 export const anakUsahaProfileCreateRequestSchema = z
   .object({
     logoMediaId: z.string().uuid().nullable().optional(),
+    backgroundColor: hexColorSchema.nullable().optional(),
     description: z.string().max(2000).nullable().optional(),
     kind: anakUsahaKindSchema,
     links: z.array(anakUsahaLinkSchema).max(10).optional(),
@@ -70,6 +78,7 @@ export type AnakUsahaProfileCreateRequest = z.infer<typeof anakUsahaProfileCreat
 export const anakUsahaProfileUpdateRequestSchema = z
   .object({
     logoMediaId: z.string().uuid().nullable().optional(),
+    backgroundColor: hexColorSchema.nullable().optional(),
     description: z.string().max(2000).nullable().optional(),
     kind: anakUsahaKindSchema.optional(),
     links: z.array(anakUsahaLinkSchema).max(10).optional(),
@@ -98,6 +107,7 @@ export type AnakUsahaProfileReorderRequest = z.infer<typeof anakUsahaProfileReor
  */
 export const anakUsahaProfileFieldsSchema = z.object({
   logoUrl: z.string().nullable(),
+  backgroundColor: z.string().nullable(),
   description: z.string().nullable(),
   kind: anakUsahaKindSchema,
   links: z.array(anakUsahaLinkSchema),
@@ -128,6 +138,7 @@ export type AnakUsahaAdminResponse = z.infer<typeof anakUsahaAdminResponseSchema
  */
 export const publicAnakUsahaSchema = anakUsahaResponseSchema.extend({
   logoUrl: z.string().nullable().optional(),
+  backgroundColor: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   kind: anakUsahaKindSchema.optional(),
   links: z.array(anakUsahaLinkSchema).optional(),

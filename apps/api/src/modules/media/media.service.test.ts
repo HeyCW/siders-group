@@ -40,7 +40,7 @@ function createFakeMediaRepository() {
   return { repository, rows };
 }
 
-const env = { MEDIA_STORAGE_PATH: '/data/media', MEDIA_MAX_BYTES: 1024 };
+const env = { MEDIA_STORAGE_PATH: '/data/media', MEDIA_MAX_IMAGE_BYTES: 1024, MEDIA_MAX_VIDEO_BYTES: 4096 };
 
 describe('MediaService', () => {
   beforeEach(() => {
@@ -53,7 +53,8 @@ describe('MediaService', () => {
     const { repository } = createFakeMediaRepository();
     const service = createMediaService(env, repository);
     const row = await service.upload({
-      buffer: Buffer.from('x'),
+      tempPath: '/tmp/x',
+      sizeBytes: 1,
       declaredMime: 'image/png',
       originalFilename: 'photo.png',
       uploadedBy: 'staff-1',
@@ -68,7 +69,7 @@ describe('MediaService', () => {
     repository.create = vi.fn().mockRejectedValue(new Error('db down'));
     const service = createMediaService(env, repository);
     await expect(
-      service.upload({ buffer: Buffer.from('x'), declaredMime: 'image/png', originalFilename: 'photo.png', uploadedBy: 'staff-1' }),
+      service.upload({ tempPath: '/tmp/x', sizeBytes: 1, declaredMime: 'image/png', originalFilename: 'photo.png', uploadedBy: 'staff-1' }),
     ).rejects.toThrow('db down');
     expect(deleteStoredFileMock).toHaveBeenCalledWith(env, '2026/08/orphan.png');
   });
@@ -78,7 +79,8 @@ describe('MediaService', () => {
     const { repository } = createFakeMediaRepository();
     const service = createMediaService(env, repository);
     const row = await service.upload({
-      buffer: Buffer.from('y'),
+      tempPath: '/tmp/y',
+      sizeBytes: 1,
       declaredMime: 'image/png',
       originalFilename: 'y.png',
       uploadedBy: 'staff-1',
@@ -99,7 +101,7 @@ describe('MediaService', () => {
     const { repository, rows } = createFakeMediaRepository();
     const service = createMediaService(env, repository);
     await expect(
-      service.upload({ buffer: Buffer.from('x'), declaredMime: 'image/png', originalFilename: 'x.png', uploadedBy: 'staff-1' }),
+      service.upload({ tempPath: '/tmp/x', sizeBytes: 1, declaredMime: 'image/png', originalFilename: 'x.png', uploadedBy: 'staff-1' }),
     ).rejects.toMatchObject({ code: 'unsupported_media_type' });
     expect(rows.size).toBe(0);
   });

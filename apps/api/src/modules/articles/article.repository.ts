@@ -2,9 +2,7 @@ import { and, desc, eq, gte, inArray, isNotNull, lte, notInArray, or, sql } from
 import {
   articles,
   articleCategories,
-  articleTags,
   categories,
-  tags,
   media,
   users,
   anakUsaha,
@@ -43,7 +41,6 @@ export interface ArticleWithRelations extends ArticleRow {
   authorName: string;
   featuredMediaStoragePath: string | null;
   categories: TaxonomyRef[];
-  tags: TaxonomyRef[];
   anakUsaha: TaxonomyRef | null;
 }
 
@@ -59,7 +56,6 @@ export interface CreateArticleInput {
   seoTitle: string | null;
   seoDescription: string | null;
   categoryIds: string[];
-  tagIds: string[];
 }
 
 export interface UpdateArticleInput {
@@ -73,7 +69,6 @@ export interface UpdateArticleInput {
   seoTitle?: string | null | undefined;
   seoDescription?: string | null | undefined;
   categoryIds?: string[] | undefined;
-  tagIds?: string[] | undefined;
 }
 
 export interface PublicListFilter {
@@ -81,7 +76,6 @@ export interface PublicListFilter {
   offset: number;
   categorySlugs?: string[] | undefined;
   anakUsahaSlugs?: string[] | undefined;
-  tagSlug?: string | undefined;
   publishedAfter?: Date | undefined;
   publishedBefore?: Date | undefined;
   excludeIds?: string[] | undefined;
@@ -123,7 +117,7 @@ const FEATURED_MEDIA_CONSTRAINT = 'featured_media_id';
 const ANAK_USAHA_CONSTRAINT = 'anak_usaha_id';
 
 function invalidTaxonomyError(): AppError {
-  return new AppError('One or more category or tag ids do not exist', 400, 'invalid_taxonomy_reference');
+  return new AppError('One or more category ids do not exist', 400, 'invalid_taxonomy_reference');
 }
 
 function invalidFeaturedMediaError(): AppError {
@@ -193,24 +187,17 @@ type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0]
 async function replaceTaxonomy(
   tx: Executor,
   articleId: string,
-  input: { categoryIds?: string[] | undefined; tagIds?: string[] | undefined },
+  input: { categoryIds?: string[] | undefined },
 ): Promise<void> {
-  // Deduplicated before insert: the join tables' composite primary keys make a repeated id in
+  // Deduplicated before insert: the join table's composite primary key makes a repeated id in
   // the request a 23505, and "assign this category twice" is a no-op the caller plainly meant,
   // not a conflict worth surfacing. Assigning a set is idempotent by definition
-  // (specs/article-management/spec.md - "Articles carry multiple categories and multiple tags").
+  // (specs/article-management/spec.md - "Articles carry multiple categories").
   if (input.categoryIds !== undefined) {
     const categoryIds = [...new Set(input.categoryIds)];
     await tx.delete(articleCategories).where(eq(articleCategories.articleId, articleId));
     if (categoryIds.length > 0) {
       await tx.insert(articleCategories).values(categoryIds.map((categoryId) => ({ articleId, categoryId })));
-    }
-  }
-  if (input.tagIds !== undefined) {
-    const tagIds = [...new Set(input.tagIds)];
-    await tx.delete(articleTags).where(eq(articleTags.articleId, articleId));
-    if (tagIds.length > 0) {
-      await tx.insert(articleTags).values(tagIds.map((tagId) => ({ articleId, tagId })));
     }
   }
 }
@@ -232,17 +219,12 @@ async function attachRelations(db: Database, rows: ArticleRow[]): Promise<Articl
   const mediaIds = [...new Set(rows.map((r) => r.featuredMediaId).filter((id): id is string => id !== null))];
   const anakUsahaIds = [...new Set(rows.map((r) => r.anakUsahaId).filter((id): id is string => id !== null))];
 
-  const [categoryLinks, tagLinks, authors, mediaRows, anakUsahaRows] = await Promise.all([
+  const [categoryLinks, authors, mediaRows, anakUsahaRows] = await Promise.all([
     db
       .select({ articleId: articleCategories.articleId, id: categories.id, name: categories.name, slug: categories.slug })
       .from(articleCategories)
       .innerJoin(categories, eq(categories.id, articleCategories.categoryId))
       .where(inArray(articleCategories.articleId, articleIds)),
-    db
-      .select({ articleId: articleTags.articleId, id: tags.id, name: tags.name, slug: tags.slug })
-      .from(articleTags)
-      .innerJoin(tags, eq(tags.id, articleTags.tagId))
-      .where(inArray(articleTags.articleId, articleIds)),
     authorIds.length > 0
       ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, authorIds))
       : Promise.resolve([]),
@@ -258,7 +240,6 @@ async function attachRelations(db: Database, rows: ArticleRow[]): Promise<Articl
   ]);
 
   const categoriesByArticle = groupByArticleId(categoryLinks);
-  const tagsByArticle = groupByArticleId(tagLinks);
   const authorNameById = new Map(authors.map((a) => [a.id, a.name]));
   const mediaPathById = new Map(mediaRows.map((m) => [m.id, m.storagePath]));
   const anakUsahaById = new Map(anakUsahaRows.map((a) => [a.id, a]));
@@ -268,7 +249,6 @@ async function attachRelations(db: Database, rows: ArticleRow[]): Promise<Articl
     authorName: authorNameById.get(row.authorId) ?? 'Unknown',
     featuredMediaStoragePath: row.featuredMediaId ? (mediaPathById.get(row.featuredMediaId) ?? null) : null,
     categories: (categoriesByArticle.get(row.id) ?? []).map(({ id, name, slug }) => ({ id, name, slug })),
-    tags: (tagsByArticle.get(row.id) ?? []).map(({ id, name, slug }) => ({ id, name, slug })),
     anakUsaha: row.anakUsahaId ? (anakUsahaById.get(row.anakUsahaId) ?? null) : null,
   }));
 }
@@ -299,7 +279,7 @@ export function createArticleRepository(db: Database): ArticleRepository {
             })
             .returning();
           if (!inserted) throw new Error('article insert returned no row');
-          await replaceTaxonomy(tx, inserted.id, { categoryIds: input.categoryIds, tagIds: input.tagIds });
+          await replaceTaxonomy(tx, inserted.id, { categoryIds: input.categoryIds });
           return inserted;
         });
         const [withRelations] = await attachRelations(db, [row]);
@@ -315,16 +295,15 @@ export function createArticleRepository(db: Database): ArticleRepository {
     async update(id, input) {
       try {
         await db.transaction(async (tx) => {
-          const { categoryIds, tagIds, ...fields } = input;
+          const { categoryIds, ...fields } = input;
           const definedFields = stripUndefined(fields);
           // Bumped even when `definedFields` is empty but the taxonomy assignment changed — a
-          // category/tag-only edit is still an edit, and the admin list orders by `updatedAt`
-          // (specs/article-management/spec.md - "Articles carry multiple categories and
-          // multiple tags").
-          if (Object.keys(definedFields).length > 0 || categoryIds !== undefined || tagIds !== undefined) {
+          // category-only edit is still an edit, and the admin list orders by `updatedAt`
+          // (specs/article-management/spec.md - "Articles carry multiple categories").
+          if (Object.keys(definedFields).length > 0 || categoryIds !== undefined) {
             await tx.update(articles).set({ ...definedFields, updatedAt: new Date() }).where(eq(articles.id, id));
           }
-          await replaceTaxonomy(tx, id, { categoryIds, tagIds });
+          await replaceTaxonomy(tx, id, { categoryIds });
         });
       } catch (err) {
         const translated = translateArticleWriteError(err);
@@ -421,18 +400,6 @@ export function createArticleRepository(db: Database): ArticleRepository {
           inArray(
             articles.anakUsahaId,
             db.select({ id: anakUsaha.id }).from(anakUsaha).where(inArray(anakUsaha.slug, filter.anakUsahaSlugs)),
-          ),
-        );
-      }
-      if (filter.tagSlug) {
-        conditions.push(
-          inArray(
-            articles.id,
-            db
-              .select({ id: articleTags.articleId })
-              .from(articleTags)
-              .innerJoin(tags, eq(tags.id, articleTags.tagId))
-              .where(eq(tags.slug, filter.tagSlug)),
           ),
         );
       }

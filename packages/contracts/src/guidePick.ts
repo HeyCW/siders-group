@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
 /**
- * A guide pick requires a photo at creation — mirrors `partnerCreateRequestSchema.logoMediaId`
- * (specs/guide-of-the-week-management/spec.md - "A guide pick requires a photo"). `isActive`
- * defaults to active, matching the stored column default.
+ * A guide pick requires a photo and a video at creation — mirrors
+ * `partnerCreateRequestSchema.logoMediaId` (specs/guide-of-the-week-management/spec.md - "A guide
+ * pick requires a photo", "A guide pick requires a self-hosted video"). The photo now serves as
+ * the video's poster. `isActive` defaults to active, matching the stored column default.
  */
 export const guidePickCreateRequestSchema = z
   .object({
@@ -11,6 +12,7 @@ export const guidePickCreateRequestSchema = z
     place: z.string().min(1).max(200),
     description: z.string().min(1).max(1000),
     photoMediaId: z.string().uuid(),
+    videoMediaId: z.string().uuid(),
     isActive: z.boolean().optional(),
   })
   .strict();
@@ -20,6 +22,9 @@ export type GuidePickCreateRequest = z.infer<typeof guidePickCreateRequestSchema
  * All fields optional for a partial update. `sortOrder` is deliberately absent — order changes
  * only through the dedicated reorder endpoint, never through a per-pick update
  * (specs/guide-of-the-week-management/spec.md - "Guide-pick order is replaced as a whole list").
+ * `videoMediaId` may be updated to a new video but, like `photoMediaId`, has no way to be cleared
+ * to empty — there is no nullable variant of either field
+ * (specs/guide-of-the-week-management/spec.md - "A guide pick cannot be left without its video").
  */
 export const guidePickUpdateRequestSchema = z
   .object({
@@ -27,6 +32,7 @@ export const guidePickUpdateRequestSchema = z
     place: z.string().min(1).max(200).optional(),
     description: z.string().min(1).max(1000).optional(),
     photoMediaId: z.string().uuid().optional(),
+    videoMediaId: z.string().uuid().optional(),
     isActive: z.boolean().optional(),
   })
   .strict();
@@ -59,6 +65,7 @@ export const guidePickResponseSchema = z.object({
   place: z.string(),
   description: z.string(),
   photoUrl: z.string(),
+  videoUrl: z.string(),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
   createdAt: z.string().datetime(),
@@ -70,12 +77,16 @@ export type GuidePickResponse = z.infer<typeof guidePickResponseSchema>;
  * The public shape: only what the home page section renders
  * (specs/guide-of-the-week-management/spec.md - "Public read serves only active guide picks in
  * order"). No `isActive` (every entry here is implicitly active) and no `sortOrder` or `id` (array
- * position already carries the order).
+ * position already carries the order). `city` travels with each entry rather than the response
+ * being grouped by city — grouping is a rendering concern of the consuming page, not this
+ * endpoint's shape (specs/web-public-site/spec.md - "The guideline section groups its videos by
+ * city").
  */
 export const publicGuidePickSchema = z.object({
   city: z.string(),
   place: z.string(),
   description: z.string(),
   photoUrl: z.string(),
+  videoUrl: z.string(),
 });
 export type PublicGuidePick = z.infer<typeof publicGuidePickSchema>;

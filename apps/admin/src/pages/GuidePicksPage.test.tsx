@@ -25,6 +25,7 @@ function guidePick(overrides: Partial<GuidePickResponse> & Pick<GuidePickRespons
     place: 'Seven Cafe',
     description: 'Wifi kuat dan buka sampai tengah malam.',
     photoUrl: 'https://cdn.example.com/seven-cafe.webp',
+    videoUrl: 'https://cdn.example.com/seven-cafe.mp4',
     isActive: true,
     sortOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -39,9 +40,16 @@ async function renderPage(initial: GuidePickResponse[] = []) {
   await waitFor(() => expect(guidePicksApi.list).toHaveBeenCalled());
 }
 
+/** The create form has two "Choose file" pickers — photo first, then video. */
+function createFormFilePickers(): { photoPicker: HTMLElement; videoPicker: HTMLElement } {
+  const [photoPicker, videoPicker] = screen.getAllByLabelText('Choose file');
+  return { photoPicker: photoPicker!, videoPicker: videoPicker! };
+}
+
 describe('GuidePicksPage — new guide pick form', () => {
-  /** specs/guide-of-the-week-management/spec.md - "A guide pick requires a photo". */
-  it('keeps "Add guide pick" disabled until city, place, description, and a photo are all present', async () => {
+  /** specs/guide-of-the-week-management/spec.md - "A guide pick requires a photo", "A guide pick
+   *  requires a self-hosted video". */
+  it('keeps "Add guide pick" disabled until city, place, description, a photo, and a video are all present', async () => {
     await renderPage();
 
     const addButton = screen.getByRole('button', { name: 'Add guide pick' }) as HTMLButtonElement;
@@ -52,29 +60,51 @@ describe('GuidePicksPage — new guide pick form', () => {
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Wifi kuat.' } });
     expect(addButton.disabled).toBe(true);
 
-    vi.mocked(mediaApi.upload).mockResolvedValue({
+    const { photoPicker, videoPicker } = createFormFilePickers();
+
+    vi.mocked(mediaApi.upload).mockResolvedValueOnce({
       id: 'media-1',
       url: 'https://cdn.example.com/seven-cafe.webp',
     } as never);
-    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const photoFile = new File(['x'], 'photo.png', { type: 'image/png' });
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Choose file'), { target: { files: [file] } });
+      fireEvent.change(photoPicker, { target: { files: [photoFile] } });
+    });
+
+    // Photo alone is not enough — the button stays disabled until a video is also uploaded.
+    expect(addButton.disabled).toBe(true);
+
+    vi.mocked(mediaApi.upload).mockResolvedValueOnce({
+      id: 'media-1-video',
+      url: 'https://cdn.example.com/seven-cafe.mp4',
+    } as never);
+    const videoFile = new File(['x'], 'video.mp4', { type: 'video/mp4' });
+    await act(async () => {
+      fireEvent.change(videoPicker, { target: { files: [videoFile] } });
     });
 
     await waitFor(() => expect(addButton.disabled).toBe(false));
   });
 
-  it('submits city, place, description, and photoMediaId on create', async () => {
+  it('submits city, place, description, photoMediaId, and videoMediaId on create', async () => {
     await renderPage();
 
     fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Jakarta' } });
     fireEvent.change(screen.getByLabelText('Place'), { target: { value: 'Playground, Blok M' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Panggung kecil tiap Jumat.' } });
 
-    vi.mocked(mediaApi.upload).mockResolvedValue({ id: 'media-2', url: 'https://cdn.example.com/x.webp' } as never);
-    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const { photoPicker, videoPicker } = createFormFilePickers();
+
+    vi.mocked(mediaApi.upload).mockResolvedValueOnce({ id: 'media-2', url: 'https://cdn.example.com/x.webp' } as never);
+    const photoFile = new File(['x'], 'photo.png', { type: 'image/png' });
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Choose file'), { target: { files: [file] } });
+      fireEvent.change(photoPicker, { target: { files: [photoFile] } });
+    });
+
+    vi.mocked(mediaApi.upload).mockResolvedValueOnce({ id: 'media-2-video', url: 'https://cdn.example.com/x.mp4' } as never);
+    const videoFile = new File(['x'], 'video.mp4', { type: 'video/mp4' });
+    await act(async () => {
+      fireEvent.change(videoPicker, { target: { files: [videoFile] } });
     });
 
     vi.mocked(guidePicksApi.create).mockResolvedValue(guidePick({ id: 'new-1', city: 'Jakarta' }));
@@ -87,6 +117,7 @@ describe('GuidePicksPage — new guide pick form', () => {
       place: 'Playground, Blok M',
       description: 'Panggung kecil tiap Jumat.',
       photoMediaId: 'media-2',
+      videoMediaId: 'media-2-video',
     });
   });
 });
@@ -101,10 +132,18 @@ describe('GuidePicksPage — no pick-count limit', () => {
     fireEvent.change(screen.getByLabelText('Place'), { target: { value: 'Warkop Baru' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Kopi murah, wifi kencang.' } });
 
-    vi.mocked(mediaApi.upload).mockResolvedValue({ id: 'media-3', url: 'https://cdn.example.com/y.webp' } as never);
-    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const { photoPicker, videoPicker } = createFormFilePickers();
+
+    vi.mocked(mediaApi.upload).mockResolvedValueOnce({ id: 'media-3', url: 'https://cdn.example.com/y.webp' } as never);
+    const photoFile = new File(['x'], 'photo.png', { type: 'image/png' });
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Choose file'), { target: { files: [file] } });
+      fireEvent.change(photoPicker, { target: { files: [photoFile] } });
+    });
+
+    vi.mocked(mediaApi.upload).mockResolvedValueOnce({ id: 'media-3-video', url: 'https://cdn.example.com/y.mp4' } as never);
+    const videoFile = new File(['x'], 'video.mp4', { type: 'video/mp4' });
+    await act(async () => {
+      fireEvent.change(videoPicker, { target: { files: [videoFile] } });
     });
 
     const addButton = screen.getByRole('button', { name: 'Add guide pick' }) as HTMLButtonElement;

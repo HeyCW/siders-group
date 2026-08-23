@@ -3,7 +3,8 @@ import { deleteStoredFile, storeUpload, type MediaStorageEnv } from '../../lib/m
 import type { MediaRepository, MediaRow, UpdateMediaInput } from './media.repository.js';
 
 export interface UploadMediaInput {
-  buffer: Buffer;
+  tempPath: string;
+  sizeBytes: number;
   declaredMime: string;
   originalFilename: string;
   alt?: string | undefined;
@@ -21,7 +22,11 @@ export interface MediaService {
 export function createMediaService(env: MediaStorageEnv, repository: MediaRepository): MediaService {
   return {
     async upload(input) {
-      const stored = await storeUpload(env, { buffer: input.buffer, declaredMime: input.declaredMime });
+      const stored = await storeUpload(env, {
+        tempPath: input.tempPath,
+        sizeBytes: input.sizeBytes,
+        declaredMime: input.declaredMime,
+      });
       try {
         return await repository.create({
           storagePath: stored.storagePath,

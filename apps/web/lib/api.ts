@@ -7,7 +7,6 @@ import type {
   PublicAnakUsaha,
   PublicGuidePick,
   PublicPartner,
-  PublicReelItem,
 } from '@siders/contracts';
 import { API_URL } from './env';
 
@@ -122,10 +121,6 @@ export function getCategories(init?: RequestInit): Promise<CategoryResponse[]> {
  */
 export function getAnakUsahaList(init?: RequestInit): Promise<PublicAnakUsaha[]> {
   return apiFetch<PublicAnakUsaha[]>('/anak-usaha', init);
-}
-
-export function getReels(init?: RequestInit): Promise<PublicReelItem[]> {
-  return apiFetch<PublicReelItem[]>('/reels', init);
 }
 
 export function getPartners(init?: RequestInit): Promise<PublicPartner[]> {

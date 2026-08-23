@@ -14,8 +14,10 @@ describe('guidePickCreateRequestSchema', () => {
       place: 'Seven Cafe',
       description: 'Wifi kuat dan buka sampai tengah malam.',
       photoMediaId: id(1),
+      videoMediaId: id(2),
     });
     expect(parsed.photoMediaId).toBe(id(1));
+    expect(parsed.videoMediaId).toBe(id(2));
   });
 
   it('requires photoMediaId', () => {
@@ -23,6 +25,17 @@ describe('guidePickCreateRequestSchema', () => {
       city: 'Surabaya',
       place: 'Seven Cafe',
       description: 'Wifi kuat dan buka sampai tengah malam.',
+      videoMediaId: id(2),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('requires videoMediaId', () => {
+    const result = guidePickCreateRequestSchema.safeParse({
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'Wifi kuat dan buka sampai tengah malam.',
+      photoMediaId: id(1),
     });
     expect(result.success).toBe(false);
   });
@@ -33,6 +46,18 @@ describe('guidePickCreateRequestSchema', () => {
       place: 'Seven Cafe',
       description: 'Wifi kuat dan buka sampai tengah malam.',
       photoMediaId: 'not-a-uuid',
+      videoMediaId: id(2),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a non-uuid videoMediaId', () => {
+    const result = guidePickCreateRequestSchema.safeParse({
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'Wifi kuat dan buka sampai tengah malam.',
+      photoMediaId: id(1),
+      videoMediaId: 'not-a-uuid',
     });
     expect(result.success).toBe(false);
   });
@@ -43,6 +68,7 @@ describe('guidePickCreateRequestSchema', () => {
       place: 'Seven Cafe',
       description: 'Wifi kuat dan buka sampai tengah malam.',
       photoMediaId: id(1),
+      videoMediaId: id(2),
       sortOrder: 0,
     });
     expect(result.success).toBe(false);

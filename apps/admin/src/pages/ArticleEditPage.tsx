@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Editor, Range } from '@tiptap/core';
-import type { AnakUsahaResponse, ArticleAdminResponse, ArticlePublicDetail, CategoryResponse, TagResponse } from '@siders/contracts';
+import type { AnakUsahaResponse, ArticleAdminResponse, ArticlePublicDetail, CategoryResponse } from '@siders/contracts';
 import { articlesApi } from '../lib/articlesApi.js';
-import { anakUsahaApi, categoriesApi, tagsApi } from '../lib/taxonomyApi.js';
+import { anakUsahaApi, categoriesApi } from '../lib/taxonomyApi.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { ApiError } from '../lib/api.js';
 import { ARTICLE_STATUS_STYLES } from '../lib/articleStatusStyles.js';
@@ -21,7 +21,6 @@ interface FormState {
   seoTitle: string;
   seoDescription: string;
   categoryIds: string[];
-  tagIds: string[];
   featuredMediaId: string | null;
   featuredImageUrl: string | null;
   anakUsahaId: string | null;
@@ -35,7 +34,6 @@ function toFormState(article: ArticleAdminResponse): FormState {
     seoTitle: article.seoTitle ?? '',
     seoDescription: article.seoDescription ?? '',
     categoryIds: article.categories.map((c) => c.id),
-    tagIds: article.tags.map((t) => t.id),
     featuredMediaId: article.featuredMediaId,
     featuredImageUrl: article.featuredImageUrl,
     anakUsahaId: article.anakUsaha?.id ?? null,
@@ -69,7 +67,6 @@ export function ArticleEditPage() {
   const [slugError, setSlugError] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
-  const [tags, setTags] = useState<TagResponse[]>([]);
   const [anakUsahaOptions, setAnakUsahaOptions] = useState<AnakUsahaResponse[]>([]);
   const [taxonomyError, setTaxonomyError] = useState<string | null>(null);
 
@@ -90,13 +87,12 @@ export function ArticleEditPage() {
         setSlugInput(loaded.slug);
       })
       .catch((err: unknown) => setLoadError(errorMessage(err, 'Could not load article')));
-    Promise.all([categoriesApi.list(), tagsApi.list(), anakUsahaApi.list()])
-      .then(([c, t, a]) => {
+    Promise.all([categoriesApi.list(), anakUsahaApi.list()])
+      .then(([c, a]) => {
         setCategories(c);
-        setTags(t);
         setAnakUsahaOptions(a);
       })
-      .catch((err: unknown) => setTaxonomyError(errorMessage(err, 'Could not load categories and tags')));
+      .catch((err: unknown) => setTaxonomyError(errorMessage(err, 'Could not load categories')));
   }, [id]);
 
   const debouncedSave = useDebouncedCallback(async () => {
@@ -113,7 +109,6 @@ export function ArticleEditPage() {
         // (articleAutosaveRequestSchema has no `.min()` on any of them).
         excerpt: formRef.current.excerpt,
         categoryIds: formRef.current.categoryIds,
-        tagIds: formRef.current.tagIds,
         featuredMediaId: formRef.current.featuredMediaId,
         anakUsahaId: formRef.current.anakUsahaId,
         seoTitle: formRef.current.seoTitle,
@@ -376,12 +371,6 @@ export function ArticleEditPage() {
               options={categories}
               selectedIds={form.categoryIds}
               onChange={(ids) => patchForm({ categoryIds: ids })}
-            />
-            <MultiSelectChips
-              label="Tags"
-              options={tags}
-              selectedIds={form.tagIds}
-              onChange={(ids) => patchForm({ tagIds: ids })}
             />
 
             <div>

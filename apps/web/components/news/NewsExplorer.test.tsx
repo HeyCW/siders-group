@@ -27,7 +27,7 @@ function makeArticle(overrides: Partial<ArticlePublicCard> = {}): ArticlePublicC
     excerpt: 'An excerpt about kafe di Surabaya',
     featuredImageUrl: null,
     categories: [],
-    tags: [],
+    anakUsaha: null,
     authorName: 'Rina',
     publishedAt: '2026-08-01T00:00:00.000Z',
     ...overrides,
@@ -91,7 +91,7 @@ describe('NewsExplorer', () => {
 
   it('selecting an anak usaha pushes ?anakUsaha=<slug> using the real catalog', () => {
     renderExplorer();
-    fireEvent.click(screen.getByRole('button', { name: /anak usaha/i }));
+    fireEvent.click(screen.getByRole('button', { name: /group companies/i }));
     expect(screen.getByRole('button', { name: 'SidersVox' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'SidersVox' }));
     expect(push).toHaveBeenCalledWith('/news?anakUsaha=sidersvox');
@@ -99,7 +99,7 @@ describe('NewsExplorer', () => {
 
   it('selecting a second anak usaha adds it rather than replacing the first', () => {
     renderExplorer({ activeAnakUsahaSlugs: ['sidersvox'] });
-    fireEvent.click(screen.getByRole('button', { name: /anak usaha 1/i }));
+    fireEvent.click(screen.getByRole('button', { name: /group companies 1/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Surabaya Siders' }));
     expect(push).toHaveBeenCalledWith('/news?anakUsaha=sidersvox%2Csurabaya-siders');
   });

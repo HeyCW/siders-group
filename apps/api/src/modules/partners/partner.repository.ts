@@ -9,7 +9,7 @@ export interface PartnerRow {
   name: string;
   logoMediaId: string;
   /** Joined from `app.media` at read time so the mapper can derive a logo URL without a second
-   *  round trip — mirrors `ReelRow.posterStoragePath` (reel.repository.ts). */
+   *  round trip — mirrors `GuidePickRow.photoStoragePath` (guidePick.repository.ts). */
   logoStoragePath: string;
   websiteUrl: string | null;
   sortOrder: number;

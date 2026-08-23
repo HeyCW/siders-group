@@ -51,7 +51,7 @@
  * Every `<select>`'s native option popup, console-wide: the popup ignores the select's own
  * `background-color` and paints itself using the OS/browser theme, so without this an option
  * list can render light-on-light or dark-on-dark against `--ink` text (specs/article-editor,
- * the Reel status select, the Staff role select all hit this the same way).
+ * the Staff role select hits this the same way).
  */
 .siders-scope select option {
   background-color: var(--paper);

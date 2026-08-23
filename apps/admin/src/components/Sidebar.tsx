@@ -55,15 +55,6 @@ function IconCategories(props: IconProps) {
   );
 }
 
-function IconTags(props: IconProps) {
-  return (
-    <IconShell {...props}>
-      <path d="M4 4h6l7 7-6 6-7-7V4Z" />
-      <circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none" />
-    </IconShell>
-  );
-}
-
 function IconAnakUsaha(props: IconProps) {
   return (
     <IconShell {...props}>
@@ -78,24 +69,6 @@ function IconHomeCuration(props: IconProps) {
     <IconShell {...props}>
       <path d="M4 9 10 4l6 5" />
       <path d="M5 8.5V16a1 1 0 0 0 1 1h3v-4h2v4h3a1 1 0 0 0 1-1V8.5" />
-    </IconShell>
-  );
-}
-
-function IconReelsLibrary(props: IconProps) {
-  return (
-    <IconShell {...props}>
-      <circle cx="10" cy="10" r="7" />
-      <path d="M8.5 7.3v5.4l4.5-2.7-4.5-2.7Z" fill="currentColor" stroke="none" />
-    </IconShell>
-  );
-}
-
-function IconReelsCuration(props: IconProps) {
-  return (
-    <IconShell {...props}>
-      <path d="M10 3 3 7l7 4 7-4-7-4Z" />
-      <path d="M3 11l7 4 7-4" />
     </IconShell>
   );
 }
@@ -201,7 +174,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/articles', label: 'Articles', icon: IconArticles, permission: 'news.manage' },
       { to: '/categories', label: 'Categories', icon: IconCategories, permission: 'category.manage' },
-      { to: '/tags', label: 'Tags', icon: IconTags, permission: 'tag.manage' },
       { to: '/anak-usaha', label: 'Anak Perusahaan', icon: IconAnakUsaha, permission: 'anak-usaha.manage' },
       {
         to: '/anak-usaha-presentation',
@@ -215,9 +187,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Curation',
     items: [
       { to: '/curation', label: 'Home curation', icon: IconHomeCuration, permission: 'news.manage' },
-      { to: '/reels', label: 'Reels library', icon: IconReelsLibrary, permission: 'news.manage' },
-      { to: '/reels-curation', label: 'Reels curation', icon: IconReelsCuration, permission: 'news.manage' },
-      { to: '/guide-picks', label: 'Guide of the week', icon: IconGuidePicks, permission: 'news.manage' },
+      { to: '/guide-picks', label: 'Guideline of the week', icon: IconGuidePicks, permission: 'news.manage' },
     ],
   },
   {

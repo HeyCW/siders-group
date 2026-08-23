@@ -10,6 +10,7 @@ function pick(overrides: Partial<PublicGuidePick> & Pick<PublicGuidePick, 'place
     city: 'Surabaya',
     description: 'Wifi kuat dan buka sampai tengah malam.',
     photoUrl: 'https://cdn.example.com/seven-cafe.webp',
+    videoUrl: 'https://cdn.example.com/seven-cafe.mp4',
     ...overrides,
   };
 }
@@ -29,7 +30,42 @@ describe('GuideOfWeek', () => {
     expect(screen.getByText('Seven Cafe')).toBeTruthy();
     expect(screen.getByText('Playground, Blok M')).toBeTruthy();
     expect(screen.queryByText(/Drop .* guide photo/i)).not.toBeInTheDocument();
-    expect(screen.getAllByRole('img')).toHaveLength(2);
+  });
+
+  /** specs/web-public-site/spec.md - "Picks are grouped by city" / "Group order follows first
+   *  appearance in the editorial order". */
+  it('groups picks under one labeled heading per city, in first-appearance order', () => {
+    const guides = [
+      pick({ place: 'Blok M', city: 'Jakarta' }),
+      pick({ place: 'Seven Cafe', city: 'Surabaya' }),
+      pick({ place: 'Braga Street', city: 'Jakarta' }),
+    ];
+    render(<GuideOfWeek guides={guides} />);
+
+    const headings = screen.getAllByText(/^(Jakarta|Surabaya)$/);
+    expect(headings.map((h) => h.textContent)).toEqual(['Jakarta', 'Surabaya']);
+  });
+
+  /** specs/web-public-site/spec.md - "A single active city renders one group". */
+  it('renders exactly one group when every pick shares the same city', () => {
+    const guides = [pick({ place: 'Seven Cafe' }), pick({ place: 'Taman Bungkul' })];
+    render(<GuideOfWeek guides={guides} />);
+
+    expect(screen.getAllByText('Surabaya')).toHaveLength(1);
+  });
+
+  /** specs/web-public-site/spec.md - "Guideline videos render poster-first with playback on
+   *  activation": the video element renders with its poster and does not eagerly load the
+   *  source. */
+  it('renders each pick as a poster-first video that does not preload', () => {
+    const guides = [pick({ place: 'Seven Cafe' })];
+    const { container } = render(<GuideOfWeek guides={guides} />);
+
+    const video = container.querySelector('video') as HTMLVideoElement;
+    expect(video).toBeTruthy();
+    expect(video.getAttribute('poster')).toBe('https://cdn.example.com/seven-cafe.webp');
+    expect(video.getAttribute('src')).toBe('https://cdn.example.com/seven-cafe.mp4');
+    expect(video.getAttribute('preload')).toBe('none');
   });
 
   /** specs/web-public-site/spec.md - "A single pick renders without a dangling divider". Asserted

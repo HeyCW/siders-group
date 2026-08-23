@@ -11,7 +11,7 @@ export function StatsBand() {
             <div className="font-serif text-[clamp(38px,5vw,64px)] font-black leading-[0.95] tracking-[-0.03em]">
               <CountUp value={stat.value} />
             </div>
-            <div className="mt-2 whitespace-pre-line font-sans text-[11px] font-bold uppercase tracking-widest">
+            <div className="mt-2 whitespace-pre-line font-sans text-sm font-bold uppercase tracking-widest">
               {stat.label}
             </div>
           </div>

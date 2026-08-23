@@ -20,11 +20,10 @@ const MAX_STAGGERED_ROWS = 8;
 const STAGGER_STEP_MS = 40;
 
 /**
- * Category and tag management share this one screen shape — both are `{id, name, slug}` CRUD
- * gated on their own permission (specs/category-management/spec.md,
- * specs/tag-management/spec.md - "Permission-gated ... endpoints"; tasks.md 11.5). Shown only
- * to callers holding the matching permission — enforced by the server; this screen reacts to a
- * 403 rather than pre-computing who may see it (tasks.md 11.6).
+ * Category and anak usaha management share this one screen shape — both are `{id, name, slug}`
+ * CRUD gated on their own permission (specs/category-management/spec.md - "Permission-gated ...
+ * endpoints"). Shown only to callers holding the matching permission — enforced by the server;
+ * this screen reacts to a 403 rather than pre-computing who may see it.
  */
 export function TaxonomyManagementPage({
   title,

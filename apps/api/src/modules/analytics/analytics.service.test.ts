@@ -13,11 +13,11 @@ function createFakeAnalyticsRepository(): { repository: AnalyticsRepository; cal
       return [{ weekStart: '2026-08-10', count: 5 }];
     },
     async getContentDebt() {
-      return { missingSeoDescription: 1, missingExcerpt: 0, missingFeaturedImage: 0, uncategorized: 0, unusedTags: 0 };
+      return { missingSeoDescription: 1, missingExcerpt: 0, missingFeaturedImage: 0, uncategorized: 0 };
     },
     async getCurationIntegrity(now) {
       calledWithNow.push(now);
-      return { home: { total: 1, visible: 1 }, reels: { total: 0, visible: 0 } };
+      return { home: { total: 1, visible: 1 } };
     },
     async getUpNext(now) {
       calledWithNow.push(now);

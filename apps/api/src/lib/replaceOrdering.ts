@@ -30,9 +30,8 @@ export interface ReplaceOrderingConfig<TRow> {
 
 /**
  * Whole-list replacement in one transaction, in the lock order `add-home-curation` found
- * empirically against live Postgres 16, reused verbatim by `add-reels-curation`: row locks on
- * the referenced ids first (`FOR KEY SHARE`), then the ordering table lock, then
- * delete-and-reinsert.
+ * empirically against live Postgres 16: row locks on the referenced ids first (`FOR KEY SHARE`),
+ * then the ordering table lock, then delete-and-reinsert.
  *
  * - **Row locks first.** The cycle this avoids arises when a concurrent hard delete targets an
  *   entity that is itself in this replace's submitted list: the delete takes that entity's row
@@ -49,9 +48,9 @@ export interface ReplaceOrderingConfig<TRow> {
  *   SHARE` is a shared lock, so two concurrent replaces never block each other there, only here,
  *   in whichever order they arrive.
  *
- * Shared by `curation.repository.ts` (`home_curation`) and `reelsCuration.repository.ts`
- * (`reels_curation`) — structurally identical tables (`UNIQUE(position)`, `ON DELETE CASCADE`,
- * whole-list replacement) — so a correction to this ordering only has to happen once.
+ * Used by `curation.repository.ts` (`home_curation`), factored out on its own so a future
+ * ordering table with the same shape (`UNIQUE(position)`, `ON DELETE CASCADE`, whole-list
+ * replacement) can reuse this rather than re-deriving the lock order from scratch.
  */
 export async function replaceOrdering<TRow>(config: ReplaceOrderingConfig<TRow>): Promise<TRow[]> {
   const { db, ids, referencedTable, orderingTable, deleteAll, insertOrdered, selectJoined, onInvalidReference } =

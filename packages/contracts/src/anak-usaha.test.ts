@@ -146,6 +146,7 @@ describe('anakUsahaAdminResponseSchema', () => {
       slug: 'siders-culture',
       profile: {
         logoUrl: null,
+        backgroundColor: null,
         description: null,
         kind: 'News & Community',
         links: [],

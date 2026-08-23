@@ -3,18 +3,13 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
   articles,
   articleCategories,
-  articleTags,
   articleViewsDaily,
-  tags,
   readers,
   homeCuration,
-  reelsCuration,
-  reels,
   type Database,
 } from '@siders/db';
 import { DASHBOARD_CADENCE_WEEKS, DASHBOARD_DUE_SOON_LIMIT, DASHBOARD_TOP_ARTICLES_LIMIT } from '@siders/contracts';
 import { isPubliclyVisible } from '../articles/article.repository.js';
-import { isReelPubliclyVisible } from '../reels/reel.repository.js';
 
 /** Grace period against the one-minute publish-worker cron, so a normally-running worker never
  *  shows up as overdue (design.md - "'Up next' folds in worker health as a count"). */
@@ -82,7 +77,6 @@ export interface AnalyticsContentDebt {
   missingExcerpt: number;
   missingFeaturedImage: number;
   uncategorized: number;
-  unusedTags: number;
 }
 
 export interface AnalyticsCurationIntegrityCounts {
@@ -92,7 +86,6 @@ export interface AnalyticsCurationIntegrityCounts {
 
 export interface AnalyticsCurationIntegrity {
   home: AnalyticsCurationIntegrityCounts;
-  reels: AnalyticsCurationIntegrityCounts;
 }
 
 export interface AnalyticsDueSoonArticle {
@@ -191,37 +184,26 @@ export function createAnalyticsRepository(db: Database): AnalyticsRepository {
         .from(articles)
         .where(eq(articles.status, 'published'));
 
-      const [tagRow] = await db
-        .select({ count: count() })
-        .from(tags)
-        .where(notExists(db.select({ one: sql`1` }).from(articleTags).where(eq(articleTags.tagId, tags.id))));
-
       return {
         missingSeoDescription: articleRow?.missingSeoDescription ?? 0,
         missingExcerpt: articleRow?.missingExcerpt ?? 0,
         missingFeaturedImage: articleRow?.missingFeaturedImage ?? 0,
         uncategorized: articleRow?.uncategorized ?? 0,
-        unusedTags: tagRow?.count ?? 0,
       };
     },
 
     async getCurationIntegrity(now) {
-      const [homeRows, reelsRows] = await Promise.all([
-        db
-          .select({ status: articles.status, publishedAt: articles.publishedAt })
-          .from(homeCuration)
-          .innerJoin(articles, eq(articles.id, homeCuration.articleId)),
-        db.select({ status: reels.status }).from(reelsCuration).innerJoin(reels, eq(reels.id, reelsCuration.reelId)),
-      ]);
+      const homeRows = await db
+        .select({ status: articles.status, publishedAt: articles.publishedAt })
+        .from(homeCuration)
+        .innerJoin(articles, eq(articles.id, homeCuration.articleId));
 
-      // Computed in application code from the imported predicates, never re-derived in SQL
-      // (design.md - "Homepage & reels integrity reuse the exact public-visibility predicates").
+      // Computed in application code from the imported predicate, never re-derived in SQL
+      // (design.md - "Homepage integrity reuses the exact public-visibility predicate").
       const homeVisible = homeRows.filter((row) => isPubliclyVisible(row, now)).length;
-      const reelsVisible = reelsRows.filter((row) => isReelPubliclyVisible(row.status)).length;
 
       return {
         home: { total: homeRows.length, visible: homeVisible },
-        reels: { total: reelsRows.length, visible: reelsVisible },
       };
     },
 

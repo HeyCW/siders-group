@@ -25,7 +25,7 @@ const websiteUrlSchema = z
   .refine(isHttpUrl, { message: 'Website URL must use http or https' });
 
 /**
- * A partner requires a logo at creation — mirrors `reelCreateRequestSchema.posterMediaId`
+ * A partner requires a logo at creation — mirrors `guidePickCreateRequestSchema.photoMediaId`
  * (specs/partner-management/spec.md - "A partner requires a logo"). `isActive` defaults to
  * active, matching the stored column default.
  */

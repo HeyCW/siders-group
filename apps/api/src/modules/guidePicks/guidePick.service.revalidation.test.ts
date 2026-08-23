@@ -16,6 +16,7 @@ const env = { APP_ORIGIN: 'https://example.com', REVALIDATE_SECRET: 'c'.repeat(1
 const logger = createLogger({ LOG_LEVEL: 'silent' as never, NODE_ENV: 'test' });
 
 const PHOTO_MEDIA_ID = '11111111-1111-1111-1111-000000000001';
+const VIDEO_MEDIA_ID = '11111111-1111-1111-1111-000000000002';
 
 function row(overrides: Partial<GuidePickRow> & Pick<GuidePickRow, 'id'>): GuidePickRow {
   return {
@@ -24,6 +25,8 @@ function row(overrides: Partial<GuidePickRow> & Pick<GuidePickRow, 'id'>): Guide
     description: 'Wifi kuat dan buka sampai tengah malam.',
     photoMediaId: PHOTO_MEDIA_ID,
     photoStoragePath: '2026/08/photo.webp',
+    videoMediaId: VIDEO_MEDIA_ID,
+    videoStoragePath: '2026/08/video.mp4',
     sortOrder: 0,
     isActive: true,
     createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -75,7 +78,13 @@ describe('guide pick writes when revalidation fails', () => {
     const service = createGuidePickService(repositoryThatAlwaysSucceeds(), env, logger);
 
     await expect(
-      service.create({ city: 'Surabaya', place: 'Seven Cafe', description: 'desc', photoMediaId: PHOTO_MEDIA_ID }),
+      service.create({
+        city: 'Surabaya',
+        place: 'Seven Cafe',
+        description: 'desc',
+        photoMediaId: PHOTO_MEDIA_ID,
+        videoMediaId: VIDEO_MEDIA_ID,
+      }),
     ).resolves.toMatchObject({ id: 'a' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

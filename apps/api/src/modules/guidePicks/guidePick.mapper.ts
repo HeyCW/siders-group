@@ -11,6 +11,7 @@ export function toGuidePickResponse(env: { MEDIA_PUBLIC_BASE_URL: string }, row:
     place: row.place,
     description: row.description,
     photoUrl: publicUrlFor(env, row.photoStoragePath),
+    videoUrl: publicUrlFor(env, row.videoStoragePath),
     isActive: row.isActive,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
@@ -28,5 +29,6 @@ export function toPublicGuidePick(env: { MEDIA_PUBLIC_BASE_URL: string }, row: G
     place: row.place,
     description: row.description,
     photoUrl: publicUrlFor(env, row.photoStoragePath),
+    videoUrl: publicUrlFor(env, row.videoStoragePath),
   };
 }

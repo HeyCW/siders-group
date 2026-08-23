@@ -25,10 +25,8 @@ import { articleRoutes, publicArticleRoutes } from './modules/articles/article.r
 import { createArticleRepository } from './modules/articles/article.repository.js';
 import { createScheduledPublishJob } from './modules/articles/scheduledPublishWorker.js';
 import { categoryRoutes } from './modules/categories/category.routes.js';
-import { tagRoutes } from './modules/tags/tag.routes.js';
 import { anakUsahaRoutes } from './modules/anak-usaha/anakUsaha.routes.js';
 import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
-import { reelRoutes, reelsCurationRoutes, publicReelsRoutes } from './modules/reels/reels.routes.js';
 import { partnerRoutes, publicPartnerRoutes } from './modules/partners/partner.routes.js';
 import { guidePickRoutes, publicGuidePickRoutes } from './modules/guidePicks/guidePick.routes.js';
 import { publicEngagementRoutes } from './modules/engagement/engagement.routes.js';
@@ -73,13 +71,9 @@ export function createServer(): Express {
   // can collide with `publicArticleRoutes`' `/` and `/:slug` (engagement.routes.ts).
   app.use('/articles', publicEngagementRoutes(db, env));
   app.use('/categories', categoryRoutes(db));
-  app.use('/tags', tagRoutes(db));
   app.use('/anak-usaha', anakUsahaRoutes(db, env));
   app.use('/admin/curation', curationRoutes(db, env));
   app.use('/home', publicHomeRoutes(db, env));
-  app.use('/admin/reels-curation', reelsCurationRoutes(db, env));
-  app.use('/admin/reels', reelRoutes(db, env));
-  app.use('/reels', publicReelsRoutes(db, env));
   app.use('/admin/partners', partnerRoutes(db, env));
   app.use('/partners', publicPartnerRoutes(db, env));
   app.use('/admin/guide-picks', guidePickRoutes(db, env));

@@ -63,7 +63,11 @@ const envSchema = z.object({
     message: 'must be an absolute path',
   }),
   MEDIA_PUBLIC_BASE_URL: z.string().url().transform(stripTrailingSlash),
-  MEDIA_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
+  // Separate maxima per kind, not one shared limit — raising a single limit for video would also
+  // authorize an image of that size (openspec/changes/self-hosted-guideline-videos/design.md -
+  // "Per-kind size limit, enforced after sniffing").
+  MEDIA_MAX_IMAGE_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
+  MEDIA_MAX_VIDEO_BYTES: z.coerce.number().int().positive().default(200 * 1024 * 1024),
 
   // Trailing slashes are stripped so these compare equal to a parsed `URL.origin`, which never
   // carries one. `redirect.ts` matches the post-sign-in target's origin against this set; with

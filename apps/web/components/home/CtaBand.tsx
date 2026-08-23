@@ -16,7 +16,7 @@ export function CtaBand() {
             href="/contact"
             className="mark-hover border-b-2 border-ink pb-[3px] font-sans text-[11px] font-bold uppercase tracking-widest"
           >
-            Hubungi redaksi →
+            Hubungi aja →
           </Link>
           <Link
             href="/news"

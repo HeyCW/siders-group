@@ -18,7 +18,6 @@ export interface ArticleCreateInput {
   bodyJson?: unknown;
   excerpt?: string | undefined;
   categoryIds?: string[] | undefined;
-  tagIds?: string[] | undefined;
   featuredMediaId?: string | null | undefined;
   anakUsahaId?: string | null | undefined;
   seoTitle?: string | undefined;
@@ -37,7 +36,6 @@ export interface ArticleEditInput {
   bodyJson?: unknown;
   excerpt?: string | undefined;
   categoryIds?: string[] | undefined;
-  tagIds?: string[] | undefined;
   featuredMediaId?: string | null | undefined;
   anakUsahaId?: string | null | undefined;
   seoTitle?: string | undefined;
@@ -119,7 +117,6 @@ export function createArticleService(
         seoTitle: input.seoTitle ?? null,
         seoDescription: input.seoDescription ?? null,
         categoryIds: input.categoryIds ?? [],
-        tagIds: input.tagIds ?? [],
       };
       return repository.create(created);
     },
@@ -140,7 +137,6 @@ export function createArticleService(
         ...toRepositoryFields(input),
         ...(slug !== undefined && { slug }),
         ...(input.categoryIds !== undefined && { categoryIds: input.categoryIds }),
-        ...(input.tagIds !== undefined && { tagIds: input.tagIds }),
       });
 
       // Gated on whether the article was *already* publicly visible before this edit — a draft
@@ -171,7 +167,6 @@ export function createArticleService(
       const updated = await repository.update(id, {
         ...toRepositoryFields(input),
         ...(input.categoryIds !== undefined && { categoryIds: input.categoryIds }),
-        ...(input.tagIds !== undefined && { tagIds: input.tagIds }),
       });
       if (isPubliclyVisible(existing, new Date())) {
         await revalidateArticlePaths(revalidateEnv, logger, updated.slug);

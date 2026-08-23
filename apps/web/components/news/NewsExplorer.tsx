@@ -184,14 +184,14 @@ export function NewsExplorer({
 
       <div className="flex flex-wrap items-center gap-2.5 border-b border-rule py-[clamp(14px,2vw,20px)]">
         <FilterTrigger
-          label="Anak usaha"
+          label="Group Companies"
           valueLabel={activeAnakUsaha.length > 0 ? String(activeAnakUsaha.length) : undefined}
           active={activeAnakUsaha.length > 0}
           open={openPopover === 'anak'}
           onToggle={() => togglePopover('anak')}
         >
           <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-            Anak usaha — pilih beberapa
+            Group Companies — pilih beberapa
           </span>
           {anakUsahaOptions.map((entry) => (
             <FilterOption
@@ -316,7 +316,7 @@ export function NewsExplorer({
             onClick={() => toggleAnakUsaha(entry.slug)}
             className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-signal focus-visible:bg-ink focus-visible:text-signal"
           >
-            Anak usaha <span className="font-serif font-bold normal-case tracking-normal">{entry.name}</span> ×
+            Group Companies <span className="font-serif font-bold normal-case tracking-normal">{entry.name}</span> ×
           </button>
         ))}
         {activeCategories.map((cat) => (

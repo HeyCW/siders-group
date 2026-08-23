@@ -34,8 +34,7 @@ export function commentModerationRoutes(db: Database) {
   router.patch('/:id', requirePermission('moderation.manage'), controller.moderateComment);
   // Declared after `/:id` even though it is a distinct, longer path — Express matches by pattern
   // specificity here regardless of declaration order for non-overlapping shapes, but the order
-  // mirrors `reels.routes.ts`'s own precedent of stating explicitly which path wins when two
-  // could be read as ambiguous.
+  // states explicitly which path wins when two could be read as ambiguous.
   router.patch('/:id/reports/dismiss', requirePermission('moderation.manage'), controller.dismissCommentReports);
 
   return router;

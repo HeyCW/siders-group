@@ -64,6 +64,7 @@ function createFakeAnakUsahaRepository() {
       const profile: AnakUsahaProfileFields = {
         logoMediaId: input.logoMediaId ?? null,
         logoStoragePath: null,
+        backgroundColor: input.backgroundColor ?? null,
         description: input.description ?? null,
         kind: input.kind,
         links: input.links ?? [],
@@ -79,6 +80,7 @@ function createFakeAnakUsahaRepository() {
       const updated: AnakUsahaProfileFields = {
         logoMediaId: input.logoMediaId !== undefined ? input.logoMediaId : existing.logoMediaId,
         logoStoragePath: existing.logoStoragePath,
+        backgroundColor: input.backgroundColor !== undefined ? input.backgroundColor : existing.backgroundColor,
         description: input.description !== undefined ? input.description : existing.description,
         kind: input.kind ?? existing.kind,
         links: input.links ?? existing.links,

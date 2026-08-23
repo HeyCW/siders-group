@@ -21,7 +21,7 @@ function makeArticle(overrides: Partial<ArticlePublicCard> = {}): ArticlePublicC
     excerpt: null,
     featuredImageUrl: null,
     categories: [{ id: 'c1', name: 'Kuliner', slug: 'kuliner' }],
-    tags: [],
+    anakUsaha: null,
     authorName: 'Rina',
     publishedAt: '2026-08-01T00:00:00.000Z',
     ...overrides,

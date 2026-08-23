@@ -16,9 +16,6 @@ export default function TeamPage() {
           <h1 className="font-serif text-[clamp(28px,4vw,44px)] font-bold uppercase tracking-[0.02em]">
             Behind The Siders
           </h1>
-          <p className="mt-2.5 max-w-[56ch] text-[15px] leading-[1.7] text-muted">
-            The people building the masthead, city by city.
-          </p>
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
@@ -28,7 +25,7 @@ export default function TeamPage() {
               className="border-b border-rule border-r border-r-rule-strong py-[clamp(20px,3vw,32px)] pr-[clamp(20px,3vw,32px)]"
             >
               <MediaSlot
-                src={null}
+                src={member.photoUrl}
                 alt={member.name}
                 label="Drop photo (no background)"
                 aspectClassName="aspect-[3/4]"

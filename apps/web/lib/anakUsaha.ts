@@ -5,6 +5,7 @@ export interface PresentedAnakUsaha {
   name: string;
   slug: string;
   logoUrl: string | null;
+  backgroundColor: string | null;
   description: string | null;
   kind: 'Media Platform' | 'News & Community';
   links: AnakUsahaLink[];
@@ -28,6 +29,7 @@ export function presentedAnakUsaha(list: PublicAnakUsaha[]): PresentedAnakUsaha[
       name: entry.name,
       slug: entry.slug,
       logoUrl: entry.logoUrl ?? null,
+      backgroundColor: entry.backgroundColor ?? null,
       description: entry.description ?? null,
       kind: entry.kind as PresentedAnakUsaha['kind'],
       links: entry.links ?? [],

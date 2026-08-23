@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Container } from './Container';
-import { CONTACT_INFO, EDITION, FOOTER_DESCRIPTION, NAV_ITEMS } from '../../lib/content';
+import { CONTACT_INFO, FOOTER_DESCRIPTION, NAV_ITEMS } from '../../lib/content';
 import type { PresentedAnakUsaha } from '../../lib/anakUsaha';
 
 const colClass = 'py-[clamp(20px,3vw,32px)] px-[clamp(16px,2vw,28px)] border-r border-rule-strong';
@@ -25,7 +25,7 @@ export function SiteFooter({ brands }: { brands: PresentedAnakUsaha[] }) {
 
         <div className={colClass}>
           <div className="border-b border-ink pb-2 font-sans text-[11px] font-bold uppercase tracking-widest">
-            Halaman
+            Pages
           </div>
           {NAV_ITEMS.map((item) => (
             <Link
@@ -41,30 +41,28 @@ export function SiteFooter({ brands }: { brands: PresentedAnakUsaha[] }) {
         {brands.length > 0 && (
           <div className={colClass}>
             <div className="border-b border-ink pb-2 font-sans text-[11px] font-bold uppercase tracking-widest">
-              Anak Usaha
+              More About Us
             </div>
-            {brands.map((brand) => (
-              <Link
-                key={brand.id}
-                href="/news"
-                className="group flex justify-between gap-3 border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink"
-              >
-                <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
-              </Link>
-            ))}
+            {brands.map((brand) => {
+              const link = brand.links[0];
+              const className =
+                'group flex justify-between gap-3 border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink';
+              return link ? (
+                <a key={brand.id} href={link.href} target="_blank" rel="noopener noreferrer" className={className}>
+                  <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
+                </a>
+              ) : (
+                <Link key={brand.id} href="/news" className={className}>
+                  <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
+                </Link>
+              );
+            })}
           </div>
         )}
 
         <div className="py-[clamp(20px,3vw,32px)] pl-[clamp(16px,2vw,28px)] pr-0">
           <div className="border-b border-ink pb-2 font-sans text-[11px] font-bold uppercase tracking-widest">
-            Redaksi
-          </div>
-          <div className="border-b border-rule py-2.5 text-sm leading-[1.65]">
-            {CONTACT_INFO.address.map((line) => (
-              <span key={line} className="block">
-                {line}
-              </span>
-            ))}
+            Contact
           </div>
           <a
             href={`mailto:${CONTACT_INFO.emails[0]}`}
@@ -74,25 +72,21 @@ export function SiteFooter({ brands }: { brands: PresentedAnakUsaha[] }) {
           </a>
           <div className="border-b border-rule py-2.5 text-sm">{CONTACT_INFO.whatsapp}</div>
           <div className="flex flex-wrap gap-2 pt-3.5">
-            {['Instagram', 'TikTok', 'WhatsApp'].map((social) => (
-              <a
-                key={social}
-                href="#"
-                className="mark-hover border-b-2 border-ink pb-0.5 font-sans text-[11px] font-bold uppercase tracking-widest"
-              >
-                {social}
-              </a>
-            ))}
+            <a
+              href={`https://wa.me/${CONTACT_INFO.whatsappNumber}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mark-hover border-b-2 border-ink pb-0.5 font-sans text-[11px] font-bold uppercase tracking-widest"
+            >
+              WhatsApp
+            </a>
           </div>
         </div>
       </div>
 
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3 border-t border-ink pt-3.5">
         <span className="font-sans text-[11px] font-bold uppercase tracking-widest">
-          PT. Siders Karya Nusantara
-        </span>
-        <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-          {EDITION} · Agustus 2026
+          2026 Siders Group | PT. Siders Karya Nusantara
         </span>
         <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
           © 2026 — Hak cipta dilindungi

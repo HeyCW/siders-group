@@ -107,7 +107,7 @@ export function ContactForm() {
           )}
         </label>
         <label className="block">
-          <span className={labelClass}>Organisation</span>
+          <span className={labelClass}>Organization</span>
           <input type="text" maxLength={CONTACT_ORGANISATION_MAX_LENGTH} className={inputClass} {...field('organisation')} />
           {touched.organisation && errors.organisation && (
             <span className="mt-1 block text-xs text-red-700">{errors.organisation}</span>

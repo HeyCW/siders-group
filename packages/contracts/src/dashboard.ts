@@ -38,7 +38,6 @@ export const dashboardContentDebtSchema = z.object({
   missingExcerpt: z.number().int().nonnegative(),
   missingFeaturedImage: z.number().int().nonnegative(),
   uncategorized: z.number().int().nonnegative(),
-  unusedTags: z.number().int().nonnegative(),
 });
 export type DashboardContentDebt = z.infer<typeof dashboardContentDebtSchema>;
 
@@ -49,7 +48,6 @@ const curationIntegrityCountsSchema = z.object({
 
 export const dashboardCurationIntegritySchema = z.object({
   home: curationIntegrityCountsSchema,
-  reels: curationIntegrityCountsSchema,
 });
 export type DashboardCurationIntegrity = z.infer<typeof dashboardCurationIntegritySchema>;
 

@@ -14,14 +14,14 @@ interface PulseItem {
 
 /**
  * Static, illustrative snapshot of the kind of activity the real dashboard tracks
- * (pipeline, schedule, reels/curation, taxonomy — see DashboardPage) — not a live feed.
+ * (pipeline, schedule, guideline curation, taxonomy — see DashboardPage) — not a live feed.
  * It exists to make the login screen feel like the front door of a running newsroom
  * console rather than an anonymous auth form.
  */
 const PULSE_ITEMS: PulseItem[] = [
   { time: '08:42', tag: 'Pipeline', text: '3 drafts moved to review' },
   { time: '08:37', tag: 'Schedule', text: '1 article queued for the 6:00 PM slot' },
-  { time: '08:24', tag: 'Reels', text: 'Reels curation refreshed' },
+  { time: '08:24', tag: 'Guideline', text: 'Guideline of the week refreshed' },
   { time: '08:11', tag: 'Taxonomy', text: '2 uncategorized articles cleared' },
 ];
 

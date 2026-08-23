@@ -1,4 +1,4 @@
-import type { AnakUsahaResponse, CategoryResponse, TagResponse } from '@siders/contracts';
+import type { AnakUsahaResponse, CategoryResponse } from '@siders/contracts';
 import { apiFetch } from './api.js';
 
 interface Envelope<T> {
@@ -6,15 +6,15 @@ interface Envelope<T> {
   data: T;
 }
 
-function makeTaxonomyApi(resource: 'categories' | 'tags' | 'anak-usaha') {
+function makeTaxonomyApi(resource: 'categories' | 'anak-usaha') {
   return {
-    list<T = CategoryResponse | TagResponse | AnakUsahaResponse>(): Promise<T[]> {
+    list<T = CategoryResponse | AnakUsahaResponse>(): Promise<T[]> {
       return apiFetch<Envelope<T[]>>(`/${resource}`).then((r) => r.data);
     },
-    create<T = CategoryResponse | TagResponse | AnakUsahaResponse>(name: string): Promise<T> {
+    create<T = CategoryResponse | AnakUsahaResponse>(name: string): Promise<T> {
       return apiFetch<Envelope<T>>(`/${resource}`, { method: 'POST', body: { name } }).then((r) => r.data);
     },
-    update<T = CategoryResponse | TagResponse | AnakUsahaResponse>(id: string, name: string): Promise<T> {
+    update<T = CategoryResponse | AnakUsahaResponse>(id: string, name: string): Promise<T> {
       return apiFetch<Envelope<T>>(`/${resource}/${id}`, { method: 'PATCH', body: { name } }).then((r) => r.data);
     },
     remove(id: string): Promise<void> {
@@ -28,13 +28,6 @@ export const categoriesApi = {
   create: (name: string) => makeTaxonomyApi('categories').create<CategoryResponse>(name),
   update: (id: string, name: string) => makeTaxonomyApi('categories').update<CategoryResponse>(id, name),
   remove: (id: string) => makeTaxonomyApi('categories').remove(id),
-};
-
-export const tagsApi = {
-  list: () => makeTaxonomyApi('tags').list<TagResponse>(),
-  create: (name: string) => makeTaxonomyApi('tags').create<TagResponse>(name),
-  update: (id: string, name: string) => makeTaxonomyApi('tags').update<TagResponse>(id, name),
-  remove: (id: string) => makeTaxonomyApi('tags').remove(id),
 };
 
 export const anakUsahaApi = {

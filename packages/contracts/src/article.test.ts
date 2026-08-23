@@ -22,11 +22,10 @@ describe('articleCreateRequestSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('accepts categoryIds and tagIds as arrays, never a single categoryId', () => {
+  it('accepts categoryIds as an array, never a single categoryId', () => {
     const parsed = articleCreateRequestSchema.parse({
       title: 'T',
       categoryIds: ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'],
-      tagIds: ['33333333-3333-3333-3333-333333333333'],
     });
     expect(parsed.categoryIds).toHaveLength(2);
   });

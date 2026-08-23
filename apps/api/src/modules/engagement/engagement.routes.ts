@@ -17,11 +17,10 @@ export type EngagementRoutesEnv = Pick<Env, 'SESSION_SECRET'>;
 /**
  * Reader engagement for one article, mounted alongside the public article routes at `/articles`.
  *
- * Sharing that mount path is unambiguous here in a way it is not in `reels.routes.ts`: every
- * route below is two segments deep (`/:id/view`), while `publicArticleRoutes` declares only
- * `/` and `/:slug`. No path either router declares can match a request meant for the other,
- * whatever order they are mounted in — so this needs neither a sibling mount nor a documented
- * registration order to stay correct.
+ * Sharing that mount path is unambiguous: every route below is two segments deep (`/:id/view`),
+ * while `publicArticleRoutes` declares only `/` and `/:slug`. No path either router declares can
+ * match a request meant for the other, whatever order they are mounted in — so this needs neither
+ * a sibling mount nor a documented registration order to stay correct.
  *
  * The endpoints split three ways by declaration:
  *   - `requirePublic()`  — the summary and the comment listing; anyone may read them, and the

@@ -1,5 +1,5 @@
 import { AppError } from '../../middleware/errorHandler.js';
-import { isForeignKeyViolation } from '../../lib/pgErrors.js';
+import { isForeignKeyViolation, violatedConstraint } from '../../lib/pgErrors.js';
 import { revalidateHomePath, type RevalidateEnv } from '../../lib/revalidate.js';
 import type { Logger } from '../../lib/logger.js';
 import type {
@@ -21,6 +21,16 @@ function invalidPhotoMediaError(): AppError {
   return new AppError('photoMediaId does not reference an existing media item', 400, 'invalid_photo_media');
 }
 
+function invalidVideoMediaError(): AppError {
+  return new AppError('videoMediaId does not reference an existing media item', 400, 'invalid_video_media');
+}
+
+/** Disambiguates which of the two foreign keys guide picks hold against `app.media` fired —
+ *  `guide_picks_photo_media_id_media_id_fk` vs. `guide_picks_video_media_id_media_id_fk`. */
+function invalidMediaReferenceError(err: unknown): AppError {
+  return violatedConstraint(err)?.includes('video_media_id') ? invalidVideoMediaError() : invalidPhotoMediaError();
+}
+
 /**
  * Every admin write revalidates `/` unconditionally, mirroring `partner.service.ts` — a guide
  * pick has no non-visible-but-stored state for an edit to be indifferent to: every field on the
@@ -38,7 +48,7 @@ export function createGuidePickService(
       try {
         row = await repository.create(input);
       } catch (err) {
-        if (isForeignKeyViolation(err)) throw invalidPhotoMediaError();
+        if (isForeignKeyViolation(err)) throw invalidMediaReferenceError(err);
         throw err;
       }
       await revalidateHomePath(revalidateEnv, logger);
@@ -56,7 +66,7 @@ export function createGuidePickService(
       try {
         updated = await repository.update(id, input);
       } catch (err) {
-        if (isForeignKeyViolation(err)) throw invalidPhotoMediaError();
+        if (isForeignKeyViolation(err)) throw invalidMediaReferenceError(err);
         throw err;
       }
       await revalidateHomePath(revalidateEnv, logger);
