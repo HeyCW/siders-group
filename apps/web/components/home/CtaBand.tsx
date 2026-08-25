@@ -25,7 +25,7 @@ export function CtaBand() {
             Baca News →
           </Link>
           <video
-            className="ml-auto h-[clamp(56px,7vw,88px)] w-[clamp(56px,7vw,88px)] rounded-full object-cover"
+            className="ml-auto h-[clamp(56px,7vw,88px)] w-[clamp(56px,7vw,88px)] border border-rule object-cover"
             src="/video/cta-loop.mp4"
             autoPlay
             loop
