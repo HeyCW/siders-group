@@ -10,10 +10,12 @@ export function requireParam(req: Request, name: string): string {
 }
 
 /**
- * Every `:id`-shaped route param in this API identifies a uuid primary key. Without this check
- * a malformed value (`/admin/articles/not-a-uuid`) reaches Drizzle, which hands it to Postgres,
- * which rejects it as invalid input for `uuid` — an error `errorHandler` doesn't recognize, so
- * it fell through to a logged-as-`error` 500 for what is really a client mistake.
+ * Every `:id`-shaped route param in this API identifies a uuid primary key. Primary keys are
+ * `char(36)` in MySQL, not a database-enforced `uuid` type (openspec/changes/migrate-postgres-to-mysql
+ * - "primary keys are `char(36)`..."), so a malformed value (`/admin/articles/not-a-uuid`) has no
+ * driver-level backstop at all — without this check it would simply reach Drizzle as an ordinary
+ * string, match no row, and surface as an ambiguous 404 rather than the precise `400 invalid_id`
+ * a client mistake deserves.
  */
 export function requireUuidParam(req: Request, name: string): string {
   const value = requireParam(req, name);

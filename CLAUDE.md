@@ -3,7 +3,7 @@
 # Technology Stack
 
 Frontend — React, TypeScript, Vite, Tailwind CSS, shadcn/ui
-Backend — Node.js, Express, PostgreSQL
+Backend — Node.js, Express, MySQL
 
 # Coding Standards
 

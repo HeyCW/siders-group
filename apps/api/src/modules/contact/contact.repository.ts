@@ -1,5 +1,5 @@
 import { count, desc, eq, type SQL } from 'drizzle-orm';
-import { contactMessages, type Database } from '@siders/db';
+import { contactMessages, newId, type Database } from '@siders/db';
 import type { ContactMessageStatusFilter } from '@siders/contracts';
 
 export interface ContactMessageRow {
@@ -36,17 +36,17 @@ export interface ContactMessageRepository {
 export function createContactMessageRepository(db: Database): ContactMessageRepository {
   return {
     async submit(input) {
-      const [row] = await db
-        .insert(contactMessages)
-        .values({
-          name: input.name,
-          organisation: input.organisation ?? null,
-          email: input.email,
-          subject: input.subject ?? null,
-          message: input.message,
-        })
-        .returning();
-      if (!row) throw new Error('contact message insert returned no row');
+      const id = newId();
+      await db.insert(contactMessages).values({
+        id,
+        name: input.name,
+        organisation: input.organisation ?? null,
+        email: input.email,
+        subject: input.subject ?? null,
+        message: input.message,
+      });
+      const [row] = await db.select().from(contactMessages).where(eq(contactMessages.id, id)).limit(1);
+      if (!row) throw new Error('contact message missing immediately after insert');
       return row;
     },
 
@@ -62,11 +62,8 @@ export function createContactMessageRepository(db: Database): ContactMessageRepo
     },
 
     async setStatus(id, status) {
-      const [row] = await db
-        .update(contactMessages)
-        .set({ status })
-        .where(eq(contactMessages.id, id))
-        .returning();
+      await db.update(contactMessages).set({ status }).where(eq(contactMessages.id, id));
+      const [row] = await db.select().from(contactMessages).where(eq(contactMessages.id, id)).limit(1);
       return row ?? null;
     },
   };

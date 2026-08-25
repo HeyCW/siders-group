@@ -25,7 +25,10 @@ function row(overrides: Partial<PartnerRow> & Pick<PartnerRow, 'id'>): PartnerRo
 }
 
 function foreignKeyViolation(): Error {
-  return Object.assign(new Error('violates foreign key constraint'), { code: '23503' });
+  return Object.assign(new Error('Cannot add or update a child row: a foreign key constraint fails'), {
+    errno: 1452,
+    code: 'ER_NO_REFERENCED_ROW_2',
+  });
 }
 
 function createFakePartnerRepository(initial: PartnerRow[] = []) {

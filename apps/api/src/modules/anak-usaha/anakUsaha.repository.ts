@@ -1,9 +1,10 @@
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { anakUsaha, anakUsahaProfile, media, type Database } from '@siders/db';
+import { anakUsaha, anakUsahaProfile, media, newId, type Database } from '@siders/db';
 import type { AnakUsahaLink } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
-import { isForeignKeyViolation, isUniqueViolationOn, violatedConstraint } from '../../lib/pgErrors.js';
+import { isForeignKeyViolation, isUniqueViolationOn, violatedConstraint } from '../../lib/dbErrors.js';
 import { isExactIdSet, type SortOrderExecutor } from '../../lib/replaceSortOrder.js';
+import { withTableWriteLock } from '../../lib/tableWriteLock.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
 
 export interface AnakUsahaRow {
@@ -213,8 +214,10 @@ export function createAnakUsahaRepository(db: Database): AnakUsahaRepository {
   return {
     async create(input) {
       try {
-        const [row] = await db.insert(anakUsaha).values(input).returning();
-        if (!row) throw new Error('anak usaha insert returned no row');
+        const id = newId();
+        await db.insert(anakUsaha).values({ ...input, id });
+        const [row] = await db.select().from(anakUsaha).where(eq(anakUsaha.id, id)).limit(1);
+        if (!row) throw new Error('anak usaha missing immediately after insert');
         return row;
       } catch (err) {
         if (isUniqueViolationOn(err, 'anak_usaha_slug_unique')) throw slugConflictError();
@@ -224,7 +227,8 @@ export function createAnakUsahaRepository(db: Database): AnakUsahaRepository {
 
     async update(id, input) {
       try {
-        const [row] = await db.update(anakUsaha).set(input).where(eq(anakUsaha.id, id)).returning();
+        await db.update(anakUsaha).set(input).where(eq(anakUsaha.id, id));
+        const [row] = await db.select().from(anakUsaha).where(eq(anakUsaha.id, id)).limit(1);
         if (!row) throw new Error('anak usaha missing immediately after update');
         return row;
       } catch (err) {
@@ -270,25 +274,33 @@ export function createAnakUsahaRepository(db: Database): AnakUsahaRepository {
       try {
         // Same read-then-write-under-lock shape as `partner.repository.ts`'s `create`: two
         // concurrent creates outside a transaction could read the same `max(sortOrder)` and
-        // collide, since `sortOrder` carries no unique constraint.
+        // collide, since `sortOrder` carries no unique constraint. Uses the same advisory-lock
+        // name as `reorderProfiles` below so the two mutually exclude each other, exactly like
+        // the SHARE ROW EXCLUSIVE / EXCLUSIVE lock pair this replaces
+        // (openspec/changes/migrate-postgres-to-mysql/design.md).
         await db.transaction(async (tx) => {
-          await tx.execute(sql`LOCK TABLE app.anak_usaha_profile IN SHARE ROW EXCLUSIVE MODE`);
-          const [maxRow] = await tx
-            .select({ nextSortOrder: sql<number>`coalesce(max(${anakUsahaProfile.sortOrder}), -1) + 1` })
-            .from(anakUsahaProfile);
-          if (!maxRow) throw new Error('sortOrder aggregate returned no row');
-          await tx.insert(anakUsahaProfile).values({
-            anakUsahaId: input.anakUsahaId,
-            logoMediaId: input.logoMediaId ?? null,
-            backgroundColor: input.backgroundColor ?? null,
-            description: input.description ?? null,
-            kind: input.kind,
-            links: input.links ?? [],
-            sortOrder: maxRow.nextSortOrder,
+          await withTableWriteLock(tx, 'anak_usaha_profile', async () => {
+            const [maxRow] = await tx
+              .select({ nextSortOrder: sql<number>`coalesce(max(${anakUsahaProfile.sortOrder}), -1) + 1` })
+              .from(anakUsahaProfile);
+            if (!maxRow) throw new Error('sortOrder aggregate returned no row');
+            await tx.insert(anakUsahaProfile).values({
+              anakUsahaId: input.anakUsahaId,
+              logoMediaId: input.logoMediaId ?? null,
+              backgroundColor: input.backgroundColor ?? null,
+              description: input.description ?? null,
+              kind: input.kind,
+              links: input.links ?? [],
+              sortOrder: maxRow.nextSortOrder,
+            });
           });
         });
       } catch (err) {
-        if (isUniqueViolationOn(err, 'anak_usaha_profile_pkey')) throw profileAlreadyExistsError();
+        // `PRIMARY`, not a `_pkey`-suffixed name: `anakUsahaId` is both the primary key and the
+        // FK here, and MySQL always names the primary key's own index `PRIMARY` regardless of
+        // the table (openspec/changes/migrate-postgres-to-mysql/design.md - constraint-name
+        // translation).
+        if (isUniqueViolationOn(err, 'PRIMARY')) throw profileAlreadyExistsError();
         if (isForeignKeyViolation(err)) {
           const constraint = violatedConstraint(err) ?? '';
           if (constraint.includes('logo_media_id')) throw invalidLogoMediaError();
@@ -324,19 +336,23 @@ export function createAnakUsahaRepository(db: Database): AnakUsahaRepository {
 
     reorderProfiles(anakUsahaIds) {
       return db.transaction(async (tx) => {
-        await tx.execute(sql`LOCK TABLE app.anak_usaha_profile IN EXCLUSIVE MODE`);
-        const current = await tx.execute(sql`select anak_usaha_id as id from app.anak_usaha_profile`);
-        const currentIds = current.rows.map((r) => (r as { id: string }).id);
-        if (!isExactIdSet(currentIds, anakUsahaIds)) throw invalidProfileSetError();
+        return withTableWriteLock(tx, 'anak_usaha_profile', async () => {
+          const [rows] = (await tx.execute(sql`select anak_usaha_id as id from anak_usaha_profile`)) as unknown as [
+            { id: string }[],
+            unknown,
+          ];
+          const currentIds = rows.map((r) => r.id);
+          if (!isExactIdSet(currentIds, anakUsahaIds)) throw invalidProfileSetError();
 
-        for (const [index, id] of anakUsahaIds.entries()) {
-          await tx
-            .update(anakUsahaProfile)
-            .set({ sortOrder: index, updatedAt: new Date() })
-            .where(eq(anakUsahaProfile.anakUsahaId, id));
-        }
+          for (const [index, id] of anakUsahaIds.entries()) {
+            await tx
+              .update(anakUsahaProfile)
+              .set({ sortOrder: index, updatedAt: new Date() })
+              .where(eq(anakUsahaProfile.anakUsahaId, id));
+          }
 
-        return listWithProfileJoined(tx);
+          return listWithProfileJoined(tx);
+        });
       });
     },
   };

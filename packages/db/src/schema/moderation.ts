@@ -1,16 +1,17 @@
 import { sql } from 'drizzle-orm';
-import { index, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { boolean, char, datetime, index, mysqlEnum, mysqlTable, text, uniqueIndex } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 import { users } from './users';
 import { readers } from './readers';
 import { comments } from './engagement';
 
-export const moderationTargetType = app.enum('moderation_target_type', ['comment', 'reader']);
+export const MODERATION_TARGET_TYPE_VALUES = ['comment', 'reader'] as const;
+export type ModerationTargetTypeValue = (typeof MODERATION_TARGET_TYPE_VALUES)[number];
 
 /** `comment_reports_dismissed` is its own action, distinct from `comment_removed` — "this comment
  *  stays up despite being reported" is a decision worth its own record
  *  (design.md - Decision 8). */
-export const moderationAction = app.enum('moderation_action', [
+export const MODERATION_ACTION_VALUES = [
   'comment_removed',
   'comment_restored',
   'comment_reports_dismissed',
@@ -18,7 +19,8 @@ export const moderationAction = app.enum('moderation_action', [
   'reader_unmuted',
   'reader_banned',
   'reader_unbanned',
-]);
+] as const;
+export type ModerationActionValue = (typeof MODERATION_ACTION_VALUES)[number];
 
 /**
  * One row per moderation action taken, never overwritten — a repeat offender is a question this
@@ -41,18 +43,18 @@ export const moderationAction = app.enum('moderation_action', [
  * `apps/api/src/middleware/authorize.ts` — before this table or the surface that writes to them
  * existed. This table only gives staff a way to set them, and a record that they did.
  */
-export const moderationActions = app.table(
+export const moderationActions = mysqlTable(
   'moderation_actions',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    actorId: uuid('actor_id')
+    id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+    actorId: char('actor_id', { length: 36 })
       .notNull()
       .references(() => users.id),
-    targetType: moderationTargetType('target_type').notNull(),
-    targetId: uuid('target_id').notNull(),
-    action: moderationAction('action').notNull(),
+    targetType: mysqlEnum('target_type', MODERATION_TARGET_TYPE_VALUES).notNull(),
+    targetId: char('target_id', { length: 36 }).notNull(),
+    action: mysqlEnum('action', MODERATION_ACTION_VALUES).notNull(),
     reason: text('reason'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
   (table) => ({
     // Per-target history: "has this comment or reader been moderated before, and how".
@@ -66,7 +68,8 @@ export const moderationActions = app.table(
   }),
 );
 
-export const commentReportReason = app.enum('comment_report_reason', ['spam', 'harassment', 'off_topic', 'other']);
+export const COMMENT_REPORT_REASON_VALUES = ['spam', 'harassment', 'off_topic', 'other'] as const;
+export type CommentReportReasonValue = (typeof COMMENT_REPORT_REASON_VALUES)[number];
 
 /**
  * One open report per reader per comment — the unique index on `(commentId, reporterId)` is what
@@ -83,30 +86,39 @@ export const commentReportReason = app.enum('comment_report_reason', ['spam', 'h
  * Both references cascade. A deleted comment's reports are meaningless, and a reporter's identity
  * is exactly what the unique index needs to exist for the constraint to mean anything.
  */
-export const commentReports = app.table(
+export const commentReports = mysqlTable(
   'comment_reports',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    commentId: uuid('comment_id')
+    id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+    commentId: char('comment_id', { length: 36 })
       .notNull()
       .references(() => comments.id, { onDelete: 'cascade' }),
-    reporterId: uuid('reporter_id')
+    reporterId: char('reporter_id', { length: 36 })
       .notNull()
       .references(() => readers.id, { onDelete: 'cascade' }),
-    reason: commentReportReason('reason').notNull(),
+    reason: mysqlEnum('reason', COMMENT_REPORT_REASON_VALUES).notNull(),
     note: text('note'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
-    resolvedBy: uuid('resolved_by').references(() => users.id),
+    createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+    resolvedAt: datetime('resolved_at', { fsp: 3 }),
+    resolvedBy: char('resolved_by', { length: 36 }).references(() => users.id),
+    // Replaces the Postgres partial index `comment_reports_open_idx ... WHERE resolved_at IS
+    // NULL` (MySQL has no partial index) — see
+    // openspec/changes/migrate-postgres-to-mysql/design.md, "the one partial index becomes a
+    // stored generated column". Generated from `resolvedAt` alone, deliberately not from
+    // `commentId`: MySQL/InnoDB rejects a generated column whose expression reads a column that
+    // is itself the base of a cascading foreign key (`commentId` cascades on comment delete) —
+    // confirmed against a live MySQL 8 instance while implementing this, where the natural
+    // `case when resolved_at is null then comment_id end` design failed to install with
+    // `ERROR 1215 Cannot add foreign key constraint`. A boolean flag has no such dependency, and
+    // the composite index below (`isOpen` leading) serves `moderation.repository.ts`'s
+    // open-report aggregate (`WHERE resolved_at IS NULL GROUP BY comment_id`) exactly as
+    // selectively as the partial index did.
+    isOpen: boolean('is_open')
+      .notNull()
+      .generatedAlwaysAs(sql`(\`resolved_at\` is null)`, { mode: 'stored' }),
   },
   (table) => ({
     commentReporterUnique: uniqueIndex('comment_reports_comment_reporter_unique').on(table.commentId, table.reporterId),
-    // Sized for exactly what the queue reads on every load: "does this comment have any
-    // unresolved reports, and how many" — a partial index over only the unresolved rows, rather
-    // than the full table, since a comment's resolved reports never factor into that question
-    // again (design.md - Decision 8).
-    openReportsIdx: index('comment_reports_open_idx')
-      .on(table.commentId)
-      .where(sql`${table.resolvedAt} is null`),
+    openReportsIdx: index('comment_reports_open_idx').on(table.isOpen, table.commentId),
   }),
 );

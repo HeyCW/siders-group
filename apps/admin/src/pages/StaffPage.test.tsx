@@ -57,7 +57,7 @@ describe('StaffPage — list', () => {
     mockAccount();
     // The page trusts `GET /staff`'s own name-ordering (`staff.repository.ts`'s
     // `orderBy(asc(users.name))`) rather than re-sorting client-side — a JS `localeCompare`
-    // could otherwise disagree with the Postgres collation and reorder a correct response. So
+    // could otherwise disagree with the database collation and reorder a correct response. So
     // this mock is pre-sorted, exactly as the real endpoint's contract promises.
     await renderPage([staffEntry({ id: 'a', name: 'Alice' }), staffEntry({ id: 'z', name: 'Zed' })]);
 

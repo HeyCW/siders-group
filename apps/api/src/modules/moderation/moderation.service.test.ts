@@ -36,10 +36,13 @@ function commentRow(overrides: Partial<CommentQueueRow> = {}): CommentQueueRow {
   };
 }
 
-/** Mimics node-postgres's shape for a unique-violation error closely enough for
- *  `isUniqueViolation` to recognize it. */
+/** Mimics `mysql2`'s shape for a unique-violation error closely enough for `isUniqueViolation`
+ *  to recognize it. */
 function uniqueViolation(): Error {
-  return Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' });
+  return Object.assign(new Error("Duplicate entry '...' for key 'comment_reports.comment_reports_comment_reporter_unique'"), {
+    errno: 1062,
+    code: 'ER_DUP_ENTRY',
+  });
 }
 
 function readerRow(overrides: Partial<ReaderQueueRow> = {}): ReaderQueueRow {

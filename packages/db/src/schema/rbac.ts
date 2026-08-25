@@ -1,34 +1,35 @@
-import { boolean, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { boolean, char, datetime, mysqlTable, primaryKey, text, varchar } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 
 /**
  * `slug` recognizes the seeded Owner role. `is_system` is set only by migration —
  * never through the API — so a client payload can never mint a second system role
  * (see openspec/changes/add-auth-foundation/design.md - Decisions).
  */
-export const roles = app.table('roles', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull().unique(),
-  slug: text('slug').notNull().unique(),
+export const roles = mysqlTable('roles', {
+  id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+  name: varchar('name', { length: 191 }).notNull().unique(),
+  slug: varchar('slug', { length: 191 }).notNull().unique(),
   isSystem: boolean('is_system').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime('updated_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });
 
 /** Fixed catalog — seeded by migration only, never created through the API. */
-export const permissions = app.table('permissions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  key: text('key').notNull().unique(),
+export const permissions = mysqlTable('permissions', {
+  id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+  key: varchar('key', { length: 191 }).notNull().unique(),
   description: text('description').notNull(),
 });
 
-export const rolePermissions = app.table(
+export const rolePermissions = mysqlTable(
   'role_permissions',
   {
-    roleId: uuid('role_id')
+    roleId: char('role_id', { length: 36 })
       .notNull()
       .references(() => roles.id, { onDelete: 'cascade' }),
-    permissionId: uuid('permission_id')
+    permissionId: char('permission_id', { length: 36 })
       .notNull()
       .references(() => permissions.id, { onDelete: 'cascade' }),
   },

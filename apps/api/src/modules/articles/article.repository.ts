@@ -6,12 +6,13 @@ import {
   media,
   users,
   anakUsaha,
+  newId,
   type Database,
 } from '@siders/db';
 import type { ArticleStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
-import { isForeignKeyViolation, isUniqueViolationOn, violatedConstraint } from '../../lib/pgErrors.js';
+import { isForeignKeyViolation, isUniqueViolationOn, violatedConstraint } from '../../lib/dbErrors.js';
 
 export interface ArticleRow {
   id: string;
@@ -262,26 +263,26 @@ export function createArticleRepository(db: Database): ArticleRepository {
   return {
     async create(input) {
       try {
-        const row = await db.transaction(async (tx) => {
-          const [inserted] = await tx
-            .insert(articles)
-            .values({
-              title: input.title,
-              slug: input.slug,
-              bodyJson: input.bodyJson,
-              bodyHtml: input.bodyHtml,
-              excerpt: input.excerpt,
-              authorId: input.authorId,
-              featuredMediaId: input.featuredMediaId,
-              anakUsahaId: input.anakUsahaId,
-              seoTitle: input.seoTitle,
-              seoDescription: input.seoDescription,
-            })
-            .returning();
-          if (!inserted) throw new Error('article insert returned no row');
-          await replaceTaxonomy(tx, inserted.id, { categoryIds: input.categoryIds });
-          return inserted;
+        const id = await db.transaction(async (tx) => {
+          const newRowId = newId();
+          await tx.insert(articles).values({
+            id: newRowId,
+            title: input.title,
+            slug: input.slug,
+            bodyJson: input.bodyJson,
+            bodyHtml: input.bodyHtml,
+            excerpt: input.excerpt,
+            authorId: input.authorId,
+            featuredMediaId: input.featuredMediaId,
+            anakUsahaId: input.anakUsahaId,
+            seoTitle: input.seoTitle,
+            seoDescription: input.seoDescription,
+          });
+          await replaceTaxonomy(tx, newRowId, { categoryIds: input.categoryIds });
+          return newRowId;
         });
+        const row = await findRowById(id);
+        if (!row) throw new Error('article missing immediately after create');
         const [withRelations] = await attachRelations(db, [row]);
         if (!withRelations) throw new Error('article missing immediately after create');
         return withRelations;
@@ -342,14 +343,13 @@ export function createArticleRepository(db: Database): ArticleRepository {
       //
       // `published_at` is left untouched, so promotion preserves the scheduled time
       // (specs/article-management/spec.md - "Worker promotion preserves the scheduled time").
-      const updated = await db
+      const [result] = await db
         .update(articles)
         .set({ status: 'published', updatedAt: new Date() })
         .where(
           and(eq(articles.id, id), eq(articles.status, 'scheduled'), lte(articles.publishedAt, now)),
-        )
-        .returning({ id: articles.id });
-      return updated.length > 0;
+        );
+      return result.affectedRows > 0;
     },
 
     async findById(id) {

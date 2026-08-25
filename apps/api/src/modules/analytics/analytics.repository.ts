@@ -1,5 +1,5 @@
-import { and, asc, count, eq, gte, isNull, lt, lte, notExists, or, sql } from 'drizzle-orm';
-import type { AnyPgColumn } from 'drizzle-orm/pg-core';
+import { and, asc, count, eq, gte, isNull, lt, lte, notExists, or, sql, type SQL } from 'drizzle-orm';
+import type { AnyMySqlColumn } from 'drizzle-orm/mysql-core';
 import {
   articles,
   articleCategories,
@@ -51,11 +51,20 @@ export function jakartaDateLabel(instant: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-/** `col IS NULL OR btrim(col) = ''` — blank-aware missingness, not bare `IS NULL`
+/** `col IS NULL OR trim(col) = ''` — blank-aware missingness, not bare `IS NULL`
  *  (design.md - "Content debt" - the autosave path stores an intentionally cleared field as
- *  `''`, never coercing it to `NULL`). */
-function blankOrNull(column: AnyPgColumn) {
-  return or(isNull(column), sql`btrim(${column}) = ''`);
+ *  `''`, never coercing it to `NULL`). `btrim` was Postgres-only; MySQL's `trim()` strips the
+ *  same whitespace by default. */
+function blankOrNull(column: AnyMySqlColumn) {
+  return or(isNull(column), sql`trim(${column}) = ''`);
+}
+
+/** `count(*) filter (where cond)` has no MySQL equivalent (no `FILTER` clause) — `count(case
+ *  when cond then 1 end)` is the standard rewrite: `CASE` yields `NULL` for a false condition,
+ *  and `count()` only counts non-null values, giving the identical result
+ *  (openspec/changes/migrate-postgres-to-mysql/design.md). */
+function countWhere(condition: SQL | undefined) {
+  return sql<number>`count(case when ${condition} then 1 end)`.mapWith(Number);
 }
 
 export interface AnalyticsPipelineCounts {
@@ -152,7 +161,21 @@ export function createAnalyticsRepository(db: Database): AnalyticsRepository {
       // `articles_status_published_at_idx` stays usable (design.md - "Risks / Trade-offs";
       // tasks.md - 2.3). The bucketing expression below is separate and only ever appears in
       // SELECT/GROUP BY, never in WHERE.
-      const bucketExpr = sql<string>`to_char(date_trunc('week', ${articles.publishedAt} AT TIME ZONE 'Asia/Jakarta'), 'YYYY-MM-DD')`;
+      //
+      // `to_char(date_trunc('week', x AT TIME ZONE 'Asia/Jakarta'), 'YYYY-MM-DD')` has no single
+      // MySQL equivalent; three functions stand in for it
+      // (openspec/changes/migrate-postgres-to-mysql/design.md): `CONVERT_TZ(x, '+00:00',
+      // '+07:00')` shifts the UTC-stored `datetime` into Jakarta local time — a literal offset,
+      // not the named zone `'Asia/Jakarta'`, since MySQL only resolves named zones when the
+      // server's `mysql.time_zone_name` tables are populated (`mysql_tzinfo_to_sql`), which
+      // cannot be assumed of every deployment target; `Asia/Jakarta` carries no DST
+      // (`jakartaWeekStart`'s own comment), so the fixed +07:00 offset is exact, not an
+      // approximation. `DATE_SUB(DATE(x), INTERVAL WEEKDAY(x) DAY)` finds that Jakarta-local
+      // day's Monday — `WEEKDAY()` returns 0 for Monday, matching `jakartaWeekStart`'s own ISO
+      // week-start convention. `DATE_FORMAT(x, '%Y-%m-%d')` is `to_char`'s direct MySQL
+      // equivalent.
+      const jakartaLocal = sql`convert_tz(${articles.publishedAt}, '+00:00', '+07:00')`;
+      const bucketExpr = sql<string>`date_format(date_sub(date(${jakartaLocal}), interval weekday(${jakartaLocal}) day), '%Y-%m-%d')`;
 
       const rows = await db
         .select({ weekStart: bucketExpr, count: count() })
@@ -176,10 +199,10 @@ export function createAnalyticsRepository(db: Database): AnalyticsRepository {
 
       const [articleRow] = await db
         .select({
-          missingSeoDescription: sql<number>`count(*) filter (where ${blankOrNull(articles.seoDescription)})`.mapWith(Number),
-          missingExcerpt: sql<number>`count(*) filter (where ${blankOrNull(articles.excerpt)})`.mapWith(Number),
-          missingFeaturedImage: sql<number>`count(*) filter (where ${isNull(articles.featuredMediaId)})`.mapWith(Number),
-          uncategorized: sql<number>`count(*) filter (where ${uncategorizedCondition})`.mapWith(Number),
+          missingSeoDescription: countWhere(blankOrNull(articles.seoDescription)),
+          missingExcerpt: countWhere(blankOrNull(articles.excerpt)),
+          missingFeaturedImage: countWhere(isNull(articles.featuredMediaId)),
+          uncategorized: countWhere(uncategorizedCondition),
         })
         .from(articles)
         .where(eq(articles.status, 'published'));
@@ -252,10 +275,11 @@ export function createAnalyticsRepository(db: Database): AnalyticsRepository {
       const [row] = await db
         .select({
           // `activeLast30d` naturally excludes a reader with `lastLoginAt IS NULL`: SQL's
-          // `NULL >= x` evaluates to NULL, which `filter (where ...)` treats as false
+          // `NULL >= x` evaluates to NULL, and `case when null then 1 end` is itself `NULL` —
+          // `count()` never counts it, the same "not active" outcome `filter (where ...)` gave
           // (spec.md - "Reader who never logged in is not counted as active").
-          newLast7d: sql<number>`count(*) filter (where ${gte(readers.createdAt, newCutoff)})`.mapWith(Number),
-          activeLast30d: sql<number>`count(*) filter (where ${gte(readers.lastLoginAt, activeCutoff)})`.mapWith(Number),
+          newLast7d: countWhere(gte(readers.createdAt, newCutoff)),
+          activeLast30d: countWhere(gte(readers.lastLoginAt, activeCutoff)),
         })
         .from(readers);
 

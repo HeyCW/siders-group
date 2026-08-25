@@ -1,10 +1,11 @@
 import { asc, eq, inArray, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { alias } from 'drizzle-orm/mysql-core';
 import { isVideoMimeType } from '@siders/contracts';
-import { media, guidePicks, type Database } from '@siders/db';
+import { media, guidePicks, newId, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
 import { isExactIdSet, replaceSortOrder } from '../../lib/replaceSortOrder.js';
+import { withTableWriteLock } from '../../lib/tableWriteLock.js';
 
 export interface GuidePickRow {
   id: string;
@@ -181,17 +182,17 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
     async create(input) {
       await assertMediaKinds(db, input);
       // Read-then-write on `max(sort_order)`, so it has to be one transaction — see
-      // `partner.repository.ts`'s `create` for why the SHARE lock is what makes the aggregate
-      // hold for the insert.
-      const inserted = await db.transaction(async (tx) => {
-        await tx.execute(sql`LOCK TABLE app.guide_picks IN SHARE ROW EXCLUSIVE MODE`);
-        const [maxRow] = await tx
-          .select({ nextSortOrder: sql<number>`coalesce(max(${guidePicks.sortOrder}), -1) + 1` })
-          .from(guidePicks);
-        if (!maxRow) throw new Error('sortOrder aggregate returned no row');
-        const [row] = await tx
-          .insert(guidePicks)
-          .values({
+      // `partner.repository.ts`'s `create` for why the advisory lock (the same name `reorder`
+      // below acquires) is what makes the aggregate hold for the insert.
+      const id = await db.transaction(async (tx) => {
+        return withTableWriteLock(tx, 'guide_picks', async () => {
+          const [maxRow] = await tx
+            .select({ nextSortOrder: sql<number>`coalesce(max(${guidePicks.sortOrder}), -1) + 1` })
+            .from(guidePicks);
+          if (!maxRow) throw new Error('sortOrder aggregate returned no row');
+          const newRowId = newId();
+          await tx.insert(guidePicks).values({
+            id: newRowId,
             city: input.city,
             place: input.place,
             description: input.description,
@@ -199,12 +200,11 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
             videoMediaId: input.videoMediaId,
             isActive: input.isActive ?? true,
             sortOrder: maxRow.nextSortOrder,
-          })
-          .returning({ id: guidePicks.id });
-        if (!row) throw new Error('guide pick insert returned no row');
-        return row;
+          });
+          return newRowId;
+        });
       });
-      const row = await findByIdJoined(inserted.id);
+      const row = await findByIdJoined(id);
       if (!row) throw new Error('guide pick missing immediately after insert');
       return row;
     },
@@ -217,13 +217,11 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
 
     async update(id, input) {
       await assertMediaKinds(db, input);
-      const [updated] = await db
+      await db
         .update(guidePicks)
         .set({ ...stripUndefined(input), updatedAt: new Date() })
-        .where(eq(guidePicks.id, id))
-        .returning({ id: guidePicks.id });
-      if (!updated) throw new Error('guide pick missing immediately after update');
-      const row = await findByIdJoined(updated.id);
+        .where(eq(guidePicks.id, id));
+      const row = await findByIdJoined(id);
       if (!row) throw new Error('guide pick missing immediately after update');
       return row;
     },
@@ -236,7 +234,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
       return replaceSortOrder({
         db,
         ids: guidePickIds,
-        table: 'app.guide_picks',
+        table: 'guide_picks',
         updateSortOrder: (tx, id, sortOrder) =>
           tx.update(guidePicks).set({ sortOrder, updatedAt: new Date() }).where(eq(guidePicks.id, id)),
         selectJoined: (tx) =>

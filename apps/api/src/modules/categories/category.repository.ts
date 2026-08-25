@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { categories, type Database } from '@siders/db';
+import { categories, newId, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
-import { isUniqueViolationOn } from '../../lib/pgErrors.js';
+import { isUniqueViolationOn } from '../../lib/dbErrors.js';
 
 export interface CategoryRow {
   id: string;
@@ -32,9 +32,11 @@ export function createCategoryRepository(db: Database): CategoryRepository {
   return {
     async create(input) {
       try {
-        const [row] = await db.insert(categories).values(input).returning();
-        if (!row) throw new Error('category insert returned no row');
-        return row;
+        const id = newId();
+        await db.insert(categories).values({ ...input, id });
+        // `CategoryRow` is just `{ id, name, slug }` — every field is already known from `id`
+        // and `input`, none of it DB-generated, so there's nothing a re-select would add.
+        return { id, ...input };
       } catch (err) {
         if (isUniqueViolationOn(err, 'categories_slug_unique')) throw slugConflictError();
         throw err;
@@ -43,7 +45,8 @@ export function createCategoryRepository(db: Database): CategoryRepository {
 
     async update(id, input) {
       try {
-        const [row] = await db.update(categories).set(input).where(eq(categories.id, id)).returning();
+        await db.update(categories).set(input).where(eq(categories.id, id));
+        const [row] = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
         if (!row) throw new Error('category missing immediately after update');
         return row;
       } catch (err) {

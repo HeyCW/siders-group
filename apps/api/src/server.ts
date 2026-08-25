@@ -9,7 +9,6 @@ import { startScheduler } from './lib/scheduler.js';
 import { createCsrfMiddleware } from './lib/csrf.js';
 import { getDatabase } from './lib/db.js';
 import { ensureMediaStorageDir } from './lib/mediaStorage.js';
-import { assertDatabaseRoleCanReadNewsTables } from './lib/assertDatabaseRole.js';
 import { requestId } from './middleware/requestId.js';
 import { createAuthenticate } from './middleware/authenticate.js';
 import { auditAuthorizationDeclarations } from './middleware/authorize.js';
@@ -105,9 +104,6 @@ if (isMainModule) {
   // for operational visibility (add-news-management-system/tasks.md - 4.3), not a correctness
   // dependency of the upload path itself.
   await ensureMediaStorageDir(env);
-  // RLS is enabled with no policies on the news-management tables (tasks.md - 2.7), so this
-  // connection must be exempt from it or every read silently returns nothing (tasks.md - 2.9).
-  await assertDatabaseRoleCanReadNewsTables(getDatabase(env), logger);
   const app = createServer();
   const scheduler = startScheduler(logger);
   // Every minute, matching design.md - "Scheduling: status flag plus a lazy read-time

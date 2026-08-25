@@ -1,13 +1,9 @@
-import { index, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { char, datetime, index, mysqlEnum, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 
-/**
- * `new` is the only state a submission can arrive in; `read` is set only by a permitted staff
- * caller and can be toggled back to `new` (specs/contact-messages/spec.md - "A permitted caller
- * can mark a message read or unread"). There is no third state and no deletion — a message
- * persists indefinitely (design.md - Non-Goals).
- */
-export const contactMessageStatus = app.enum('contact_message_status', ['new', 'read']);
+export const CONTACT_MESSAGE_STATUS_VALUES = ['new', 'read'] as const;
+export type ContactMessageStatusValue = (typeof CONTACT_MESSAGE_STATUS_VALUES)[number];
 
 /**
  * One row per public contact-form submission. `organisation` and `subject` are nullable — the
@@ -15,17 +11,17 @@ export const contactMessageStatus = app.enum('contact_message_status', ['new', '
  * contact message without authentication"). No foreign key to any session or reader: the
  * submitter is anonymous by definition, so there is no identity for this row to reference.
  */
-export const contactMessages = app.table(
+export const contactMessages = mysqlTable(
   'contact_messages',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    name: text('name').notNull(),
-    organisation: text('organisation'),
-    email: text('email').notNull(),
-    subject: text('subject'),
+    id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+    name: varchar('name', { length: 255 }).notNull(),
+    organisation: varchar('organisation', { length: 255 }),
+    email: varchar('email', { length: 320 }).notNull(),
+    subject: varchar('subject', { length: 512 }),
     message: text('message').notNull(),
-    status: contactMessageStatus('status').notNull().default('new'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    status: mysqlEnum('status', CONTACT_MESSAGE_STATUS_VALUES).notNull().default('new'),
+    createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
   (table) => ({
     // The inbox read: every message, newest first, optionally filtered by status.

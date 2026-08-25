@@ -31,8 +31,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
+  // A single `mysql://` connection string for both runtime queries and migrations — MySQL has no
+  // pooled/direct-connection split the way Supabase's Postgres did, so there is no `DIRECT_URL`
+  // to carry over (openspec/changes/migrate-postgres-to-mysql).
   DATABASE_URL: z.string().url(),
-  DIRECT_URL: z.string().url().optional(),
 
   // CSRF double-submit token signing secret (openspec/changes/add-auth-foundation/design.md -
   // "SESSION_SECRET is repurposed, not orphaned"). Access credentials are EdDSA-signed and

@@ -56,7 +56,7 @@ export function StaffPage() {
       .then(([staffList, roleList]) => {
         // The server already returns `staffList` name-ordered (`staff.repository.ts`'s
         // `orderBy(asc(users.name))`) — no client-side re-sort here, since a JS `localeCompare`
-        // and the Postgres collation can disagree on accents and case, and re-sorting a
+        // and the database collation (utf8mb4_0900_ai_ci) can disagree on accents and case, and re-sorting a
         // correctly-ordered response can only make it wrong.
         setStaff(staffList);
         setRoles(roleList);

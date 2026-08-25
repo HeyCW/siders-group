@@ -4,7 +4,7 @@ import type { Express } from 'express';
 
 const requiredEnv = {
   NODE_ENV: 'test',
-  DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
+  DATABASE_URL: 'mysql://user:pass@localhost:3306/db',
   SESSION_SECRET: 'a'.repeat(32),
   REVALIDATE_SECRET: 'b'.repeat(16),
   ACCESS_TOKEN_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nZmFrZS1rZXk=\\n-----END PRIVATE KEY-----',

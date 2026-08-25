@@ -1,19 +1,21 @@
-import { boolean, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { boolean, char, datetime, mysqlEnum, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 
-export const readerStatus = app.enum('reader_status', ['active', 'banned']);
+export const READER_STATUS_VALUES = ['active', 'banned'] as const;
+export type ReaderStatus = (typeof READER_STATUS_VALUES)[number];
 
 /** Google-authenticated readers, keyed on `google_sub` — never on email (docs/ARCHITECTURE.md §5.1). */
-export const readers = app.table('readers', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  googleSub: text('google_sub').notNull().unique(),
-  email: text('email').notNull(),
+export const readers = mysqlTable('readers', {
+  id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+  googleSub: varchar('google_sub', { length: 128 }).notNull().unique(),
+  email: varchar('email', { length: 320 }).notNull(),
   emailVerified: boolean('email_verified').notNull().default(false),
-  name: text('name').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
   avatarUrl: text('avatar_url'),
-  status: readerStatus('status').notNull().default('active'),
-  mutedUntil: timestamp('muted_until', { withTimezone: true }),
-  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  status: mysqlEnum('status', READER_STATUS_VALUES).notNull().default('active'),
+  mutedUntil: datetime('muted_until', { fsp: 3 }),
+  lastLoginAt: datetime('last_login_at', { fsp: 3 }),
+  createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime('updated_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });

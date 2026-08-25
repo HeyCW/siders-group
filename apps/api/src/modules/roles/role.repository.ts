@@ -1,5 +1,5 @@
 import { count, eq, inArray } from 'drizzle-orm';
-import { permissions, roles, rolePermissions, users, type Database } from '@siders/db';
+import { newId, permissions, roles, rolePermissions, users, type Database } from '@siders/db';
 
 export interface RoleRow {
   id: string;
@@ -141,8 +141,10 @@ export function createRoleRepository(db: Database): RoleRepository {
       // failure between them leaves a role that exists and authorizes nothing — and role
       // creation reports success either way (CLAUDE.md - "transactions where appropriate").
       return db.transaction(async (tx) => {
-        const [row] = await tx.insert(roles).values({ name: input.name, slug: input.slug }).returning();
-        if (!row) throw new Error('role insert returned no row');
+        const id = newId();
+        await tx.insert(roles).values({ id, name: input.name, slug: input.slug });
+        const [row] = await tx.select().from(roles).where(eq(roles.id, id)).limit(1);
+        if (!row) throw new Error('role missing immediately after insert');
         await replacePermissions(row.id, input.permissionKeys, tx);
         return { ...row, permissions: input.permissionKeys };
       });
@@ -180,15 +182,14 @@ export function createRoleRepository(db: Database): RoleRepository {
     },
 
     async assignRole(staffId, roleId) {
-      // `returning` so a staff id matching no row is distinguishable from a real assignment.
-      // Without it the update quietly affects zero rows and the endpoint answers 204, telling
-      // an administrator the role was assigned when nothing happened at all.
-      const assigned = await db
+      // The affected-rows count is what distinguishes a staff id matching no row from a real
+      // assignment. Without it the update quietly affects zero rows and the endpoint answers
+      // 204, telling an administrator the role was assigned when nothing happened at all.
+      const [result] = await db
         .update(users)
         .set({ roleId, updatedAt: new Date() })
-        .where(eq(users.id, staffId))
-        .returning({ id: users.id });
-      return assigned.length > 0;
+        .where(eq(users.id, staffId));
+      return result.affectedRows > 0;
     },
   };
 }

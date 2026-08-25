@@ -1,6 +1,7 @@
-import { asc, eq, sql } from 'drizzle-orm';
-import { roles, users, type Database } from '@siders/db';
+import { asc, eq } from 'drizzle-orm';
+import { newId, roles, users, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
+import { isUniqueViolation } from '../../lib/dbErrors.js';
 
 export interface StaffRow {
   id: string;
@@ -49,8 +50,6 @@ const SELECT_COLUMNS = {
   createdAt: users.createdAt,
 } as const;
 
-const UNIQUE_VIOLATION = '23505';
-
 /**
  * Turns the unique-constraint violation into the same 409 the pre-insert existence check
  * raises. That check is a read-then-insert, so two concurrent creations for one address both
@@ -63,7 +62,7 @@ async function insertOrTranslateDuplicate<T>(insert: () => Promise<T>): Promise<
   try {
     return await insert();
   } catch (err) {
-    if ((err as { code?: string }).code === UNIQUE_VIOLATION) {
+    if (isUniqueViolation(err)) {
       throw new AppError('An account with this email already exists', 409, 'email_exists');
     }
     throw err;
@@ -80,12 +79,15 @@ export function createStaffRepository(db: Database): StaffRepository {
 
   return {
     async findByEmail(email) {
-      // Matched on `lower(email)` against the `users_email_lower_unique` index rather than on
-      // the raw column, so a row written outside the contract boundary (seed.sql, a manual
-      // insert) is still found by the duplicate check and by sign-in.
-      const [row] = await baseQuery()
-        .where(sql`lower(${users.email}) = lower(${email})`)
-        .limit(1);
+      // A plain equality match is sufficient here — every column in this schema uses MySQL's
+      // `utf8mb4_0900_ai_ci` collation (packages/db/src/schema; the whole database is created
+      // with it), which is case-insensitive by construction. The Postgres version needed
+      // `lower(email) = lower(?)` against a hand-written functional index
+      // (`users_email_lower_unique`, `supabase/migrations/0000_useful_red_shift.sql`) because
+      // Postgres's default collation is case-sensitive; that index has no MySQL equivalent
+      // because it has no MySQL *need* — `users.email`'s own unique index already enforces and
+      // serves case-insensitive lookups for free.
+      const [row] = await baseQuery().where(eq(users.email, email)).limit(1);
       return row ?? null;
     },
 
@@ -99,14 +101,11 @@ export function createStaffRepository(db: Database): StaffRepository {
       // Created active with must_change_password true by column default — creation never
       // supplies that flag explicitly, so there is one place (the schema) asserting every
       // new account starts in the forced-change state.
-      const [inserted] = await insertOrTranslateDuplicate(() =>
-        db
-          .insert(users)
-          .values({ email: input.email, name: input.name, roleId: input.roleId, passwordHash: input.passwordHash })
-          .returning({ id: users.id }),
+      const id = newId();
+      await insertOrTranslateDuplicate(() =>
+        db.insert(users).values({ id, email: input.email, name: input.name, roleId: input.roleId, passwordHash: input.passwordHash }),
       );
-      if (!inserted) throw new Error('staff insert returned no row');
-      const created = await findById(inserted.id);
+      const created = await findById(id);
       if (!created) throw new Error('staff row missing immediately after insert');
       return created;
     },

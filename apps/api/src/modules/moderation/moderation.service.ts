@@ -12,7 +12,7 @@ import type {
   ReaderQueueRow,
 } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
-import { isUniqueViolation } from '../../lib/pgErrors.js';
+import { isUniqueViolation } from '../../lib/dbErrors.js';
 import { toCommentQueueRow, toCommentReportResponse, toReaderQueueRow } from './moderation.mapper.js';
 import type { ModerationActionInput, ModerationRepository, ReaderModerationStatus } from './moderation.repository.js';
 

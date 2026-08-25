@@ -1,5 +1,5 @@
 import { AppError } from '../../middleware/errorHandler.js';
-import { isForeignKeyViolation } from '../../lib/pgErrors.js';
+import { isForeignKeyViolation } from '../../lib/dbErrors.js';
 import { revalidateHomePath, type RevalidateEnv } from '../../lib/revalidate.js';
 import type { Logger } from '../../lib/logger.js';
 import type {

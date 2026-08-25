@@ -1,1 +1,0 @@
-ALTER TABLE "app"."anak_usaha_profile" ADD COLUMN "background_color" text;

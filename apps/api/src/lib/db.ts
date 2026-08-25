@@ -3,7 +3,7 @@ import type { Env } from '../config/env.js';
 
 let cachedDb: Database | undefined;
 
-export function getDatabase(env: Pick<Env, 'DATABASE_URL'>): Database {
+export function getDatabase(env: Pick<Env, 'DATABASE_URL' | 'NODE_ENV'>): Database {
   if (!cachedDb) {
     cachedDb = getDb(env);
   }

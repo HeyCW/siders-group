@@ -1,20 +1,26 @@
 import { sql } from 'drizzle-orm';
 import type { Database } from '@siders/db';
 import { AppError } from '../middleware/errorHandler.js';
-import { isForeignKeyViolation } from './pgErrors.js';
+import { isForeignKeyViolation } from './dbErrors.js';
+import { withTableWriteLock } from './tableWriteLock.js';
 
-export type OrderingExecutor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+/**
+ * Deliberately excludes the bare `Database` pool — same reasoning as `LockExecutor` in
+ * `tableWriteLock.ts`: `deleteAll`/`insertOrdered`/`selectJoined` all run inside the one
+ * transaction `replaceOrdering` opens, and a caller passed the pool instead would silently run
+ * outside it.
+ */
+export type OrderingExecutor = Parameters<Parameters<Database['transaction']>[0]>[0];
 
 export interface ReplaceOrderingConfig<TRow> {
   db: Database;
   ids: string[];
-  /** Fully-qualified name of the table `ids` reference, e.g. `"app.articles"`. Interpolated as
-   *  raw SQL into a `FOR KEY SHARE` existence check — safe only because every call site passes a
-   *  literal, never a value derived from a request. Not a configuration point. */
+  /** Bare table name, e.g. `"articles"`. Interpolated as raw SQL into the existence check — safe
+   *  only because every call site passes a literal, never a value derived from a request. Not a
+   *  configuration point. */
   referencedTable: string;
-  /** Fully-qualified name of the ordering table being replaced, e.g. `"app.home_curation"`.
-   *  Interpolated as raw SQL into a `LOCK TABLE` statement — same literal-only constraint as
-   *  `referencedTable`. */
+  /** Bare table name, e.g. `"home_curation"`, of the ordering table being replaced. Passed as the
+   *  advisory-lock name below — same literal-only constraint as `referencedTable`. */
   orderingTable: string;
   /** Deletes every row of the ordering table, within the transaction. */
   deleteAll: (tx: OrderingExecutor) => Promise<unknown>;
@@ -29,51 +35,47 @@ export interface ReplaceOrderingConfig<TRow> {
 }
 
 /**
- * Whole-list replacement in one transaction, in the lock order `add-home-curation` found
- * empirically against live Postgres 16: row locks on the referenced ids first (`FOR KEY SHARE`),
- * then the ordering table lock, then delete-and-reinsert.
+ * Whole-list replacement in one transaction. Ported from the Postgres version, which took row
+ * locks on the referenced ids (`FOR KEY SHARE`) before the ordering table's lock, in that order,
+ * to avoid a specific deadlock against a concurrent hard delete of a referenced entity — see
+ * `openspec/changes/migrate-postgres-to-mysql/design.md`, "`RETURNING` becomes
+ * insert/update-then-select" section's sibling decision on locking, for the full account of why
+ * that ordering existed and why it doesn't carry over:
  *
- * - **Row locks first.** The cycle this avoids arises when a concurrent hard delete targets an
- *   entity that is itself in this replace's submitted list: the delete takes that entity's row
- *   lock first and only then needs a lock on the ordering table (to run its `ON DELETE CASCADE`),
- *   while taking the table lock first here would need the same entity's row lock only afterward
- *   (via the insert's foreign-key check) — an unavoidable `40P01` deadlock reaching the caller as
- *   a 500 for a save that looked ordinary. `FOR KEY SHARE` on the submitted ids *before* the
- *   table lock removes the cycle, and doubles as the existence check.
- * - **Table lock second.** Without it, two overlapping replaces can both `DELETE` before either
- *   `INSERT`s (`READ COMMITTED` only removes rows visible to its own snapshot), and the second
- *   `INSERT` then collides with the first's rows on the ordering table's primary key or its
- *   `UNIQUE(position)` constraint — an unhandled `23505` surfacing as a 500 instead of the
- *   last-write-wins semantics these callers promise. Safe to take after the row locks: `FOR KEY
- *   SHARE` is a shared lock, so two concurrent replaces never block each other there, only here,
- *   in whichever order they arrive.
- *
- * Used by `curation.repository.ts` (`home_curation`), factored out on its own so a future
- * ordering table with the same shape (`UNIQUE(position)`, `ON DELETE CASCADE`, whole-list
- * replacement) can reuse this rather than re-deriving the lock order from scratch.
+ * The deadlock the row-lock-first ordering avoided was a cycle between two *storage-engine* locks
+ * (a row lock and a table lock) taken in opposite orders by two transactions. `withTableWriteLock`
+ * replaces the table lock with a named advisory lock, which is not a storage-engine lock at all —
+ * it participates in no lock-ordering relationship with a row lock, so that specific cycle cannot
+ * form here regardless of ordering. What the row lock *also* did — guarantee the checked ids are
+ * still present at insert time — is preserved differently: the existence check below is a plain
+ * read (no lock), and a referenced entity deleted in the window between that check and the insert
+ * surfaces as an ordinary foreign-key violation, caught below exactly as it always was for a
+ * dangling id supplied by the caller. The two cases are indistinguishable to the caller by design
+ * — both are "a submitted id doesn't reference a live row" — so this loses no correctness, only
+ * the (Postgres-only) guarantee that the race is prevented rather than caught.
  */
 export async function replaceOrdering<TRow>(config: ReplaceOrderingConfig<TRow>): Promise<TRow[]> {
   const { db, ids, referencedTable, orderingTable, deleteAll, insertOrdered, selectJoined, onInvalidReference } =
     config;
   try {
     return await db.transaction(async (tx) => {
-      if (ids.length > 0) {
-        const rows = await tx.execute(sql`
-          select id from ${sql.raw(referencedTable)}
-          where id in (${sql.join(
-            ids.map((id) => sql`${id}`),
-            sql`, `,
-          )})
-          for key share
-        `);
-        if (rows.rows.length !== ids.length) throw onInvalidReference();
-      }
-      await tx.execute(sql`LOCK TABLE ${sql.raw(orderingTable)} IN EXCLUSIVE MODE`);
-      await deleteAll(tx);
-      if (ids.length > 0) {
-        await insertOrdered(tx, ids);
-      }
-      return selectJoined(tx);
+      return withTableWriteLock(tx, orderingTable, async () => {
+        if (ids.length > 0) {
+          const [rows] = (await tx.execute(sql`
+            select id from ${sql.raw(referencedTable)}
+            where id in (${sql.join(
+              ids.map((id) => sql`${id}`),
+              sql`, `,
+            )})
+          `)) as unknown as [{ id: string }[], unknown];
+          if (rows.length !== ids.length) throw onInvalidReference();
+        }
+        await deleteAll(tx);
+        if (ids.length > 0) {
+          await insertOrdered(tx, ids);
+        }
+        return selectJoined(tx);
+      });
     });
   } catch (err) {
     if (err instanceof AppError) throw err;

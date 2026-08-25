@@ -1,10 +1,12 @@
-import { index, jsonb, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { char, datetime, index, json, mysqlEnum, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 import { users } from './users';
 import { media } from './media';
 import { anakUsaha } from './anakUsaha';
 
-export const articleStatus = app.enum('article_status', ['draft', 'scheduled', 'published']);
+export const ARTICLE_STATUS_VALUES = ['draft', 'scheduled', 'published'] as const;
+export type ArticleStatusValue = (typeof ARTICLE_STATUS_VALUES)[number];
 
 /**
  * `bodyJson` (Tiptap/ProseMirror document) is the source of truth; `bodyHtml` is derived from
@@ -15,26 +17,29 @@ export const articleStatus = app.enum('article_status', ['draft', 'scheduled', '
  * and cleared on unpublish — see design.md's `published_at` lifecycle table — so a published
  * article never carries a stale future timestamp from an earlier schedule.
  */
-export const articles = app.table(
+export const articles = mysqlTable(
   'articles',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    title: text('title').notNull(),
-    slug: text('slug').notNull().unique(),
-    bodyJson: jsonb('body_json').notNull(),
+    id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+    // `varchar(500)`, not `text`, to match every sibling short single-line name/label column
+    // converted in this migration — bound matches `packages/contracts/src/article.ts`'s
+    // `z.string().min(1).max(500)` at the API boundary.
+    title: varchar('title', { length: 500 }).notNull(),
+    slug: varchar('slug', { length: 255 }).notNull().unique(),
+    bodyJson: json('body_json').notNull(),
     bodyHtml: text('body_html').notNull(),
     excerpt: text('excerpt'),
-    status: articleStatus('status').notNull().default('draft'),
-    authorId: uuid('author_id')
+    status: mysqlEnum('status', ARTICLE_STATUS_VALUES).notNull().default('draft'),
+    authorId: char('author_id', { length: 36 })
       .notNull()
       .references(() => users.id),
-    featuredMediaId: uuid('featured_media_id').references(() => media.id, { onDelete: 'set null' }),
-    anakUsahaId: uuid('anak_usaha_id').references(() => anakUsaha.id, { onDelete: 'set null' }),
+    featuredMediaId: char('featured_media_id', { length: 36 }).references(() => media.id, { onDelete: 'set null' }),
+    anakUsahaId: char('anak_usaha_id', { length: 36 }).references(() => anakUsaha.id, { onDelete: 'set null' }),
     seoTitle: text('seo_title'),
     seoDescription: text('seo_description'),
-    publishedAt: timestamp('published_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: datetime('published_at', { fsp: 3 }),
+    createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+    updatedAt: datetime('updated_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
   (table) => ({
     // The public list/by-slug queries filter on status and order by publishedAt — the pair

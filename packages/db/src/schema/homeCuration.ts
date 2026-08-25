@@ -1,5 +1,5 @@
-import { integer, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { char, datetime, int, mysqlTable } from 'drizzle-orm/mysql-core';
 import { articles } from './articles';
 
 /**
@@ -12,10 +12,10 @@ import { articles } from './articles';
  * remove an interior entry (a 3-entry list can be left as `0, 2`); nothing reads its absolute
  * value, only its relative order via `ORDER BY position`.
  */
-export const homeCuration = app.table('home_curation', {
-  articleId: uuid('article_id')
+export const homeCuration = mysqlTable('home_curation', {
+  articleId: char('article_id', { length: 36 })
     .primaryKey()
     .references(() => articles.id, { onDelete: 'cascade' }),
-  position: integer('position').notNull().unique(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  position: int('position').notNull().unique(),
+  createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });

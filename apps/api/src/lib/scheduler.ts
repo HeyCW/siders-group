@@ -14,7 +14,9 @@ export interface SchedulerHandle {
  *
  * Decision: in-process node-cron, not a separate worker process (see
  * design.md "Cron: in-process node-cron"). If the API ever runs multiple
- * replicas, guard registered jobs with a Postgres advisory lock.
+ * replicas, guard registered jobs with a MySQL named advisory lock
+ * (`GET_LOCK`/`RELEASE_LOCK` — see `lib/tableWriteLock.ts`, built for a
+ * different purpose but the same primitive applies here).
  */
 export function startScheduler(logger: Logger): SchedulerHandle {
   const tasks: ScheduledTask[] = [];

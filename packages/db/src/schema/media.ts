@@ -1,5 +1,6 @@
-import { index, integer, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { char, datetime, index, int, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 import { users } from './users';
 
 /**
@@ -8,18 +9,18 @@ import { users } from './users';
  * the public URL is derived at map time so relocating storage is a config change, not a
  * migration. Declared before `articles` so `articles.featuredMediaId` can reference it inline.
  */
-export const media = app.table(
+export const media = mysqlTable(
   'media',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    storagePath: text('storage_path').notNull().unique(),
-    mime: text('mime').notNull(),
-    sizeBytes: integer('size_bytes').notNull(),
-    originalFilename: text('original_filename').notNull(),
+    id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+    storagePath: varchar('storage_path', { length: 512 }).notNull().unique(),
+    mime: varchar('mime', { length: 255 }).notNull(),
+    sizeBytes: int('size_bytes').notNull(),
+    originalFilename: varchar('original_filename', { length: 512 }).notNull(),
     alt: text('alt'),
     caption: text('caption'),
-    uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    uploadedBy: char('uploaded_by', { length: 36 }).references(() => users.id, { onDelete: 'set null' }),
+    createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
   (table) => ({
     uploadedByIdx: index('media_uploaded_by_idx').on(table.uploadedBy),

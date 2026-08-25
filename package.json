@@ -22,7 +22,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "pnpm -r run typecheck",
-    "docs:index": "node scripts/build-docs-index.mjs"
+    "docs:index": "node scripts/build-docs-index.mjs",
+    "db:up": "docker compose up -d mysql",
+    "db:down": "docker compose down"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",

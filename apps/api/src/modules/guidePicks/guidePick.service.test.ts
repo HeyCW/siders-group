@@ -27,10 +27,16 @@ function row(overrides: Partial<GuidePickRow> & Pick<GuidePickRow, 'id'>): Guide
   };
 }
 
-/** `constraint` mirrors what `node-postgres` reports for a 23503 — the name distinguishes which
- *  of the two media foreign keys fired (guidePick.service.ts - `invalidMediaReferenceError`). */
+/** Mirrors what `mysql2` reports for `ER_NO_REFERENCED_ROW_2` (errno 1452) — `dbErrors.ts`
+ *  parses the constraint name out of `sqlMessage`, not off a driver-provided field, so the
+ *  fake message has to carry it the way a real one does (guidePick.service.ts -
+ *  `invalidMediaReferenceError`). */
 function foreignKeyViolation(constraint: 'guide_picks_photo_media_id_media_id_fk' | 'guide_picks_video_media_id_media_id_fk'): Error {
-  return Object.assign(new Error('violates foreign key constraint'), { code: '23503', constraint });
+  return Object.assign(new Error('Cannot add or update a child row: a foreign key constraint fails'), {
+    errno: 1452,
+    code: 'ER_NO_REFERENCED_ROW_2',
+    sqlMessage: `Cannot add or update a child row: a foreign key constraint fails (\`siders\`.\`guide_picks\`, CONSTRAINT \`${constraint}\` FOREIGN KEY (...) REFERENCES \`media\` (\`id\`))`,
+  });
 }
 
 function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {

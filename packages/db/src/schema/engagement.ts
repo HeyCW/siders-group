@@ -1,15 +1,11 @@
-import { date, index, integer, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { char, date, datetime, index, int, mysqlEnum, mysqlTable, primaryKey, text, uniqueIndex, varchar } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 import { articles } from './articles';
 import { readers } from './readers';
 
-/**
- * `removed` rather than a hard delete, so taking a comment down leaves the row for whoever needs
- * to see what was said. Moderation is manual for this launch — nothing in the product writes this
- * value; a staff member updates the row directly
- * (openspec/changes/add-article-engagement/proposal.md - Moderation).
- */
-export const commentStatus = app.enum('comment_status', ['visible', 'removed']);
+export const COMMENT_STATUS_VALUES = ['visible', 'removed'] as const;
+export type CommentStatusValue = (typeof COMMENT_STATUS_VALUES)[number];
 
 /**
  * One row per reader per article. The unique index is the toggle's correctness guarantee, not a
@@ -21,17 +17,17 @@ export const commentStatus = app.enum('comment_status', ['visible', 'removed']);
  * likes are unattributable — neither is worth keeping as an orphan, and the like count is derived
  * from these rows, so a dangling one would inflate it forever.
  */
-export const likes = app.table(
+export const likes = mysqlTable(
   'likes',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    readerId: uuid('reader_id')
+    id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+    readerId: char('reader_id', { length: 36 })
       .notNull()
       .references(() => readers.id, { onDelete: 'cascade' }),
-    articleId: uuid('article_id')
+    articleId: char('article_id', { length: 36 })
       .notNull()
       .references(() => articles.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
   (table) => ({
     readerArticleUnique: uniqueIndex('likes_reader_article_unique').on(table.readerId, table.articleId),
@@ -51,19 +47,19 @@ export const likes = app.table(
  * admit markup, and the web client renders it into a text node where markup has no render path to
  * escape through.
  */
-export const comments = app.table(
+export const comments = mysqlTable(
   'comments',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    articleId: uuid('article_id')
+    id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+    articleId: char('article_id', { length: 36 })
       .notNull()
       .references(() => articles.id, { onDelete: 'cascade' }),
-    readerId: uuid('reader_id')
+    readerId: char('reader_id', { length: 36 })
       .notNull()
       .references(() => readers.id, { onDelete: 'cascade' }),
     body: text('body').notNull(),
-    status: commentStatus('status').notNull().default('visible'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    status: mysqlEnum('status', COMMENT_STATUS_VALUES).notNull().default('visible'),
+    createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
   (table) => ({
     // Covers the public listing's exact shape: filter by article, order newest first.
@@ -73,24 +69,24 @@ export const comments = app.table(
 
 /**
  * The daily view aggregate from `docs/ARCHITECTURE.md` §9.1. The composite primary key is what
- * `on conflict (article_id, date) do update` targets, so the counter is a single statement with
- * no read-then-write race.
+ * `on duplicate key update` targets, so the counter is a single statement with no read-then-write
+ * race.
  *
- * `date` is a calendar date, written by the database's own `current_date`. That resolves in the
- * database session's timezone (UTC on Supabase) while `admin-dashboard` reports in Asia/Jakarta,
- * so a view recorded at 05:00 Jakarta lands in the previous day's bucket. This shifts which day a
- * view is attributed to, never whether it is counted, and every dashboard figure derived from
- * this table is a rolling multi-day window (design.md - "View counting").
+ * `date` is a calendar date, written by the application as `curdate()` under the connection's UTC
+ * setting (`client.ts` pins `timezone: 'Z'`) while `admin-dashboard` reports in Asia/Jakarta, so a
+ * view recorded at 05:00 Jakarta lands in the previous day's bucket. This shifts which day a view
+ * is attributed to, never whether it is counted, and every dashboard figure derived from this
+ * table is a rolling multi-day window (design.md - "View counting").
  */
-export const articleViewsDaily = app.table(
+export const articleViewsDaily = mysqlTable(
   'article_views_daily',
   {
-    articleId: uuid('article_id')
+    articleId: char('article_id', { length: 36 })
       .notNull()
       .references(() => articles.id, { onDelete: 'cascade' }),
-    date: date('date').notNull(),
-    views: integer('views').notNull().default(0),
-    uniqueViews: integer('unique_views').notNull().default(0),
+    date: date('date', { mode: 'string' }).notNull(),
+    views: int('views').notNull().default(0),
+    uniqueViews: int('unique_views').notNull().default(0),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.articleId, table.date] }),
@@ -102,7 +98,7 @@ export const articleViewsDaily = app.table(
 
 /**
  * Whether a given visitor has already been counted for a given article on a given day. Inserted
- * with `on conflict do nothing`; the affected row count is the entire uniqueness decision
+ * with `insert ignore`; the affected row count is the entire uniqueness decision
  * (`docs/ARCHITECTURE.md` §9.1).
  *
  * `visitorHash` is an HMAC of the caller's address keyed on `SESSION_SECRET`, never the address
@@ -113,14 +109,14 @@ export const articleViewsDaily = app.table(
  * index exists so a retention job can delete aged rows with a range scan instead of a sequential
  * one. No such job is built here; this note is the record that one is owed.
  */
-export const viewSeen = app.table(
+export const viewSeen = mysqlTable(
   'view_seen',
   {
-    articleId: uuid('article_id')
+    articleId: char('article_id', { length: 36 })
       .notNull()
       .references(() => articles.id, { onDelete: 'cascade' }),
-    visitorHash: text('visitor_hash').notNull(),
-    date: date('date').notNull(),
+    visitorHash: varchar('visitor_hash', { length: 128 }).notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.articleId, table.visitorHash, table.date] }),

@@ -13,7 +13,7 @@ export async function getOwnerRoleId(db: Database): Promise<string> {
   if (cachedOwnerRoleId) return cachedOwnerRoleId;
   // No `.limit(1)`: the seed creates exactly one `is_system` role, so a second one means the
   // invariant this whole check rests on is broken. `limit(1)` with no ORDER BY would have
-  // silently picked whichever row Postgres returned first — a non-deterministic choice of who
+  // silently picked whichever row the database returned first — a non-deterministic choice of who
   // counts as Owner — so the ambiguity is surfaced instead of arbitrated.
   const rows = await db.select({ id: roles.id }).from(roles).where(eq(roles.isSystem, true));
   const [row] = rows;

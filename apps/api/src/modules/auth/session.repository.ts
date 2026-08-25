@@ -1,5 +1,5 @@
 import { and, eq, isNull, ne } from 'drizzle-orm';
-import { readers, sessions, users, type Database } from '@siders/db';
+import { newId, readers, sessions, users, type Database } from '@siders/db';
 
 export type SubjectType = 'staff' | 'reader';
 
@@ -64,21 +64,32 @@ function toSessionRow(row: typeof sessions.$inferSelect): SessionRow {
 export function createSessionRepository(db: Database): SessionRepository {
   return {
     async create(input) {
-      const [row] = await db
-        .insert(sessions)
-        .values({
-          subjectId: input.subjectId,
-          subjectType: input.subjectType,
-          refreshTokenHash: input.refreshTokenHash,
-          familyId: input.familyId,
-          expiresAt: input.expiresAt,
-          absoluteExpiresAt: input.absoluteExpiresAt,
-          userAgent: input.userAgent ?? null,
-          ipHash: input.ipHash ?? null,
-        })
-        .returning();
-      if (!row) throw new Error('session insert returned no row');
-      return toSessionRow(row);
+      const id = newId();
+      await db.insert(sessions).values({
+        id,
+        subjectId: input.subjectId,
+        subjectType: input.subjectType,
+        refreshTokenHash: input.refreshTokenHash,
+        familyId: input.familyId,
+        expiresAt: input.expiresAt,
+        absoluteExpiresAt: input.absoluteExpiresAt,
+        userAgent: input.userAgent ?? null,
+        ipHash: input.ipHash ?? null,
+      });
+      // Every field `SessionRow` exposes is already known from `id`/`input` — unlike a caller
+      // that needs a joined view, there's nothing here a re-select would add (`created_at` isn't
+      // part of `SessionRow`), so this runs on every login and refresh-token rotation without
+      // the extra round trip a select-back would cost.
+      return {
+        id,
+        subjectId: input.subjectId,
+        subjectType: input.subjectType,
+        refreshTokenHash: input.refreshTokenHash,
+        familyId: input.familyId,
+        expiresAt: input.expiresAt,
+        absoluteExpiresAt: input.absoluteExpiresAt,
+        revokedAt: null,
+      };
     },
 
     async findByRefreshTokenHash(hash) {

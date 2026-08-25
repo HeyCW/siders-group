@@ -8,6 +8,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: siders
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +54,18 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Migrate the CI MySQL database
+        env:
+          DATABASE_URL: mysql://root@127.0.0.1:3306/siders
+        run: pnpm --filter @siders/db db:migrate
+
       - name: Test
+        env:
+          # Enables apps/api/src/lib/mysqlIntegration.test.ts, which the rest of the suite
+          # (built on in-memory fakes) can't stand in for — see that file's own comment and
+          # openspec/changes/migrate-postgres-to-mysql/design.md's "Risks / trade-offs".
+          RUN_DB_INTEGRATION_TESTS: '1'
+          DATABASE_URL: mysql://root@127.0.0.1:3306/siders
         run: pnpm test
 
       - name: Start mock API (apps/web's `/` needs a reachable API to statically render at build time)

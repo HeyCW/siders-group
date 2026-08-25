@@ -1,9 +1,10 @@
-import { and, asc, count, desc, eq, gt, ilike, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import {
   articles,
   comments,
   commentReports,
   moderationActions,
+  newId,
   readers,
   users,
   type Database,
@@ -100,31 +101,45 @@ export interface CommentReportRow {
  * reader list's comment count.
  *
  * Scoped to unresolved reports at the subquery level via `.where()`, not inside `FILTER` clauses
- * on the aggregates — that lets `comment_reports_open_idx` (partial on `resolved_at is null`)
- * serve the scan. A comment whose reports are all resolved simply produces no row here, and falls
- * to the `LEFT JOIN`'s `NULL`, which every caller already reads as "no open reports".
+ * on the aggregates (MySQL has no `FILTER` clause in any case) — filtered on `isOpen`, the stored
+ * generated column `packages/db/src/schema/moderation.ts` replaces the Postgres partial index
+ * with, rather than on `resolvedAt is null` directly, so `comment_reports_open_idx`'s composite
+ * `(isOpen, commentId)` index is the one that actually serves this scan
+ * (openspec/changes/migrate-postgres-to-mysql/design.md - "the one partial index becomes a
+ * stored generated column"). A comment whose reports are all resolved simply produces no row
+ * here, and falls to the `LEFT JOIN`'s `NULL`, which every caller already reads as "no open
+ * reports".
+ *
+ * `array_agg(distinct reason::text)` has no MySQL equivalent — MySQL has no array type.
+ * `GROUP_CONCAT(DISTINCT ... SEPARATOR ',')` returns one comma-joined string instead, decoded
+ * back into `CommentReportReason[]` in `toReportReasons` below rather than at the SQL layer,
+ * mirroring how `openReportCount`'s `bigint` was already coerced in JS, not SQL.
  */
 function reportAggregateSubquery(db: Executor) {
   return db
     .select({
       commentId: commentReports.commentId,
-      // `.mapWith(Number)` because `count(*)` is `bigint`, and node-postgres returns `bigint` as
-      // a string to avoid precision loss — every other aggregate in this repo coerces the same
-      // way (`analytics.repository.ts`, and `commentCount` in `readerRowSelect` below).
+      // `.mapWith(Number)` because `count(*)` is `bigint`, and the driver returns a `bigint`
+      // aggregate as a string to avoid precision loss (`supportBigNumbers` in
+      // `packages/db/src/client.ts`) — every other aggregate in this repo coerces the same way
+      // (`analytics.repository.ts`, and `commentCount` in `readerRowSelect` below).
       openReportCount: sql<number>`count(*)`.mapWith(Number).as('open_report_count'),
-      // `::text` is load-bearing, not cosmetic. `commentReports.reason` is a user-defined
-      // Postgres enum; its array type is assigned a dynamic OID at `CREATE TYPE` time, and
-      // node-postgres parses array values only by a hardcoded table of built-in OIDs — so without
-      // the cast this arrives as the literal string `'{spam,other}'`, not an array, and the admin
-      // UI's `.join()` on it throws. `text[]` is a built-in array type and is parsed correctly.
-      reportReasons: sql<CommentReportReason[]>`array_agg(distinct ${commentReports.reason}::text)`.as(
-        'report_reasons',
-      ),
+      reportReasons: sql<CommentReportReason[]>`group_concat(distinct ${commentReports.reason} separator ',')`
+        .mapWith(toReportReasons)
+        .as('report_reasons'),
     })
     .from(commentReports)
-    .where(isNull(commentReports.resolvedAt))
+    .where(eq(commentReports.isOpen, true))
     .groupBy(commentReports.commentId)
     .as('report_agg');
+}
+
+/** `group_concat`'s `NULL` (no reports) and `''` (defensive) both mean "no reasons" — an actual
+ *  reason value is never an empty string (`CommentReportReason` is a fixed enum), so this can't
+ *  misread a real reason as absent. */
+function toReportReasons(raw: string | null): CommentReportReason[] {
+  if (raw === null || raw === '') return [];
+  return raw.split(',') as CommentReportReason[];
 }
 
 function commentQueueSelectColumns(reportAgg: ReturnType<typeof reportAggregateSubquery>) {
@@ -259,12 +274,11 @@ export function createModerationRepository(db: Database): ModerationRepository {
    *  the number of reports actually resolved, so `dismissReports` can answer not-found when that
    *  number is zero without a separate existence check. */
   async function resolveOpenReports(tx: Executor, commentId: string, resolvedBy: string): Promise<number> {
-    const resolved = await tx
+    const [result] = await tx
       .update(commentReports)
       .set({ resolvedAt: new Date(), resolvedBy })
-      .where(and(eq(commentReports.commentId, commentId), isNull(commentReports.resolvedAt)))
-      .returning({ id: commentReports.id });
-    return resolved.length;
+      .where(and(eq(commentReports.commentId, commentId), isNull(commentReports.resolvedAt)));
+    return result.affectedRows;
   }
 
   return {
@@ -312,12 +326,8 @@ export function createModerationRepository(db: Database): ModerationRepository {
 
     async setCommentStatus(id, status, logEntry) {
       return db.transaction(async (tx) => {
-        const [updated] = await tx
-          .update(comments)
-          .set({ status })
-          .where(eq(comments.id, id))
-          .returning({ id: comments.id });
-        if (!updated) throw new Error('comment missing immediately before moderation update');
+        const [updateResult] = await tx.update(comments).set({ status }).where(eq(comments.id, id));
+        if (updateResult.affectedRows === 0) throw new Error('comment missing immediately before moderation update');
 
         // Only removal resolves reports — restoring a comment never reopens ones its earlier
         // removal already closed (design.md - Decision 8, "Restoring a comment does not reopen
@@ -348,18 +358,21 @@ export function createModerationRepository(db: Database): ModerationRepository {
     },
 
     async createReport(commentId, reporterId, reason, note) {
-      const [inserted] = await db
-        .insert(commentReports)
-        .values({ commentId, reporterId, reason, note })
-        .returning({
+      const id = newId();
+      await db.insert(commentReports).values({ id, commentId, reporterId, reason, note });
+      const [row] = await db
+        .select({
           id: commentReports.id,
           commentId: commentReports.commentId,
           reason: commentReports.reason,
           note: commentReports.note,
           createdAt: commentReports.createdAt,
-        });
-      if (!inserted) throw new Error('report insert returned no row');
-      return inserted;
+        })
+        .from(commentReports)
+        .where(eq(commentReports.id, id))
+        .limit(1);
+      if (!row) throw new Error('report missing immediately after insert');
+      return row;
     },
 
     async findReaderById(id) {
@@ -380,8 +393,14 @@ export function createModerationRepository(db: Database): ModerationRepository {
       const conditions: SQL[] = [];
       if (filter.status !== 'all') conditions.push(eq(readers.status, filter.status));
       if (filter.search) {
-        const term = `%${filter.search}%`;
-        conditions.push(or(ilike(readers.name, term), ilike(readers.email, term)) as SQL);
+        // `ilike` has no MySQL equivalent; `like` is case-insensitive here for free because
+        // every column in this schema uses the `utf8mb4_0900_ai_ci` collation
+        // (openspec/changes/migrate-postgres-to-mysql/design.md). `%`/`_`/`\` are `LIKE`
+        // metacharacters — escape any the caller typed literally, or a search for e.g. `50%_off`
+        // would silently become a wildcard match instead of a literal one.
+        const escaped = filter.search.replace(/[\\%_]/g, '\\$&');
+        const term = `%${escaped}%`;
+        conditions.push(or(like(readers.name, term), like(readers.email, term)) as SQL);
       }
 
       return readerRowSelect(db, conditions.length > 0 ? and(...conditions) : undefined)
@@ -395,8 +414,8 @@ export function createModerationRepository(db: Database): ModerationRepository {
         // `patch` can legitimately be empty (a caller-side no-op is filtered before this is
         // called), but this function's own contract does not assume that — an empty `set()` is a
         // Drizzle error, so this always has at least one field by the time the service calls it.
-        const [updated] = await tx.update(readers).set(patch).where(eq(readers.id, id)).returning({ id: readers.id });
-        if (!updated) throw new Error('reader missing immediately before moderation update');
+        const [updateResult] = await tx.update(readers).set(patch).where(eq(readers.id, id));
+        if (updateResult.affectedRows === 0) throw new Error('reader missing immediately before moderation update');
 
         await insertActionLog(tx, 'reader', id, logEntries);
 

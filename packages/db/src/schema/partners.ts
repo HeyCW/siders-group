@@ -1,5 +1,6 @@
-import { boolean, integer, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { app } from './schema';
+import { sql } from 'drizzle-orm';
+import { boolean, char, datetime, int, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
+import { newId } from '../newId';
 import { media } from './media';
 
 /**
@@ -12,15 +13,15 @@ import { media } from './media';
  * independent existence outside the ticker — there is no pool to select from
  * (design.md - "Partners are directly-owned entities, not a curated selection").
  */
-export const partners = app.table('partners', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  logoMediaId: uuid('logo_media_id')
+export const partners = mysqlTable('partners', {
+  id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
+  name: varchar('name', { length: 255 }).notNull(),
+  logoMediaId: char('logo_media_id', { length: 36 })
     .notNull()
     .references(() => media.id, { onDelete: 'restrict' }),
   websiteUrl: text('website_url'),
-  sortOrder: integer('sort_order').notNull(),
+  sortOrder: int('sort_order').notNull(),
   isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime('updated_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });

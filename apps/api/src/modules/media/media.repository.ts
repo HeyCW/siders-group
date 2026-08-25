@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { media, type Database } from '@siders/db';
+import { media, newId, type Database } from '@siders/db';
 import { stripUndefined } from '../../lib/stripUndefined.js';
 
 export interface MediaRow {
@@ -40,8 +40,10 @@ export interface MediaRepository {
 export function createMediaRepository(db: Database): MediaRepository {
   return {
     async create(input) {
-      const [row] = await db.insert(media).values(input).returning();
-      if (!row) throw new Error('media insert returned no row');
+      const id = newId();
+      await db.insert(media).values({ ...input, id });
+      const [row] = await db.select().from(media).where(eq(media.id, id)).limit(1);
+      if (!row) throw new Error('media missing immediately after insert');
       return row;
     },
 
@@ -51,7 +53,8 @@ export function createMediaRepository(db: Database): MediaRepository {
     },
 
     async update(id, input) {
-      const [row] = await db.update(media).set(stripUndefined(input)).where(eq(media.id, id)).returning();
+      await db.update(media).set(stripUndefined(input)).where(eq(media.id, id));
+      const [row] = await db.select().from(media).where(eq(media.id, id)).limit(1);
       if (!row) throw new Error('media missing immediately after update');
       return row;
     },

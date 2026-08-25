@@ -1,0 +1,30 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    environment:
+      MYSQL_DATABASE: siders
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-dev-root-password}
+      MYSQL_USER: siders_migrate
+      MYSQL_PASSWORD: ${MYSQL_MIGRATE_PASSWORD:-local-dev-migrate-password}
+      # Read by db/init/01-create-api-user.sh, which creates the least-privilege `siders_api`
+      # credential the running API connects as — kept overridable like the two credentials above,
+      # rather than hardcoded (see that script's own comment).
+      MYSQL_API_PASSWORD: ${MYSQL_API_PASSWORD:-local-dev-api-password}
+    ports:
+      - '3306:3306'
+    volumes:
+      - siders_mysql_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  siders_mysql_data:

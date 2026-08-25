@@ -1,8 +1,9 @@
 import { asc, eq, sql } from 'drizzle-orm';
-import { media, partners, type Database } from '@siders/db';
+import { media, newId, partners, type Database } from '@siders/db';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
 import { isExactIdSet, replaceSortOrder } from '../../lib/replaceSortOrder.js';
+import { withTableWriteLock } from '../../lib/tableWriteLock.js';
 
 export interface PartnerRow {
   id: string;
@@ -46,19 +47,16 @@ export interface PartnerRepository {
   delete(id: string): Promise<void>;
   /**
    * Whole-list reorder in one transaction (specs/partner-management/spec.md - "Partner order is
-   * replaced as a whole list"): takes an EXCLUSIVE table lock, reads the current id set, requires
-   * `partnerIds` to name exactly that set — no more, no fewer — then writes each row's `sortOrder`
-   * from its index in the submitted array. Throws `invalid_partner_set` (leaving the transaction to
-   * roll back, order untouched) when the submitted set doesn't match.
+   * replaced as a whole list"): takes the `partners` named advisory lock (`lib/tableWriteLock.ts`),
+   * reads the current id set, requires `partnerIds` to name exactly that set — no more, no fewer —
+   * then writes each row's `sortOrder` from its index in the submitted array. Throws
+   * `invalid_partner_set` (leaving the transaction to roll back, order untouched) when the
+   * submitted set doesn't match.
    *
-   * **The lock is on the table, not the rows.** `SELECT ... FOR UPDATE` would look sufficient and
-   * is not: Postgres row locks take no predicate or gap locks, so they block a concurrent DELETE
-   * but never an INSERT — a partner created between the read and the validation would leave the
-   * checked set already stale. `LOCK TABLE ... IN EXCLUSIVE MODE` conflicts with the ROW EXCLUSIVE
-   * that INSERT/UPDATE/DELETE take, so it is what actually makes "exactly the current set" true for
-   * the length of the transaction, while still admitting plain reads (ACCESS SHARE). This is the
-   * same reason `lib/replaceOrdering.ts` takes a table lock for the curation tables; only one table
-   * is touched here, so there is no lock-ordering cycle to design around.
+   * The lock uses the same name `create` acquires for its own `max(sortOrder) + 1` read, so the
+   * two exclude each other and a partner created mid-reorder cannot leave the checked set stale —
+   * see `lib/tableWriteLock.ts` for what this trades away relative to the Postgres `LOCK TABLE ...
+   * IN EXCLUSIVE MODE` it replaces (openspec/changes/migrate-postgres-to-mysql/design.md).
    */
   reorder(partnerIds: string[]): Promise<PartnerRow[]>;
   /** Active partners only, in stored order — specs/partner-management/spec.md - "Public partner
@@ -127,29 +125,29 @@ export function createPartnerRepository(db: Database): PartnerRepository {
     async create(input) {
       // Read-then-write on `max(sort_order)`, so it has to be one transaction: two concurrent
       // creates outside one both read the same max and land on the same `sortOrder`, and nothing
-      // downstream would notice — `sort_order` carries no unique constraint. The SHARE lock is what
-      // makes the aggregate hold for the insert; it blocks a concurrent create's aggregate (and a
-      // reorder's EXCLUSIVE) but not ordinary reads.
-      const inserted = await db.transaction(async (tx) => {
-        await tx.execute(sql`LOCK TABLE app.partners IN SHARE ROW EXCLUSIVE MODE`);
-        const [maxRow] = await tx
-          .select({ nextSortOrder: sql<number>`coalesce(max(${partners.sortOrder}), -1) + 1` })
-          .from(partners);
-        if (!maxRow) throw new Error('sortOrder aggregate returned no row');
-        const [row] = await tx
-          .insert(partners)
-          .values({
+      // downstream would notice — `sort_order` carries no unique constraint. The advisory lock is
+      // what makes the aggregate hold for the insert; it uses the same name `reorder` locks below,
+      // so it excludes a concurrent create and a concurrent reorder alike, but not ordinary reads
+      // or an ordinary `update`/`delete` (openspec/changes/migrate-postgres-to-mysql/design.md).
+      const id = await db.transaction(async (tx) => {
+        return withTableWriteLock(tx, 'partners', async () => {
+          const [maxRow] = await tx
+            .select({ nextSortOrder: sql<number>`coalesce(max(${partners.sortOrder}), -1) + 1` })
+            .from(partners);
+          if (!maxRow) throw new Error('sortOrder aggregate returned no row');
+          const newRowId = newId();
+          await tx.insert(partners).values({
+            id: newRowId,
             name: input.name,
             logoMediaId: input.logoMediaId,
             websiteUrl: input.websiteUrl ?? null,
             isActive: input.isActive ?? true,
             sortOrder: maxRow.nextSortOrder,
-          })
-          .returning({ id: partners.id });
-        if (!row) throw new Error('partner insert returned no row');
-        return row;
+          });
+          return newRowId;
+        });
       });
-      const row = await findByIdJoined(inserted.id);
+      const row = await findByIdJoined(id);
       if (!row) throw new Error('partner missing immediately after insert');
       return row;
     },
@@ -161,13 +159,11 @@ export function createPartnerRepository(db: Database): PartnerRepository {
     },
 
     async update(id, input) {
-      const [updated] = await db
+      await db
         .update(partners)
         .set({ ...stripUndefined(input), updatedAt: new Date() })
-        .where(eq(partners.id, id))
-        .returning({ id: partners.id });
-      if (!updated) throw new Error('partner missing immediately after update');
-      const row = await findByIdJoined(updated.id);
+        .where(eq(partners.id, id));
+      const row = await findByIdJoined(id);
       if (!row) throw new Error('partner missing immediately after update');
       return row;
     },
@@ -180,7 +176,7 @@ export function createPartnerRepository(db: Database): PartnerRepository {
       return replaceSortOrder({
         db,
         ids: partnerIds,
-        table: 'app.partners',
+        table: 'partners',
         updateSortOrder: (tx, id, sortOrder) =>
           tx.update(partners).set({ sortOrder, updatedAt: new Date() }).where(eq(partners.id, id)),
         selectJoined: (tx) =>

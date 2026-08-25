@@ -4,6 +4,16 @@ import type { ArticleStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { replaceOrdering, type OrderingExecutor } from '../../lib/replaceOrdering.js';
 
+/**
+ * Wider than `OrderingExecutor`: `selectJoined` below is reused both as a `replaceOrdering`
+ * config field (always called with its transaction's `tx`, which is exactly what
+ * `OrderingExecutor` requires) and standalone from `list()`, where there's no transaction to be
+ * in and the plain pool is correct. `OrderingExecutor` itself stays transaction-only so
+ * `ReplaceOrderingConfig`'s fields keep catching a bare-pool passed where the lock's correctness
+ * would silently break.
+ */
+type Executor = Database | OrderingExecutor;
+
 export interface HomeCurationEntryRow {
   articleId: string;
   position: number;
@@ -29,7 +39,7 @@ function invalidArticleReferenceError(): AppError {
   return new AppError('One or more article ids do not exist', 400, 'invalid_article_reference');
 }
 
-async function selectJoined(executor: OrderingExecutor): Promise<HomeCurationEntryRow[]> {
+async function selectJoined(executor: Executor): Promise<HomeCurationEntryRow[]> {
   return executor
     .select({
       articleId: homeCuration.articleId,
@@ -58,8 +68,8 @@ export function createHomeCurationRepository(db: Database): HomeCurationReposito
       return replaceOrdering({
         db,
         ids: articleIds,
-        referencedTable: 'app.articles',
-        orderingTable: 'app.home_curation',
+        referencedTable: 'articles',
+        orderingTable: 'home_curation',
         deleteAll: (tx) => tx.delete(homeCuration),
         insertOrdered: (tx, ids) =>
           tx.insert(homeCuration).values(ids.map((articleId, position) => ({ articleId, position }))),

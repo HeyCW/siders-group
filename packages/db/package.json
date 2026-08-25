@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.36.4",
-    "pg": "^8.12.0"
+    "mysql2": "^3.11.5",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@siders/config": "workspace:*",
-    "@types/pg": "^8.11.6",
     "drizzle-kit": "^0.28.1",
     "typescript": "^5.5.3",
     "vitest": "^2.0.2"

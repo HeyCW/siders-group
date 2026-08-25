@@ -1,6 +1,6 @@
 # Siders — Technical Architecture
 
-**Stack:** React (Next.js + Vite) · Node.js (Express) · PostgreSQL on Supabase
+**Stack:** React (Next.js + Vite) · Node.js (Express) · MySQL 8.0
 **Companion to:** Siders Website Project Spec v1.0
 **Version:** 1.0
 **Date:** 3 August 2026
@@ -9,21 +9,23 @@
 
 ## 1. The decision that shapes everything
 
-**Supabase is the managed Postgres, and nothing else.** No Supabase Auth, no PostgREST, no `supabase-js` anywhere in the codebase. Google sign-in is implemented directly against Google's OAuth 2.0 endpoints by the Node API, which also issues and owns every session.
+**MySQL is the database, and nothing else.** No managed-platform auth product, no REST-over-the-database surface, no client SDK anywhere in the codebase. Google sign-in is implemented directly against Google's OAuth 2.0 endpoints by the Node API, which also issues and owns every session.
+
+This project originally ran on Supabase-managed Postgres; `openspec/changes/migrate-postgres-to-mysql` moved the database engine to MySQL 8.0 while changing nothing about where authority lives. That move is not a one-command swap — see that change's `design.md` for what had to be redesigned (identifier generation, table-level locking, constraint-violation translation) rather than merely re-syntaxed, and `db/README.md` for the least-privilege grants that replace Postgres Row Level Security.
 
 This is a coherent position, and it has real advantages:
 
-- **No vendor lock-in on identity.** The user table is yours. Moving off Supabase later is a `pg_dump` and a connection string change, not an auth migration.
-- **One security model instead of two.** Every request is authorised in one place, by code you can read in a pull request, rather than split between Express middleware and RLS policies.
-- **No publishable key in the browser at all.** The Supabase REST surface is simply never used, so it is never an attack surface.
+- **No vendor lock-in on identity.** The user table is yours. Moving the database again later is a data export and a connection string change, not an auth migration.
+- **One security model instead of two.** Every request is authorised in one place, by code you can read in a pull request, rather than split between Express middleware and a database-level policy layer.
+- **No publishable key in the browser at all.** No managed-platform REST surface is ever used, so it is never an attack surface.
 
 The costs, stated plainly so nobody is surprised in week 11:
 
-- Google OAuth, session issuance, refresh rotation, staff account creation and password reset are now **your code to write and maintain** — roughly 1.5 to 2 weeks that Supabase Auth would have absorbed.
+- Google OAuth, session issuance, refresh rotation, staff account creation and password reset are now **your code to write and maintain** — roughly 1.5 to 2 weeks that a managed auth product would have absorbed.
 - Staff have no unauthenticated password recovery. Onboarding and reset both run through an admin (§5.4), so a staff member who forgets their password needs one, and losing every Owner account at once needs a manual database edit.
 - Token rotation, reuse detection and cookie configuration are easy to get subtly wrong. §5 specifies them tightly for that reason.
 
-**In one line:** Supabase stores rows; Node owns identity, authorisation and every write.
+**In one line:** MySQL stores rows; Node owns identity, authorisation and every write.
 
 ---
 
@@ -49,11 +51,11 @@ The costs, stated plainly so nobody is surprised in week 11:
     └─────────────────────────┘             │          │
                                             │          │
                           Drizzle over      │          │  S3 SDK
-                          Supavisor :6543   ▼          ▼
+                          mysql2 :3306      ▼          ▼
                             ┌───────────────────┐  ┌────────────────┐
-                            │ Supabase Postgres │  │ Object storage │
-                            │ schema `app`      │  │ + image CDN    │
-                            │ not API-exposed   │  └────────────────┘
+                            │  MySQL 8.0        │  │ Object storage │
+                            │  database `siders`│  │ + image CDN    │
+                            │  DML-only API user│  └────────────────┘
                             └───────────────────┘
 ```
 
@@ -77,10 +79,10 @@ siders/
 │  ├─ db/                   Drizzle schema, migrations, client
 │  ├─ contracts/            Zod schemas + inferred types, shared by all three
 │  └─ config/              tsconfig, eslint, tailwind presets
-├─ supabase/
-│  ├─ config.toml           local stack definition
-│  ├─ migrations/           SQL applied by CI
-│  └─ seed.sql              categories, sub-brands, first Owner
+├─ docker-compose.yml       local MySQL service
+├─ db/
+│  ├─ migrations/           SQL applied by CI, incl. the permission/role/sub-brand catalog
+│  └─ seed.sql              local-dev only — the first Owner user
 └─ .github/workflows/
 ```
 
@@ -138,75 +140,75 @@ Written by us, owned by us. Three flows: Google sign-in for readers, email + pas
 
 ### 5.1 Identity tables
 
-No `auth.users` to reference any more. Identity lives in the `app` schema like everything else.
+No `auth.users` to reference any more. Identity lives alongside everything else, one flat MySQL database rather than a non-default Postgres schema — that separation existed only to hide tables from Supabase's REST surface (§6.3, previous revision), which no longer exists to hide anything from.
 
 ```sql
-create table app.roles (               -- named bundles of permissions
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null unique,
-  slug        text not null unique,
+create table roles (                   -- named bundles of permissions
+  id          char(36) primary key,               -- app-generated UUIDv7, not a server default
+  name        varchar(191) not null unique,
+  slug        varchar(191) not null unique,
   is_system   boolean not null default false,  -- true only for the seeded Owner row
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  created_at  datetime(3) not null,
+  updated_at  datetime(3) not null
 );
 
-create table app.permissions (         -- fixed catalog, seeded by migration only
-  id           uuid primary key default gen_random_uuid(),
-  key          text not null unique,   -- news.manage, role.manage, settings.manage, …
+create table permissions (             -- fixed catalog, seeded by migration only
+  id           char(36) primary key,
+  `key`        varchar(191) not null unique,   -- news.manage, role.manage, settings.manage, …
   description  text not null
 );
 
-create table app.role_permissions (
-  role_id        uuid not null references app.roles(id) on delete cascade,
-  permission_id  uuid not null references app.permissions(id) on delete cascade,
+create table role_permissions (
+  role_id        char(36) not null references roles(id) on delete cascade,
+  permission_id  char(36) not null references permissions(id) on delete cascade,
   primary key (role_id, permission_id)
 );
 
-create table app.users (               -- staff only
-  id                    uuid primary key default gen_random_uuid(),
-  email                 citext not null unique,
-  password_hash         text not null,        -- always set; creation issues a temporary password
+create table users (                   -- staff only
+  id                    char(36) primary key,
+  email                 varchar(320) not null unique,  -- case-insensitive via utf8mb4_0900_ai_ci, no citext needed
+  password_hash         varchar(255) not null,  -- always set; creation issues a temporary password
   must_change_password  boolean not null default true,
-  name                  text not null,
-  role_id               uuid not null references app.roles(id),   -- exactly one role
-  status                app.user_status not null default 'active',   -- active | disabled
-  last_login_at         timestamptz,
-  created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now()
+  name                  varchar(255) not null,
+  role_id               char(36) not null references roles(id),   -- exactly one role
+  status                enum('active','disabled') not null default 'active',
+  last_login_at         datetime(3),
+  created_at            datetime(3) not null,
+  updated_at            datetime(3) not null
 );
 
-create table app.readers (             -- Google-authenticated readers
-  id                uuid primary key default gen_random_uuid(),
-  google_sub        text not null unique,   -- Google's stable subject ID
-  email             citext not null,
+create table readers (                 -- Google-authenticated readers
+  id                char(36) primary key,
+  google_sub        varchar(128) not null unique,   -- Google's stable subject ID
+  email             varchar(320) not null,
   email_verified    boolean not null default false,
-  name              text not null,
+  name              varchar(255) not null,
   avatar_url        text,
-  status            app.reader_status not null default 'active',
-  muted_until       timestamptz,
-  last_login_at     timestamptz,
-  created_at        timestamptz not null default now()
+  status            enum('active','banned') not null default 'active',
+  muted_until       datetime(3),
+  last_login_at     datetime(3),
+  created_at        datetime(3) not null
 );
 
-create table app.sessions (            -- both audiences, one table
-  id                  uuid primary key default gen_random_uuid(),  -- the `sid` claim
-  subject_id          uuid not null,               -- polymorphic: no FK possible
-  subject_type        app.subject_type not null,   -- staff | reader
-  refresh_token_hash  text not null unique,
-  family_id           uuid not null,               -- rotation lineage
+create table sessions (                -- both audiences, one table
+  id                  char(36) primary key,        -- the `sid` claim
+  subject_id          char(36) not null,            -- polymorphic: no FK possible
+  subject_type        enum('staff','reader') not null,
+  refresh_token_hash  varchar(128) not null unique,
+  family_id           char(36) not null,            -- rotation lineage
   user_agent          text,
-  ip_hash             text,                        -- HMAC-SHA256 keyed on SESSION_SECRET,
+  ip_hash             varchar(128),                 -- HMAC-SHA256 keyed on SESSION_SECRET,
                                                    -- never the address itself: an IPv4 is
                                                    -- only 2^32 candidates, so an unkeyed
                                                    -- digest is pseudonymous in name only
-  expires_at          timestamptz not null,        -- sliding
-  absolute_expires_at timestamptz not null,        -- hard cap, never extended
-  revoked_at          timestamptz,
-  created_at          timestamptz not null default now()
+  expires_at          datetime(3) not null,        -- sliding
+  absolute_expires_at datetime(3) not null,        -- hard cap, never extended
+  revoked_at          datetime(3),
+  created_at          datetime(3) not null
 );
 ```
 
-`subject_id` is polymorphic across `app.users` and `app.readers`, so it cannot carry a
+`subject_id` is polymorphic across `users` and `readers`, so it cannot carry a
 foreign key. Every lookup therefore filters on `subject_type` and joins the correct
 subject table, re-validating that the row still exists and is active. A session whose
 subject has vanished fails closed.
@@ -238,7 +240,7 @@ Browser              API                          Google
    │                   │<────────────────────────────│
    │                   │ verify id_token vs Google   │
    │                   │ JWKS: iss, aud, exp, nonce  │
-   │                   │ upsert app.readers          │
+   │                   │ upsert readers               │
    │                   │ issue OUR session cookies   │
    │  302 to ?next=... │                             │
    │<──────────────────│                             │
@@ -290,7 +292,7 @@ res.cookie('sid_at', accessJwt, {
 
 **Cookies, not localStorage.** A token in `localStorage` is readable by any injected script; one XSS becomes total account takeover. httpOnly cookies survive that. The cost is CSRF exposure, handled by `SameSite=Lax` plus a double-submit CSRF token on state-changing requests.
 
-The CSRF token is signed with `SESSION_SECRET` **and bound to the session id it was issued for**. Binding is what retires the previous token on rotation: refresh mints a new `app.sessions` row, so the caller's next request carries a new `sid` and a token signed against the old one no longer matches. The check stays stateless — it compares against the `sid` claim `authenticate` already verified, never a database read. On `POST /auth/refresh` the access credential has usually expired, leaving no `sid` to bind against; there the signature alone carries the request, and the response immediately issues a token bound to the new session.
+The CSRF token is signed with `SESSION_SECRET` **and bound to the session id it was issued for**. Binding is what retires the previous token on rotation: refresh mints a new `sessions` row, so the caller's next request carries a new `sid` and a token signed against the old one no longer matches. The check stays stateless — it compares against the `sid` claim `authenticate` already verified, never a database read. On `POST /auth/refresh` the access credential has usually expired, leaving no `sid` to bind against; there the signature alone carries the request, and the response immediately issues a token bound to the new session.
 
 **Put the API on a subdomain of the same registrable domain** — `api.siders.id` alongside `siders.id`. Different registrable domains force `SameSite=None`, which requires third-party cookies that browsers are actively killing. Getting this wrong is discovered late and is painful to unwind.
 
@@ -298,16 +300,16 @@ The CSRF token is signed with `SESSION_SECRET` **and bound to the session id it 
 
 The access token carries a **session id (`sid`) and deliberately no role or permission data.** Anything embedded in a 15-minute credential is stale for up to 15 minutes, which is unacceptable for a demotion or an account disable. Role and permission state is therefore resolved per request instead — see §5.5.
 
-Access tokens are signed with EdDSA using a key pair held by the API, and verification is local. Anonymous and public traffic touches the database not at all. Gated routes pay one indexed lookup, and refresh touches `app.sessions`.
+Access tokens are signed with EdDSA using a key pair held by the API, and verification is local. Anonymous and public traffic touches the database not at all. Gated routes pay one indexed lookup, and refresh touches `sessions`.
 
-**Rotating the signing key does not end sessions.** It invalidates access tokens only; refresh tokens are opaque `app.sessions` rows unaffected by the key, so every client silently refreshes and carries on. Key rotation is not the incident response for a stolen session — bulk revocation is, which is why revoking every session for a subject, and every session system-wide, is a first-class operation rather than an afterthought. Per-subject revocation runs automatically on account disable and on any password set; the system-wide sweep is `POST /auth/sessions/revoke-all`, gated on `settings.manage`, and it ends the caller's own session along with everyone else's.
+**Rotating the signing key does not end sessions.** It invalidates access tokens only; refresh tokens are opaque `sessions` rows unaffected by the key, so every client silently refreshes and carries on. Key rotation is not the incident response for a stolen session — bulk revocation is, which is why revoking every session for a subject, and every session system-wide, is a first-class operation rather than an afterthought. Per-subject revocation runs automatically on account disable and on any password set; the system-wide sweep is `POST /auth/sessions/revoke-all`, gated on `settings.manage`, and it ends the caller's own session along with everyone else's.
 
 ### 5.4 Staff — admin-created, temporary password
 
 No public route creates a staff account, and no email is sent at any point in the staff lifecycle.
 
 1. A caller holding `user.manage` creates the user, supplying an email, a name, and a role — but **not** a password. Granting the **Owner** role additionally requires the caller to already hold it, otherwise `user.manage` alone would be a complete path to Owner.
-2. The API generates a temporary password (≥128 bits of entropy, from `node:crypto`), hashes it with **Argon2id** — memory cost 19 MiB, 2 iterations, parallelism 1 (OWASP baseline) — writes `app.users` with `status = 'active'` and `must_change_password = true`, and returns the plaintext **exactly once**, in the creation response. The operator relays it to the staff member out of band. No later read discloses it again.
+2. The API generates a temporary password (≥128 bits of entropy, from `node:crypto`), hashes it with **Argon2id** — memory cost 19 MiB, 2 iterations, parallelism 1 (OWASP baseline) — writes `users` with `status = 'active'` and `must_change_password = true`, and returns the plaintext **exactly once**, in the creation response. The operator relays it to the staff member out of band. No later read discloses it again.
 3. The staff member signs in with it and receives a session, but every endpoint declaring staff identity or a named permission refuses them — with a distinct error code, not a generic denial — until they replace the password. Only `POST /staff/me/password` and `GET /users/me` are exempt, so the change can actually be made. **The Owner role does not bypass this**: it is not a permission check, and an Owner holding an admin-issued password is exactly the case it exists for.
 4. Changing the password clears `must_change_password` and revokes every *other* session for the account, leaving the caller's own alive so the change does not sign them out of the request that made it.
 
@@ -376,7 +378,7 @@ export async function authenticate(req, _res, next) {
 
 `requireStaff()` rejects anything where `subjectType !== 'staff'`, so a reader credential can never reach an admin handler — the check is on credential type, not on a role string that might be absent. It takes no role argument: role-name checks are exactly what `requirePermission` replaces.
 
-`requirePermission(key)` resolves the caller's **current** role from `app.users.role_id` and that role's permissions from `app.role_permissions` on every request, never from the credential. That is what makes revocation honest: sign-out, account disable, reader ban, role reassignment, and permission edits all bite on the caller's very next gated request rather than lingering until a 15-minute credential expires. The cost is one indexed lookup on admin and reader-authored traffic; public reads stay DB-free. No in-process cache — with more than one API instance, in-process invalidation is silently wrong, and correctness here outranks a saved query.
+`requirePermission(key)` resolves the caller's **current** role from `users.role_id` and that role's permissions from `role_permissions` on every request, never from the credential. That is what makes revocation honest: sign-out, account disable, reader ban, role reassignment, and permission edits all bite on the caller's very next gated request rather than lingering until a 15-minute credential expires. The cost is one indexed lookup on admin and reader-authored traffic; public reads stay DB-free. No in-process cache — with more than one API instance, in-process invalidation is silently wrong, and correctness here outranks a saved query.
 
 **The Owner role satisfies every permission check**, so role administration can never lock out every staff member. Recognition is by the **seeded row's immutable id**, resolved once at boot — never by a name or slug. That distinction is load-bearing: if a caller-editable string granted the bypass, any holder of `role.manage` could create a role called "Owner" and inherit the entire catalog. For the same reason `is_system` and role identity are set only by migration and rejected from every request payload, assigning the Owner role requires already holding it, and no staff member may change their own role or disable their own account.
 
@@ -388,96 +390,71 @@ Public endpoints must not make access decisions from `req.auth`. A public route 
 
 ### 6.1 Drizzle, not Prisma
 
-Drizzle is the better fit here for reasons specific to Supabase: migrations are plain readable SQL, RLS policies can be declared beside the table they protect, and there is no engine binary or pooler workaround to manage. Prisma is a defensible alternative if the team already knows it, but its pgBouncer handling adds friction that buys nothing on this project.
+Drizzle stays the ORM through the MySQL move (`openspec/changes/migrate-postgres-to-mysql`): migrations are plain readable SQL either way, and there is no engine binary to manage. Prisma is a defensible alternative if the team already knows it.
 
-<cite index="27-1">The common pattern is supabase-js for auth and storage, Drizzle for the real data queries</cite> — which is exactly the split here.
+### 6.2 Connection string
 
-### 6.2 Connection strings — get this right or nothing works
-
-Supabase exposes the database on two ports and they are not interchangeable.
-
-| Purpose | Port | Mode | Env var |
-|---|---|---|---|
-| Runtime queries | **6543** | Transaction (Supavisor) | `DATABASE_URL` |
-| Migrations, `drizzle-kit`, psql | **5432** | Session / direct | `DIRECT_URL` |
-
-<cite index="17-1">Migrations must use the direct URL, because Supavisor's transaction mode does not support the multi-statement transactions migrations require.</cite> Pointing `drizzle-kit` at 6543 produces failures that look like syntax errors and aren't.
+One `mysql://` connection string, `DATABASE_URL`, for both runtime queries and migrations. MySQL has no pooled/direct-connection split the way Supabase's Postgres did (§6.2 previously documented a `DATABASE_URL`/`DIRECT_URL` pair for exactly that split), so there is nothing analogous to get wrong here.
 
 ```ts
 // packages/db/src/client.ts
-import postgres from 'postgres';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import * as schema from './schema';
+import { drizzle } from 'drizzle-orm/mysql2';
+import { createPool } from 'mysql2/promise';
+import * as schema from './schema/index.js';
 
-const sql = postgres(env.DATABASE_URL, {
-  prepare: false,     // REQUIRED — transaction pooling breaks prepared statements
-  max: 10,
-  idle_timeout: 20,
+const pool = createPool({
+  uri: env.DATABASE_URL,
+  timezone: 'Z',          // REQUIRED — every datetime column is stored and read as UTC
+  supportBigNumbers: true,
 });
 
-export const db = drizzle(sql, { schema });
+export const db = drizzle(pool, { schema, mode: 'default' });
 ```
 
-`prepare: false` is not optional. Without it the app works in local development against direct Postgres and fails intermittently in production, which is the worst possible failure shape.
+`timezone: 'Z'` is not optional. Every `datetime` column in the schema is written and read assuming the connection's session time zone is UTC; a connection in any other zone would silently shift every timestamp it touches.
 
-> Also note the shared pooler is IPv4; the direct connection is IPv6 unless the IPv4 add-on is enabled. If CI cannot reach port 5432, this is usually why.
+### 6.3 Least-privilege grants — the security decision that matters most
 
-### 6.3 Schema isolation — the security decision that matters most
+**The API's database credential can read and write rows, and nothing else.** It holds `SELECT, INSERT, UPDATE, DELETE` on the application database — no `CREATE`, `ALTER`, `DROP`, or grant-management privilege. Migrations run under a separate credential that holds full DDL (`db/README.md`).
 
-**All application tables live in an `app` schema, and `app` is not added to Supabase's exposed schemas.**
+This replaces Postgres Row Level Security, which has no MySQL equivalent. RLS's own job in the Postgres design was defending against a hypothetical *second* direct-connection client (a BI tool, a support script) — the API itself was always exempt from it — so the least-privilege grant defends against the same scenario the same way: a connection using the wrong credential, or one that leaked, still can't alter the schema or grant itself more, even though (unlike RLS's default-deny) it can read and write every row. There is only one intended writer either way (§2's trust boundary), so this is not a narrowing of what the *application* can do — only of what a connection with the wrong credential could do.
 
-Since nothing in the browser ever holds a Supabase key, PostgREST is not part of the design at all. Removing the schema from the exposed list closes it completely — the REST surface has nothing to serve even if a key were somehow obtained.
-
-RLS is still enabled on every table as a second layer: default deny, no policies granted to `anon` or `authenticated`. The API connects as a role that owns the tables and is unaffected. The cost is one line per table, and it means a future decision to expose something starts from closed rather than open.
-
-```sql
-create schema if not exists app;
-
-create table app.articles (
-  id            uuid primary key default gen_random_uuid(),
-  title         text not null,
-  slug          text not null unique,
-  body_json     jsonb not null,
-  body_html     text  not null,
-  status        app.article_status not null default 'draft',
-  author_id     uuid not null references app.users(id),
-  category_id   uuid references app.categories(id),
-  published_at  timestamptz,
-  search_vector tsvector generated always as (
-    setweight(to_tsvector('simple', coalesce(title,'')),   'A') ||
-    setweight(to_tsvector('simple', coalesce(excerpt,'')), 'B')
-  ) stored,
-  created_at    timestamptz not null default now()
-);
-
-alter table app.articles enable row level security;   -- default deny, no policies
-
-create index articles_search_idx    on app.articles using gin (search_vector);
-create index articles_published_idx on app.articles (published_at desc)
-  where status = 'published';
+```ts
+// packages/db/src/schema/articles.ts (abridged)
+export const articles = mysqlTable('articles', {
+  id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),   // app-generated UUIDv7
+  title: text('title').notNull(),
+  slug: varchar('slug', { length: 255 }).notNull().unique(),
+  bodyJson: json('body_json').notNull(),
+  bodyHtml: text('body_html').notNull(),
+  status: mysqlEnum('status', ARTICLE_STATUS_VALUES).notNull().default('draft'),
+  authorId: char('author_id', { length: 36 }).notNull().references(() => users.id),
+  publishedAt: datetime('published_at', { fsp: 3 }),
+  createdAt: datetime('created_at', { fsp: 3 }).notNull().$defaultFn(() => new Date()),
+}, (table) => ({
+  statusPublishedAtIdx: index('articles_status_published_at_idx').on(table.status, table.publishedAt),
+}));
 ```
 
-The partial index matters: almost every public query filters to published articles, and indexing only those keeps it small.
+Two things that don't carry over from the Postgres version verbatim: primary keys have no `uuid` column type or server-side default in MySQL, so every table generates its id in application code (`newId()`, UUIDv7 — time-ordered, so sequential inserts append to the clustered index rather than fragmenting it); and there is no partial index, so the one place the schema used to filter an index (`WHERE resolved_at IS NULL` on `comment_reports`) uses a stored generated column instead (`packages/db/src/schema/moderation.ts`).
 
 ### 6.4 Migrations
 
-Drizzle schema in TypeScript is the source of truth. `drizzle-kit generate` emits SQL into `supabase/migrations/`, and the Supabase CLI applies it — one migration history, readable in review.
+Drizzle schema in TypeScript is the source of truth. `drizzle-kit generate` emits SQL into `db/migrations/`, applied with `drizzle-kit migrate` — one migration history, readable in review. Run migrations against a development database first, so production only ever sees one that has already succeeded once. Schema changes and data backfills go in separate migrations and never mix.
 
-<cite index="26-1">Run two Supabase projects, development and production, and apply migrations to development first, so production only ever sees a migration that has already succeeded once.</cite> Schema changes and data backfills go in separate migrations and never mix.
-
-> **Free-tier gotcha:** free projects pause after a week of inactivity. Acceptable for a dev project; not acceptable for the staging environment a client reviews on. Staging goes on a paid plan or gets a keep-alive ping.
+The fixed permission catalog, the Owner system role, and the sub-brand catalog are seeded by a migration (`db/migrations/0001_seed_permission_catalog.sql`), not by `db/seed.sql` — production needs that data too. `db/seed.sql` is local-dev only: it seeds the first Owner *user*.
 
 ---
 
 ## 7. Storage
 
-**Current state (`add-news-management-system`): article media is stored on the API's own local filesystem, not R2.** `app.media` records a storage-root-relative path (`MEDIA_STORAGE_PATH`, date-sharded as `YYYY/MM/<uuid>.<ext>`); the public URL is derived at map time as `MEDIA_PUBLIC_BASE_URL + '/' + storage_path`, never stored. Uploads are validated server-side against an image-type allowlist and a size cap, with the real type determined by sniffing the file's leading bytes rather than trusting the client's declared `Content-Type` — the same discipline the R2 design below describes, just applied to a local write instead of a presigned PUT. This is a deliberate, scoped decision (see `openspec/changes/add-news-management-system/design.md` - "Media storage"), not a partial implementation of the section below: local storage is not replica-safe, so a deployment running this must either mount `MEDIA_STORAGE_PATH` on shared durable storage or run a single API instance. Because the URL is always derived rather than stored, migrating to R2 later touches the media mapper and configuration, not the `app.media` rows or any article that references them.
+**Current state (`add-news-management-system`): article media is stored on the API's own local filesystem, not R2.** `media` records a storage-root-relative path (`MEDIA_STORAGE_PATH`, date-sharded as `YYYY/MM/<uuid>.<ext>`); the public URL is derived at map time as `MEDIA_PUBLIC_BASE_URL + '/' + storage_path`, never stored. Uploads are validated server-side against an image-type allowlist and a size cap, with the real type determined by sniffing the file's leading bytes rather than trusting the client's declared `Content-Type` — the same discipline the R2 design below describes, just applied to a local write instead of a presigned PUT. This is a deliberate, scoped decision (see `openspec/changes/add-news-management-system/design.md` - "Media storage"), not a partial implementation of the section below: local storage is not replica-safe, so a deployment running this must either mount `MEDIA_STORAGE_PATH` on shared durable storage or run a single API instance. Because the URL is always derived rather than stored, migrating to R2 later touches the media mapper and configuration, not the `media` rows or any article that references them.
 
 The R2 design below remains the intended eventual target and is unchanged as a plan; it is simply not what this repository currently runs.
 
 ---
 
-With Supabase scoped to the database, media goes to an S3-compatible store. **Cloudflare R2** is the recommendation — S3 API compatible, zero egress fees, and an image resizing service in front of it. Backblaze B2 or plain S3 work identically; the SDK code does not change.
+With the database scoped to rows, media goes to an S3-compatible store. **Cloudflare R2** is the recommendation — S3 API compatible, zero egress fees, and an image resizing service in front of it. Backblaze B2 or plain S3 work identically; the SDK code does not change.
 
 | Bucket / prefix | Access | Contents |
 |---|---|---|
@@ -485,7 +462,7 @@ With Supabase scoped to the database, media goes to an S3-compatible store. **Cl
 | `avatars/` | Public read via CDN | Reader avatars cached from Google at first sign-in |
 | `private/` | Presigned GET only | Draft assets, analytics exports |
 
-Upload keeps large files off the Node process entirely: the client asks the API for permission, the API validates declared MIME type and size and returns a **presigned PUT URL**, the browser uploads directly to R2, then calls back so the API records the row in `app.media`. Node never proxies bytes.
+Upload keeps large files off the Node process entirely: the client asks the API for permission, the API validates declared MIME type and size and returns a **presigned PUT URL**, the browser uploads directly to R2, then calls back so the API records the row in `media`. Node never proxies bytes.
 
 ```ts
 const url = await getSignedUrl(s3, new PutObjectCommand({
@@ -533,7 +510,7 @@ Unlike the reader-facing 401 → refresh → retry cycle above, the admin fetch 
 
 The editor is the centrepiece: Tiptap with a slash-command extension, bubble menu, drag handles, markdown input rules, and an upload extension wired to the presigned-URL flow. Autosave is a debounced mutation with optimistic status display.
 
-The moderation queue polls every 30 seconds. Without Supabase Realtime, a websocket layer would be the only alternative, and it is not worth building for a queue two people look at. (Planned, not built — `openspec/changes/add-community-moderation`.)
+The moderation queue polls every 30 seconds. Without a managed realtime/streaming layer, a websocket layer would be the only alternative, and it is not worth building for a queue two people look at. (Planned, not built — `openspec/changes/add-community-moderation`.)
 
 ---
 
@@ -545,14 +522,14 @@ The one endpoint that must be cheap, since it fires on every article read.
 
 ```sql
 -- single statement, no read-then-write race
-insert into app.article_views_daily (article_id, date, views, unique_views)
-values ($1, current_date, 1, $2::int)
-on conflict (article_id, date) do update
-  set views        = app.article_views_daily.views + 1,
-      unique_views = app.article_views_daily.unique_views + $2::int;
+insert into article_views_daily (article_id, date, views, unique_views)
+values (?, curdate(), 1, ?)
+on duplicate key update
+  views        = views + 1,
+  unique_views = unique_views + values(unique_views);
 ```
 
-Uniqueness is decided first by an insert into `app.view_seen` with `on conflict do nothing`; the row count tells the caller whether this visitor is new today. Two statements, one transaction, no locks held.
+Uniqueness is decided first by an insert into `view_seen` with `insert ignore`; the affected-row count tells the caller whether this visitor is new today. Two statements, one transaction, no locks held.
 
 ### 9.2 Error contract
 
@@ -576,15 +553,15 @@ Per-route buckets keyed by user ID when signed in, hashed IP when not. Comments 
 
 ## 10. Environments
 
-| | Supabase project | Web | Admin | API |
+| | Database | Web | Admin | API |
 |---|---|---|---|---|
-| Local | `supabase start` (Docker) or plain Postgres | :3000 | :5173 | :4000 |
-| Staging | `siders-staging` (paid) | `staging.siders.id` | `admin-staging.siders.id` | `api-staging.siders.id` |
-| Production | `siders-prod` | `siders.id` | `admin.siders.id` | `api.siders.id` |
+| Local | `pnpm db:up` (Docker Compose, MySQL 8.0) | :3000 | :5173 | :4000 |
+| Staging | managed MySQL | `staging.siders.id` | `admin-staging.siders.id` | `api-staging.siders.id` |
+| Production | managed MySQL | `siders.id` | `admin.siders.id` | `api.siders.id` |
 
 All three production hostnames sit under one registrable domain so session cookies work with `SameSite=Lax`. Vercel for the two frontends, Fly.io or Railway for the API.
 
-`supabase start` still earns its place locally: it runs Postgres in Docker with Studio attached, so no developer needs cloud credentials. Only the database container is used.
+`pnpm db:up` earns its place locally: it runs `docker-compose.yml`'s MySQL service, so no developer needs cloud credentials. Only the database container is used.
 
 ### Environment variables
 
@@ -594,8 +571,7 @@ NEXT_PUBLIC_API_URL=https://api.siders.id
 NEXT_PUBLIC_CDN_URL=https://cdn.siders.id
 
 # apps/api  (server only)
-DATABASE_URL=postgresql://...pooler.supabase.com:6543/postgres
-DIRECT_URL=postgresql://...supabase.com:5432/postgres
+DATABASE_URL=mysql://siders_api:...@db.siders.id:3306/siders
 
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -620,8 +596,8 @@ Note what is absent: no Supabase URL, no anon key, no service key. The frontends
 
 ## 11. Security checklist
 
-- [ ] App tables in `app` schema; `app` **not** in Supabase's exposed schemas
-- [ ] RLS enabled on every table regardless, default deny
+- [ ] API database credential holds DML privileges only — no `CREATE`/`ALTER`/`DROP`, no grant management (`db/README.md`)
+- [ ] Migration credential kept separate from the API's runtime credential
 - [ ] `state` and PKCE verified on every OAuth callback
 - [ ] Google ID token verified against Google's JWKS — `iss`, `aud`, `exp`, `nonce`
 - [ ] `email_verified` checked before creating a reader
@@ -647,7 +623,7 @@ Note what is absent: no Supabase URL, no anon key, no service key. The frontends
 - [ ] CORS allowlist naming exact origins, `credentials: true`, no wildcard
 - [ ] Helmet, CSP, HSTS
 - [ ] `audit_log` written on every admin mutation — **outstanding**, deferred to an `add-audit-logging` follow-up change (see `openspec/changes/add-auth-foundation/design.md` Non-Goals)
-- [ ] Point-in-time recovery enabled on the production Supabase project
+- [ ] Automated backups and point-in-time recovery enabled on the production MySQL instance
 - [ ] Dependabot on, secrets scanned in CI
 
 ---
@@ -656,14 +632,14 @@ Note what is absent: no Supabase URL, no anon key, no service key. The frontends
 
 Collected because each one costs a day when met unprepared.
 
-1. **`prepare: false`** missing → works locally, fails in production under the pooler.
-2. **Migrations run against port 6543** → cryptic transaction errors. Use 5432.
+1. **`timezone: 'Z'`** missing from the connection pool → every `datetime` column silently shifts by the server's local offset.
+2. **A generated column reading a cascading FK's base column** → MySQL refuses to create the constraint at all (`ERROR 1215`), not a runtime surprise but an easy one to hit when adding a column derived from a foreign key.
 3. **`redirect_uri` mismatch** with the Google console entry, down to the trailing slash → callback fails only in the environment you didn't test.
 4. **API on a different registrable domain** from the frontends → cookies require `SameSite=None`, which browsers are actively restricting. Fix the domains before writing auth code, not after.
 5. **Tokens in `localStorage`** because it was easier during development → one XSS becomes full account takeover. Cookies from day one.
 6. **Missing `state` check** → the OAuth flow works perfectly and is CSRF-vulnerable. Nothing will fail visibly.
 7. **Matching readers on email** → account collisions the first time someone changes their Google address.
-8. **Free-tier Supabase project pausing** after a week idle → staging appears broken to the client on a Monday.
+8. **`GET_LOCK`'s connection-scoping** (the advisory-lock reorder helper, `apps/api/src/lib/tableWriteLock.ts`) → it is released by the connection closing, not by transaction rollback; acquire and release must run on the one connection Drizzle pins to a `db.transaction()` callback, or a lock taken on one pooled connection is invisible everywhere else.
 9. **Next.js caching a fetch you meant to be dynamic** → editors publish and see nothing change. Be explicit about cache behaviour on every API call.
 10. **Forgetting `credentials: 'include'`** on client fetches → intermittent 401s that look like token bugs and are cookie bugs.
 
