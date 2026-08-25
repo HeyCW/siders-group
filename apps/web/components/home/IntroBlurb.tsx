@@ -21,7 +21,7 @@ export function IntroBlurb() {
       >
         <p className="text-left text-[clamp(16px,2vw,20px)] leading-[1.6]">{second}</p>
         <video
-          className="pointer-events-none absolute bottom-0 right-0 h-[clamp(56px,7vw,88px)] w-[clamp(56px,7vw,88px)] border border-rule object-cover"
+          className="pointer-events-none absolute bottom-0 right-0 aspect-[9/16] h-[clamp(72px,9vw,112px)] w-auto border border-rule object-cover"
           src="/video/manifesto-loop.mp4"
           autoPlay
           loop
