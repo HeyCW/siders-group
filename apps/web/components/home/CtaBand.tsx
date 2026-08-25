@@ -11,7 +11,7 @@ export function CtaBand() {
         <div className="font-serif text-[clamp(26px,3.4vw,40px)] font-bold leading-[1.08] tracking-[-0.03em]">
           {CTA_BAND.headline}
         </div>
-        <div className="flex flex-wrap justify-self-start gap-3">
+        <div className="flex w-full flex-wrap items-center justify-self-start gap-3">
           <Link
             href="/contact"
             className="mark-hover border-b-2 border-ink pb-[3px] font-sans text-[11px] font-bold uppercase tracking-widest"
@@ -24,6 +24,14 @@ export function CtaBand() {
           >
             Baca News →
           </Link>
+          <video
+            className="ml-auto h-[clamp(56px,7vw,88px)] w-[clamp(56px,7vw,88px)] rounded-full object-cover"
+            src="/video/cta-loop.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
         </div>
       </Reveal>
     </div>

@@ -45,6 +45,10 @@ function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
+/** A featured-media URL ending this way previews (and later renders on the public site) as
+ *  `<video>` instead of `<img>` — mirrors apps/web/components/ui/MediaSlot.tsx's detection. */
+const VIDEO_URL_PATTERN = /\.(mp4|webm|mov|m4v)$/i;
+
 const FIELD_LABEL = 'mb-1 block font-mono text-[10px] uppercase tracking-wide text-[var(--muted)]';
 const FIELD_INPUT =
   'w-full rounded-md border border-[var(--rule)] bg-transparent px-2 py-1 text-sm focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20';
@@ -346,12 +350,15 @@ export function ArticleEditPage() {
 
             <div>
               <label className={FIELD_LABEL}>Featured image</label>
-              {form.featuredImageUrl && (
-                <img src={form.featuredImageUrl} alt="" className="mb-2 w-full rounded-md" />
-              )}
+              {form.featuredImageUrl &&
+                (VIDEO_URL_PATTERN.test(form.featuredImageUrl) ? (
+                  <video src={form.featuredImageUrl} className="mb-2 w-full rounded-md" muted loop controls />
+                ) : (
+                  <img src={form.featuredImageUrl} alt="" className="mb-2 w-full rounded-md" />
+                ))}
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) void handleFeaturedImageChosen(file);
