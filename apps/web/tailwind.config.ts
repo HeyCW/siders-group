@@ -10,7 +10,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        paper: '#F7F6F2',
+        paper: '#E8E2D3',
         ink: '#141414',
         signal: '#FFD100',
         rule: '#E3E1D9',
