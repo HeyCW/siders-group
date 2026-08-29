@@ -12,5 +12,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(PermissionCatalogSeeder::class);
+
+        // Local-dev convenience only — never seed a fixed-password account outside local dev.
+        if (app()->environment('local')) {
+            $this->call(DevOwnerSeeder::class);
+        }
     }
 }
