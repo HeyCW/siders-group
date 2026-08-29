@@ -8,7 +8,7 @@ use App\Models\Article;
 use App\Models\Comment;
 use App\Models\Like;
 use App\Models\Reader;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class EngagementService
@@ -49,26 +49,44 @@ class EngagementService
         );
     }
 
-    /** @return array{views: int, likes: int, comments: int, likedByReader: bool} */
+    /**
+     * Matches packages/contracts/src/engagement.ts's articleEngagementSchema field-for-field.
+     *
+     * @return array{viewCount: int, likeCount: int, commentCount: int, likedByReader: bool}
+     */
     public function summary(Article $article, ?Reader $reader): array
     {
-        $views = (int) DB::table('article_views_daily')->where('article_id', $article->id)->sum('views');
-        $likes = Like::where('article_id', $article->id)->count();
-        $comments = Comment::where('article_id', $article->id)->where('status', 'visible')->count();
+        $viewCount = (int) DB::table('article_views_daily')->where('article_id', $article->id)->sum('views');
+        $likeCount = Like::where('article_id', $article->id)->count();
+        $commentCount = Comment::where('article_id', $article->id)->where('status', 'visible')->count();
 
         $likedByReader = $reader !== null
             && Like::where('article_id', $article->id)->where('reader_id', $reader->id)->exists();
 
-        return ['views' => $views, 'likes' => $likes, 'comments' => $comments, 'likedByReader' => $likedByReader];
+        return [
+            'viewCount' => $viewCount,
+            'likeCount' => $likeCount,
+            'commentCount' => $commentCount,
+            'likedByReader' => $likedByReader,
+        ];
     }
 
-    public function listComments(Article $article, int $page, int $perPage): LengthAwarePaginator
+    /**
+     * Offset-paginated, matching packages/contracts/src/engagement.ts's commentListQuerySchema —
+     * the listing returns a bare array, so a full page (== $limit) is itself the client's signal
+     * that more may exist, not a separate total count.
+     *
+     * @return Collection<int, Comment>
+     */
+    public function listComments(Article $article, int $limit, int $offset): Collection
     {
         return Comment::with('reader')
             ->where('article_id', $article->id)
             ->where('status', 'visible')
             ->orderByDesc('created_at')
-            ->paginate($perPage, page: $page);
+            ->skip($offset)
+            ->take($limit)
+            ->get();
     }
 
     /**

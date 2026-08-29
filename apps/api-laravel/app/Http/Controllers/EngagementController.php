@@ -34,20 +34,12 @@ class EngagementController extends Controller
     public function comments(Request $request, string $id): JsonResponse
     {
         $article = $this->engagementService->findVisibleOrFail($id);
-        $page = (int) $request->query('page', 1);
-        $perPage = min((int) $request->query('perPage', 20), 50);
+        $limit = min((int) $request->query('limit', 10), 50);
+        $offset = max((int) $request->query('offset', 0), 0);
 
-        $comments = $this->engagementService->listComments($article, $page, $perPage);
+        $comments = $this->engagementService->listComments($article, $limit, $offset);
 
-        return response()->json([
-            'data' => collect($comments->items())->map(fn (Comment $c) => [
-                'id' => $c->id,
-                'body' => $c->body,
-                'readerName' => $c->reader->name,
-                'createdAt' => $c->created_at->toIso8601String(),
-            ]),
-            'meta' => ['total' => $comments->total(), 'page' => $comments->currentPage(), 'perPage' => $comments->perPage()],
-        ]);
+        return response()->json(['data' => $comments->map(fn (Comment $c) => $this->commentShape($c))]);
     }
 
     public function like(Request $request, string $id): JsonResponse
@@ -64,11 +56,23 @@ class EngagementController extends Controller
         $data = $request->validate(['body' => ['required', 'string', 'max:2000']]);
 
         $comment = $this->engagementService->createComment($article, $request->user('reader'), $data['body']);
+        $comment->setRelation('reader', $request->user('reader'));
 
-        return response()->json(['data' => [
+        return response()->json(['data' => $this->commentShape($comment)], 201);
+    }
+
+    /**
+     * Matches packages/contracts/src/engagement.ts's commentResponseSchema — never the reader's
+     * email or id, only what they agreed to be named on.
+     */
+    private function commentShape(Comment $comment): array
+    {
+        return [
             'id' => $comment->id,
             'body' => $comment->body,
+            'authorName' => $comment->reader->name,
+            'authorAvatarUrl' => $comment->reader->avatar_url,
             'createdAt' => $comment->created_at->toIso8601String(),
-        ]], 201);
+        ];
     }
 }
