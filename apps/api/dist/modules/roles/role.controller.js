@@ -1,0 +1,86 @@
+import { roleAssignmentRequestSchema, roleCreateRequestSchema, roleUpdateRequestSchema } from '@siders/contracts';
+import { toRoleDetailResponse, toRoleResponse, toRoleSummaryResponse } from './role.mapper.js';
+import { AppError } from '../../middleware/errorHandler.js';
+import { requireUuidParam } from '../../lib/requireParam.js';
+function requireCaller(req) {
+    const subjectId = req.auth?.subjectId;
+    if (!subjectId)
+        throw new AppError('Not authenticated', 401, 'unauthenticated');
+    return { subjectId, isOwner: req.staffRole?.isOwner ?? false };
+}
+/** Parse, delegate, respond. No `if` about business meaning lives here. */
+export function createRoleController(service) {
+    return {
+        async list(_req, res, next) {
+            try {
+                const roles = await service.list();
+                res.json({ success: true, data: roles.map(toRoleSummaryResponse) });
+            }
+            catch (err) {
+                next(err);
+            }
+        },
+        async detail(req, res, next) {
+            try {
+                const id = requireUuidParam(req, 'id');
+                const role = await service.findDetail(id);
+                res.json({ success: true, data: toRoleDetailResponse(role) });
+            }
+            catch (err) {
+                next(err);
+            }
+        },
+        async listPermissionCatalog(_req, res, next) {
+            try {
+                const catalog = await service.listPermissionCatalog();
+                res.json({ success: true, data: catalog });
+            }
+            catch (err) {
+                next(err);
+            }
+        },
+        async create(req, res, next) {
+            try {
+                const body = roleCreateRequestSchema.parse(req.body);
+                const role = await service.create(body);
+                res.status(201).json({ success: true, data: toRoleResponse(role) });
+            }
+            catch (err) {
+                next(err);
+            }
+        },
+        async update(req, res, next) {
+            try {
+                const id = requireUuidParam(req, 'id');
+                const body = roleUpdateRequestSchema.parse(req.body);
+                const role = await service.update(id, body);
+                res.json({ success: true, data: toRoleResponse(role) });
+            }
+            catch (err) {
+                next(err);
+            }
+        },
+        async delete(req, res, next) {
+            try {
+                const id = requireUuidParam(req, 'id');
+                await service.delete(id);
+                res.status(204).end();
+            }
+            catch (err) {
+                next(err);
+            }
+        },
+        async assign(req, res, next) {
+            try {
+                const targetStaffId = requireUuidParam(req, 'staffId');
+                const body = roleAssignmentRequestSchema.parse(req.body);
+                const caller = requireCaller(req);
+                await service.assign(targetStaffId, body.roleId, caller);
+                res.status(204).end();
+            }
+            catch (err) {
+                next(err);
+            }
+        },
+    };
+}

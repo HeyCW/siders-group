@@ -1,0 +1,202 @@
+export declare const SUBJECT_TYPE_VALUES: readonly ["staff", "reader"];
+export type SubjectType = (typeof SUBJECT_TYPE_VALUES)[number];
+/**
+ * One table for both audiences (docs/ARCHITECTURE.md §5.1). `subjectId` is polymorphic
+ * across `users` and `readers`, so it carries no foreign key — every lookup filters on
+ * `subjectType` and joins the correct subject table, re-validating the row still exists
+ * and is active (see design.md - Risks: polymorphic `subject_id` has no FK).
+ */
+export declare const sessions: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+    name: "sessions";
+    schema: undefined;
+    columns: {
+        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "id";
+            tableName: "sessions";
+            dataType: "string";
+            columnType: "MySqlChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: true;
+            isAutoincrement: false;
+            hasRuntimeDefault: true;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        subjectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "subject_id";
+            tableName: "sessions";
+            dataType: "string";
+            columnType: "MySqlChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        subjectType: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "subject_type";
+            tableName: "sessions";
+            dataType: "string";
+            columnType: "MySqlEnumColumn";
+            data: "staff" | "reader";
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: ["staff", "reader"];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        refreshTokenHash: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "refresh_token_hash";
+            tableName: "sessions";
+            dataType: "string";
+            columnType: "MySqlVarChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        familyId: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "family_id";
+            tableName: "sessions";
+            dataType: "string";
+            columnType: "MySqlChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        userAgent: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "user_agent";
+            tableName: "sessions";
+            dataType: "string";
+            columnType: "MySqlText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        ipHash: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "ip_hash";
+            tableName: "sessions";
+            dataType: "string";
+            columnType: "MySqlVarChar";
+            data: string;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        expiresAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "expires_at";
+            tableName: "sessions";
+            dataType: "date";
+            columnType: "MySqlDateTime";
+            data: Date;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        absoluteExpiresAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "absolute_expires_at";
+            tableName: "sessions";
+            dataType: "date";
+            columnType: "MySqlDateTime";
+            data: Date;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        revokedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "revoked_at";
+            tableName: "sessions";
+            dataType: "date";
+            columnType: "MySqlDateTime";
+            data: Date;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "created_at";
+            tableName: "sessions";
+            dataType: "date";
+            columnType: "MySqlDateTime";
+            data: Date;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+    };
+    dialect: "mysql";
+}>;

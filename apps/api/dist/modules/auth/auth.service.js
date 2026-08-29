@@ -1,0 +1,110 @@
+import { AppError } from '../../middleware/errorHandler.js';
+import { issueCsrfToken } from '../../lib/csrf.js';
+import { issueRefreshToken, rotateRefreshToken, signAccessToken, } from '../../lib/tokens.js';
+import { sha256Hex } from '../../lib/hashCompare.js';
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days, sliding
+const ABSOLUTE_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000; // hard cap, never extended
+export function createAuthService(repository, env) {
+    async function issueTokens(sessionId, subjectId, subjectType, refreshToken) {
+        const accessToken = await signAccessToken({ subjectId, subjectType, sessionId }, env);
+        return {
+            accessToken,
+            refreshToken,
+            // Bound to this session id, so the token issued before a rotation stops being accepted.
+            csrfToken: issueCsrfToken(env, sessionId),
+            sessionId,
+            subjectId,
+            subjectType,
+        };
+    }
+    return {
+        async startSession(subjectId, subjectType, meta) {
+            const { token, tokenHash, familyId } = issueRefreshToken();
+            const now = Date.now();
+            const row = await repository.create({
+                subjectId,
+                subjectType,
+                refreshTokenHash: tokenHash,
+                familyId,
+                expiresAt: new Date(now + REFRESH_TOKEN_TTL_MS),
+                absoluteExpiresAt: new Date(now + ABSOLUTE_SESSION_TTL_MS),
+                userAgent: meta.userAgent,
+                ipHash: meta.ipHash,
+            });
+            return issueTokens(row.id, subjectId, subjectType, token);
+        },
+        async refresh(rawRefreshToken, meta) {
+            const tokenHash = sha256Hex(rawRefreshToken);
+            const row = await repository.findByRefreshTokenHash(tokenHash);
+            if (!row) {
+                throw new AppError('Invalid refresh token', 401, 'invalid_refresh_token');
+            }
+            if (row.revokedAt) {
+                // Reuse of an already-rotated token: treat as compromise, end the whole lineage.
+                await repository.revokeFamily(row.familyId);
+                throw new AppError('Refresh token reuse detected', 401, 'refresh_reuse_detected');
+            }
+            const now = Date.now();
+            if (row.expiresAt.getTime() < now || row.absoluteExpiresAt.getTime() < now) {
+                await repository.revoke(row.id);
+                throw new AppError('Session expired', 401, 'session_expired');
+            }
+            const active = await repository.isSubjectActive(row.subjectType, row.subjectId);
+            if (!active) {
+                await repository.revoke(row.id);
+                throw new AppError('Account is no longer active', 401, 'account_inactive');
+            }
+            await repository.revoke(row.id);
+            const { token, tokenHash: newHash } = rotateRefreshToken(row.familyId);
+            const newRow = await repository.create({
+                subjectId: row.subjectId,
+                subjectType: row.subjectType,
+                refreshTokenHash: newHash,
+                familyId: row.familyId,
+                expiresAt: new Date(now + REFRESH_TOKEN_TTL_MS),
+                absoluteExpiresAt: row.absoluteExpiresAt, // hard cap carries forward, never extended
+                userAgent: meta.userAgent,
+                ipHash: meta.ipHash,
+            });
+            return issueTokens(newRow.id, row.subjectId, row.subjectType, token);
+        },
+        async logout(rawRefreshToken, sessionId) {
+            // Falls back to the session id from the access credential. Keyed on the refresh cookie
+            // alone, a caller holding only a valid access cookie was signed out client-side —
+            // cookies cleared — while the session row stayed live until expiry, so a copy of that
+            // access credential kept working (specs/authentication/spec.md - "Signed-out access
+            // credential is no longer accepted").
+            if (rawRefreshToken) {
+                const row = await repository.findByRefreshTokenHash(sha256Hex(rawRefreshToken));
+                if (row) {
+                    await repository.revoke(row.id);
+                    return;
+                }
+            }
+            if (sessionId)
+                await repository.revoke(sessionId);
+        },
+        async revokeAllForSubject(subjectType, subjectId) {
+            await repository.revokeAllForSubject(subjectType, subjectId);
+        },
+        async revokeAllForSubjectExcept(subjectType, subjectId, exceptSessionId) {
+            await repository.revokeAllForSubjectExcept(subjectType, subjectId, exceptSessionId);
+        },
+        async revokeAll() {
+            await repository.revokeAll();
+        },
+        async getReaderAccount(subjectId) {
+            return repository.findReaderAccount(subjectId);
+        },
+        async resolveSessionForCsrfBootstrap(rawRefreshToken) {
+            const tokenHash = sha256Hex(rawRefreshToken);
+            const row = await repository.findByRefreshTokenHash(tokenHash);
+            if (!row || row.revokedAt)
+                return null;
+            const now = Date.now();
+            if (row.expiresAt.getTime() < now || row.absoluteExpiresAt.getTime() < now)
+                return null;
+            return row.id;
+        },
+    };
+}

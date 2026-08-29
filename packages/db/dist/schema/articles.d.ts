@@ -1,0 +1,273 @@
+export declare const ARTICLE_STATUS_VALUES: readonly ["draft", "scheduled", "published"];
+export type ArticleStatusValue = (typeof ARTICLE_STATUS_VALUES)[number];
+/**
+ * `bodyJson` (Tiptap/ProseMirror document) is the source of truth; `bodyHtml` is derived from
+ * it by `sanitizeHtml` on every save and is what the public site renders
+ * (design.md - "Content storage"). `featuredMediaId` references the canonical `media` record
+ * rather than storing a display URL, and clears rather than cascades when that record is
+ * deleted (design.md - "Featured image references app.media"). `publishedAt` is set on publish
+ * and cleared on unpublish — see design.md's `published_at` lifecycle table — so a published
+ * article never carries a stale future timestamp from an earlier schedule.
+ */
+export declare const articles: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+    name: "articles";
+    schema: undefined;
+    columns: {
+        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "id";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: true;
+            isAutoincrement: false;
+            hasRuntimeDefault: true;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        title: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "title";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlVarChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        slug: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "slug";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlVarChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        bodyJson: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "body_json";
+            tableName: "articles";
+            dataType: "json";
+            columnType: "MySqlJson";
+            data: unknown;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        bodyHtml: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "body_html";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        excerpt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "excerpt";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        status: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "status";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlEnumColumn";
+            data: "draft" | "scheduled" | "published";
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: ["draft", "scheduled", "published"];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        authorId: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "author_id";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlChar";
+            data: string;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        featuredMediaId: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "featured_media_id";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlChar";
+            data: string;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        anakUsahaId: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "anak_usaha_id";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlChar";
+            data: string;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        seoTitle: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "seo_title";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        seoDescription: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "seo_description";
+            tableName: "articles";
+            dataType: "string";
+            columnType: "MySqlText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        publishedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "published_at";
+            tableName: "articles";
+            dataType: "date";
+            columnType: "MySqlDateTime";
+            data: Date;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "created_at";
+            tableName: "articles";
+            dataType: "date";
+            columnType: "MySqlDateTime";
+            data: Date;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "updated_at";
+            tableName: "articles";
+            dataType: "date";
+            columnType: "MySqlDateTime";
+            data: Date;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+    };
+    dialect: "mysql";
+}>;
