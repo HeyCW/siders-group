@@ -27,8 +27,10 @@ export class ApiError extends Error {
   }
 }
 
-const CSRF_COOKIE = 'csrf_token';
-const CSRF_HEADER = 'x-csrf-token';
+// Sanctum's own double-submit pair (not the old Node app's custom `csrf_token`/`x-csrf-token`
+// scheme) — `XSRF-TOKEN` is deliberately script-readable (not httpOnly) so this can echo it back.
+const CSRF_COOKIE = 'XSRF-TOKEN';
+const CSRF_HEADER = 'X-XSRF-TOKEN';
 
 /**
  * Whether this browser holds the script-readable CSRF cookie — the anonymous fast path's only
@@ -51,7 +53,7 @@ function csrfHeader(): Record<string, string> {
 /** The network call and JSON parsing only — no recovery. Never re-entered by the recovery paths
  *  below, which call this directly to avoid recursing into themselves. */
 async function rawFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_URL}/api${path}`, {
     ...init,
     credentials: 'include',
     headers: {
@@ -78,35 +80,16 @@ async function rawFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /**
- * At most one `POST /auth/refresh` in flight, ever, shared by every request that discovers a 401
- * at roughly the same time. Single-flight here is load-bearing, not an optimization: the server
- * cannot tell a raced second presentation of a refresh credential from theft and revokes the
- * entire session lineage for either (`specs/authentication/spec.md` — "A second presentation is
- * treated as reuse regardless of intent"). Resolves to whether the refresh itself succeeded —
- * never throws.
- */
-let inFlightRefresh: Promise<boolean> | null = null;
-function refreshSession(): Promise<boolean> {
-  if (!inFlightRefresh) {
-    inFlightRefresh = rawFetch<void>('/auth/refresh', { method: 'POST' })
-      .then(() => true)
-      .catch(() => false)
-      .finally(() => {
-        inFlightRefresh = null;
-      });
-  }
-  return inFlightRefresh;
-}
-
-/**
- * At most one in-flight `GET /auth/csrf` call, shared the same way refresh is. The endpoint
- * always answers 204, so failures here are only ever a network error; either way the caller
- * proceeds to retry once.
+ * At most one in-flight `GET /sanctum/csrf-cookie` call, shared by every request that discovers a
+ * stale/missing CSRF cookie at roughly the same time. Hits Sanctum's own route directly —
+ * deliberately NOT prefixed with `/api` like every other endpoint here, since Sanctum registers
+ * it at the application root.
  */
 let inFlightBootstrap: Promise<void> | null = null;
 function bootstrapCsrfCookie(): Promise<void> {
   if (!inFlightBootstrap) {
-    inFlightBootstrap = rawFetch<void>('/auth/csrf')
+    inFlightBootstrap = fetch(`${API_URL}/sanctum/csrf-cookie`, { credentials: 'include' })
+      .then(() => undefined)
       .catch(() => undefined)
       .finally(() => {
         inFlightBootstrap = null;
@@ -116,11 +99,10 @@ function bootstrapCsrfCookie(): Promise<void> {
 }
 
 /**
- * The recovery algorithm: branch on the error before choosing a path, retry at most once total
- * across both paths combined, and never chain one recovery into the other
- * (`specs/reader-session/spec.md` — "Recovery paths do not chain"). `perform` is re-invoked
- * verbatim on retry — it captures whatever request-specific state the caller already closed
- * over.
+ * The recovery algorithm: retry at most once. There is no refresh-token concept under Sanctum's
+ * session-cookie auth (unlike the old Node app's JWT+refresh scheme) — a 401 means the reader
+ * simply isn't signed in (or the session is gone), which every caller here already treats as a
+ * normal "anonymous" outcome rather than an error to recover from.
  */
 async function withRecovery<T>(perform: () => Promise<T>, alreadyRetried = false): Promise<T> {
   try {
@@ -130,13 +112,9 @@ async function withRecovery<T>(perform: () => Promise<T>, alreadyRetried = false
       throw err;
     }
 
-    if (err.status === 401) {
-      const refreshed = await refreshSession();
-      if (!refreshed) throw err;
-      return withRecovery(perform, true);
-    }
-
-    if (err.status === 403 && err.code === 'csrf_failed') {
+    // Laravel's TokenMismatchException renders as 419, not 403 — checked by code, not status,
+    // in case that ever changes.
+    if (err.code === 'csrf_failed') {
       await bootstrapCsrfCookie();
       return withRecovery(perform, true);
     }
@@ -163,12 +141,12 @@ export function readerRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return withRecovery(() => rawFetch<T>(path, init));
 }
 
-/** `GET /auth/me` through the recovery cycle. */
+/** `GET /reader/me` through the recovery cycle. */
 export function getReaderAccount(): Promise<ReaderAccountResponse> {
-  return readerRequest<ReaderAccountResponse>('/auth/me');
+  return readerRequest<ReaderAccountResponse>('/reader/me');
 }
 
-/** `POST /auth/logout` through the recovery cycle. */
+/** `POST /reader/logout` through the recovery cycle. */
 export function signOutReader(): Promise<void> {
-  return readerRequest<void>('/auth/logout', { method: 'POST' });
+  return readerRequest<void>('/reader/logout', { method: 'POST' });
 }

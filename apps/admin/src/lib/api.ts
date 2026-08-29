@@ -39,8 +39,10 @@ function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
   return typeof value === 'object' && value !== null && 'error' in value;
 }
 
-const CSRF_COOKIE = 'csrf_token';
-const CSRF_HEADER = 'x-csrf-token';
+// Sanctum's own double-submit pair (not the old Node app's custom `csrf_token`/`x-csrf-token`
+// scheme) — `XSRF-TOKEN` is deliberately script-readable (not httpOnly) so this can echo it back.
+const CSRF_COOKIE = 'XSRF-TOKEN';
+const CSRF_HEADER = 'X-XSRF-TOKEN';
 
 /**
  * The server's half of the double-submit pair. `sid_at`/`sid_rt` are httpOnly and unreadable
@@ -79,7 +81,7 @@ async function rawFetch<T>(path: string, options: ApiRequestOptions = {}): Promi
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_URL}${path}`, init);
+  const res = await fetch(`${API_URL}/api${path}`, init);
   const payload: unknown = await res.json().catch(() => undefined);
 
   if (!res.ok) {
@@ -98,7 +100,7 @@ async function rawFetch<T>(path: string, options: ApiRequestOptions = {}): Promi
  * multipart is unaffected by it).
  */
 async function rawUpload<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_URL}/api${path}`, {
     method: 'POST',
     credentials: 'include',
     headers: csrfHeader(),
@@ -151,37 +153,16 @@ function notifySessionShouldReresolve(): void {
 }
 
 /**
- * At most one in-flight `/auth/refresh` call, ever, shared by every request that discovers a
- * `forbidden` 403 at roughly the same time. Single-flight here is load-bearing, not an
- * optimization: the server cannot tell a raced second presentation of a refresh credential from
- * theft and revokes the entire session lineage for either
- * (specs/authentication/spec.md - "A second presentation is treated as reuse regardless of
- * intent"). Resolves to whether the refresh itself succeeded — never throws.
- */
-let inFlightRefresh: Promise<boolean> | null = null;
-function refreshSession(): Promise<boolean> {
-  if (!inFlightRefresh) {
-    inFlightRefresh = rawFetch<void>('/auth/refresh', { method: 'POST' })
-      .then(() => true)
-      .catch(() => false)
-      .finally(() => {
-        inFlightRefresh = null;
-      });
-  }
-  return inFlightRefresh;
-}
-
-/**
- * At most one in-flight `GET /auth/csrf` call, shared the same way refresh is — lower stakes
- * (a duplicated call just re-issues the same cookie twice) but the same stampede-avoidance
- * shape (design.md - "Bootstrap is single-flight for stampede avoidance, not for the
- * destructive reason refresh is"). The endpoint always answers 204, so failures here are only
- * ever a network error; either way the caller proceeds to retry once.
+ * At most one in-flight `GET /sanctum/csrf-cookie` call, shared by every request that discovers a
+ * stale/missing CSRF cookie at roughly the same time (design.md - "Bootstrap is single-flight for
+ * stampede avoidance"). Hits Sanctum's own route directly — deliberately NOT prefixed with `/api`
+ * like every other endpoint here, since Sanctum registers it at the application root.
  */
 let inFlightBootstrap: Promise<void> | null = null;
 function bootstrapCsrfCookie(): Promise<void> {
   if (!inFlightBootstrap) {
-    inFlightBootstrap = rawFetch<void>('/auth/csrf')
+    inFlightBootstrap = fetch(`${API_URL}/sanctum/csrf-cookie`, { credentials: 'include' })
+      .then(() => undefined)
       .catch(() => undefined)
       .finally(() => {
         inFlightBootstrap = null;
@@ -190,33 +171,23 @@ function bootstrapCsrfCookie(): Promise<void> {
   return inFlightBootstrap;
 }
 
-/** A session-authoritative question only a real session can answer — used to disambiguate a
- *  still-403 retry into "permission denied" (probe succeeds) vs "session gone" (probe fails)
- *  (specs/admin-session/spec.md - "A 403 after refresh is resolved by re-probing, never
- *  assumed"). Deliberately `rawFetch`, not `apiFetch` — this must never itself re-enter
- *  recovery. */
-function probeSession(): Promise<boolean> {
-  return rawFetch('/users/me').then(
-    () => true,
-    () => false,
-  );
-}
-
 /**
- * The 403-recovery algorithm shared by `apiFetch` and `apiUpload`: branch on the error `code`
- * before choosing a path, retry at most once total across both paths combined, and never chain
- * one recovery into the other (design.md - "Bounded composition"). `perform` is re-invoked
- * verbatim on retry — it captures whatever request-specific state (path, body, form data) the
- * caller already closed over.
+ * The recovery algorithm shared by `apiFetch` and `apiUpload`: branch on the error before
+ * choosing a path, retry at most once total. There is no refresh-token concept under Sanctum's
+ * session-cookie auth (unlike the old Node app's JWT+refresh scheme) — a 401 `unauthenticated`
+ * means the session itself is gone, full stop, so it goes straight to `notifySessionExpired`
+ * rather than attempting to recover it.
  */
 async function withRecovery<T>(perform: () => Promise<T>, opts: { isSignIn?: boolean }, alreadyRetried = false): Promise<T> {
   try {
     return await perform();
   } catch (err) {
-    if (!(err instanceof ApiError) || err.status !== 403 || alreadyRetried) {
+    if (!(err instanceof ApiError) || alreadyRetried) {
       throw err;
     }
 
+    // Laravel's TokenMismatchException renders as 419, not 403 — checked by code, not status,
+    // in case that ever changes.
     if (err.code === 'csrf_failed') {
       // Recovers the sign-in screen's own submission too — that is exactly the locked-out
       // state this mechanism exists to close (specs/admin-session/spec.md - "Sign-in recovers
@@ -225,27 +196,15 @@ async function withRecovery<T>(perform: () => Promise<T>, opts: { isSignIn?: boo
       return withRecovery(perform, opts, true);
     }
 
-    if (err.code === 'forbidden' && !opts.isSignIn) {
-      const refreshed = await refreshSession();
-      if (!refreshed) {
-        notifySessionExpired();
-        throw err;
-      }
-      try {
-        return await withRecovery(perform, opts, true);
-      } catch (retryErr) {
-        if (retryErr instanceof ApiError && retryErr.status === 403) {
-          const hasSession = await probeSession();
-          if (!hasSession) notifySessionExpired();
-        }
-        throw retryErr;
-      }
+    if (err.status === 401 && err.code === 'unauthenticated' && !opts.isSignIn) {
+      notifySessionExpired();
+      throw err;
     }
 
     if (err.code === 'password_change_required') {
-      // Neither refresh nor bootstrap addresses this — the session is valid and the CSRF
-      // pairing is intact, only the account's own state changed. Re-resolving lets the route
-      // guard confine the app to the change screen; the originating call still rejects.
+      // The session and CSRF pairing are both still valid, only the account's own state
+      // changed. Re-resolving lets the route guard confine the app to the change screen; the
+      // originating call still rejects.
       notifySessionShouldReresolve();
       throw err;
     }

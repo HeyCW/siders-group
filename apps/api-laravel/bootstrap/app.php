@@ -6,10 +6,12 @@ use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureReaderCanAuthorContent;
 use App\Http\Middleware\EnsureStaffActive;
 use App\Http\Middleware\MarkPublicRoute;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -38,5 +40,19 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json([
                 'error' => ['code' => $e->getErrorCode(), 'message' => $e->getMessage()],
             ], $e->getStatus());
+        });
+
+        // Gives the frontend's recovery logic a stable `code` to key on — Laravel's own default
+        // renders for these two carry no such field.
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return response()->json([
+                'error' => ['code' => 'unauthenticated', 'message' => 'Authentication is required.'],
+            ], 401);
+        });
+
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            return response()->json([
+                'error' => ['code' => 'csrf_failed', 'message' => 'CSRF token mismatch.'],
+            ], 419);
         });
     })->create();

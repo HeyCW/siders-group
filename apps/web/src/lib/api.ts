@@ -44,7 +44,7 @@ export class ApiError extends Error {
  * `docs/ARCHITECTURE.md` §8.1 (`design.md` — "The fetch client is a plain public reader").
  */
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, init);
+  const res = await fetch(`${API_URL}/api${path}`, init);
   const payload: unknown = await res.json().catch(() => undefined);
 
   if (!res.ok || (isErrorEnvelope(payload) && payload.success === false)) {

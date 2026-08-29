@@ -56,6 +56,7 @@ Route::prefix('roles')->middleware(['auth:staff', 'staff.active', 'staff.passwor
 
 Route::prefix('reader')->middleware(['auth:reader'])->group(function () {
     Route::get('/me', [ReaderMeController::class, 'show']);
+    Route::post('/logout', [ReaderMeController::class, 'logout']);
 });
 
 // --- Media ---

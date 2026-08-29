@@ -41,11 +41,11 @@ export const sessionApi = {
    *  (specs/admin-session/spec.md - "The sign-in screen's own submission never triggers a
    *  refresh"). */
   login(email: string, password: string): Promise<void> {
-    return apiFetch<void>('/auth/staff/login', { method: 'POST', body: { email, password }, isSignIn: true });
+    return apiFetch<void>('/staff/login', { method: 'POST', body: { email, password }, isSignIn: true });
   },
 
   me(): Promise<StaffMeResponse> {
-    return apiFetch<Envelope<StaffMeResponse>>('/users/me').then((r) => r.data);
+    return apiFetch<Envelope<StaffMeResponse>>('/staff/me').then((r) => r.data);
   },
 
   changePassword(currentPassword: string, newPassword: string): Promise<void> {
@@ -53,6 +53,6 @@ export const sessionApi = {
   },
 
   logout(): Promise<void> {
-    return apiFetch<void>('/auth/logout', { method: 'POST' });
+    return apiFetch<void>('/staff/logout', { method: 'POST' });
   },
 };
