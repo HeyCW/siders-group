@@ -8,7 +8,7 @@ vi.mock('../../lib/revalidate.js', () => ({
 import { createScheduledPublishJob } from './scheduledPublishWorker.js';
 import type { ArticleRepository } from './article.repository.js';
 
-const env = { APP_ORIGIN: 'https://example.com', REVALIDATE_SECRET: 'x'.repeat(16) };
+const env = { DEPLOY_TRIGGER_URL: 'https://ci.example.com/dispatch', DEPLOY_TRIGGER_TOKEN: 'x'.repeat(16) };
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never;
 
 describe('scheduledPublishJob', () => {

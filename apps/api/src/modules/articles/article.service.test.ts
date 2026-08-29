@@ -125,7 +125,7 @@ function createFakeArticleRepository() {
   return { repository, rows };
 }
 
-const revalidateEnv = { APP_ORIGIN: 'https://example.com', REVALIDATE_SECRET: 'x'.repeat(16) };
+const revalidateEnv = { DEPLOY_TRIGGER_URL: 'https://ci.example.com/dispatch', DEPLOY_TRIGGER_TOKEN: 'x'.repeat(16) };
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never;
 
 describe('ArticleService', () => {

@@ -47,9 +47,10 @@ describe('RelatedArticles', () => {
 
     render(result);
     expect(screen.getByText('A related story')).toBeInTheDocument();
-    expect(getArticlesMock).toHaveBeenCalledWith(
-      { categorySlugs: ['kuliner'], excludeIds: ['current-id'], limit: 5 },
-      expect.anything(),
-    );
+    expect(getArticlesMock).toHaveBeenCalledWith({
+      categorySlugs: ['kuliner'],
+      excludeIds: ['current-id'],
+      limit: 5,
+    });
   });
 });

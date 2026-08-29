@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ApiError, getArticleBySlug } from '../../../lib/api';
+import { ApiError, getArticleBySlug, getArticles } from '../../../lib/api';
 import { estimateReadMinutes } from '../../../lib/readingTime';
 import { Container } from '../../../components/layout/Container';
 import { MediaSlot } from '../../../components/ui/MediaSlot';
@@ -9,11 +9,28 @@ import { EngagementBar } from '../../../components/article/EngagementBar';
 import { ShareLinks } from '../../../components/article/ShareLinks';
 import { RelatedArticles } from '../../../components/article/RelatedArticles';
 
-export const revalidate = 60;
+// Static export has no server to render a detail page on demand, so every published slug must
+// be known at build time. A slug published after the last build 404s until the next rebuild —
+// the same latency trade the site now takes everywhere ISR used to paper over (see
+// next.config.mjs's `output: 'export'` comment). Paged well above NEWS_PAGE_SIZE purely to keep
+// the enumeration call count low; unrelated to the public listing's page size.
+const ENUMERATION_PAGE_SIZE = 100;
+
+export async function generateStaticParams() {
+  const slugs: string[] = [];
+  let offset = 0;
+  for (;;) {
+    const batch = await getArticles({ limit: ENUMERATION_PAGE_SIZE, offset });
+    slugs.push(...batch.map((article) => article.slug));
+    if (batch.length < ENUMERATION_PAGE_SIZE) break;
+    offset += ENUMERATION_PAGE_SIZE;
+  }
+  return slugs.map((slug) => ({ slug }));
+}
 
 async function loadArticle(slug: string) {
   try {
-    return await getArticleBySlug(slug, { next: { revalidate: 60 } });
+    return await getArticleBySlug(slug);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
     throw err;

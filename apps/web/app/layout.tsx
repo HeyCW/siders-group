@@ -29,7 +29,7 @@ export const metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Failing to load anak usaha data degrades to an empty footer section rather than taking the
   // whole site down — same treatment as `getPartners()`/`getGuidePicks()` on the home page.
-  const anakUsahaList = await getAnakUsahaList({ next: { revalidate: 60 } }).catch(() => []);
+  const anakUsahaList = await getAnakUsahaList().catch(() => []);
   const brands = presentedAnakUsaha(anakUsahaList);
 
   return (

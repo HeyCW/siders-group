@@ -1,11 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { AnakUsahaResponse, ArticlePublicCard, CategoryResponse } from '@siders/contracts';
 import { NewsExplorer } from './NewsExplorer.js';
 
 const push = vi.fn();
+// Static export moved filtering into the component itself (NewsExplorer.tsx), reading the URL
+// via useSearchParams() instead of receiving it as server-computed props — so the mock now needs
+// to supply that hook too, backed by a module-level URLSearchParams the tests can set per case.
+let currentParams = new URLSearchParams();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
+  useSearchParams: () => currentParams,
 }));
 
 const getArticlesMock = vi.fn();
@@ -17,6 +22,7 @@ afterEach(() => {
   cleanup();
   push.mockClear();
   getArticlesMock.mockReset();
+  currentParams = new URLSearchParams();
 });
 
 function makeArticle(overrides: Partial<ArticlePublicCard> = {}): ArticlePublicCard {
@@ -44,82 +50,83 @@ const anakUsahaOptions: AnakUsahaResponse[] = [
   { id: 'a2', name: 'Surabaya Siders', slug: 'surabaya-siders' },
 ];
 
-function renderExplorer(overrides: Partial<React.ComponentProps<typeof NewsExplorer>> = {}) {
-  return render(
-    <NewsExplorer
-      initialArticles={[makeArticle()]}
-      categories={categories}
-      anakUsahaOptions={anakUsahaOptions}
-      activeCategorySlugs={[]}
-      activeAnakUsahaSlugs={[]}
-      activeDateOption={undefined}
-      activeDateFrom={undefined}
-      activeDateTo={undefined}
-      {...overrides}
-    />,
-  );
+/**
+ * Renders NewsExplorer with the given URL search params, having queued `firstPage` as the
+ * result of the mount-time fetch NewsExplorer now always makes (it no longer receives
+ * `initialArticles` as a prop), then waits for that fetch to settle so callers aren't left with
+ * a pending state update after the test body returns.
+ */
+async function renderExplorer(
+  params: Record<string, string> = {},
+  firstPage: ArticlePublicCard[] = [makeArticle()],
+) {
+  currentParams = new URLSearchParams(params);
+  getArticlesMock.mockResolvedValueOnce(firstPage);
+  const result = render(<NewsExplorer categories={categories} anakUsahaOptions={anakUsahaOptions} />);
+  await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
+  return result;
 }
 
 describe('NewsExplorer', () => {
-  it('navigates to ?category=<slug> when a category is selected', () => {
-    renderExplorer();
+  it('navigates to ?category=<slug> when a category is selected', async () => {
+    await renderExplorer();
     fireEvent.click(screen.getByRole('button', { name: /kategori/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Kuliner' }));
     expect(push).toHaveBeenCalledWith('/news?category=kuliner');
   });
 
-  it('selecting a second category adds it rather than replacing the first', () => {
-    renderExplorer({ activeCategorySlugs: ['kuliner'] });
+  it('selecting a second category adds it rather than replacing the first', async () => {
+    await renderExplorer({ category: 'kuliner' });
     fireEvent.click(screen.getByRole('button', { name: /kategori 1/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Wisata' }));
     expect(push).toHaveBeenCalledWith('/news?category=kuliner%2Cwisata');
   });
 
-  it('deselecting one category leaves the other active', () => {
-    renderExplorer({ activeCategorySlugs: ['kuliner', 'wisata'] });
+  it('deselecting one category leaves the other active', async () => {
+    await renderExplorer({ category: 'kuliner,wisata' });
     fireEvent.click(screen.getByRole('button', { name: /kategori 2/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Kuliner' }));
     expect(push).toHaveBeenCalledWith('/news?category=wisata');
   });
 
-  it('clears the category filter via the panel Reset control', () => {
-    renderExplorer({ activeCategorySlugs: ['kuliner'] });
+  it('clears the category filter via the panel Reset control', async () => {
+    await renderExplorer({ category: 'kuliner' });
     fireEvent.click(screen.getByRole('button', { name: /kategori 1/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
     expect(push).toHaveBeenCalledWith('/news');
   });
 
-  it('selecting an anak usaha pushes ?anakUsaha=<slug> using the real catalog', () => {
-    renderExplorer();
+  it('selecting an anak usaha pushes ?anakUsaha=<slug> using the real catalog', async () => {
+    await renderExplorer();
     fireEvent.click(screen.getByRole('button', { name: /group companies/i }));
     expect(screen.getByRole('button', { name: 'SidersVox' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'SidersVox' }));
     expect(push).toHaveBeenCalledWith('/news?anakUsaha=sidersvox');
   });
 
-  it('selecting a second anak usaha adds it rather than replacing the first', () => {
-    renderExplorer({ activeAnakUsahaSlugs: ['sidersvox'] });
+  it('selecting a second anak usaha adds it rather than replacing the first', async () => {
+    await renderExplorer({ anakUsaha: 'sidersvox' });
     fireEvent.click(screen.getByRole('button', { name: /group companies 1/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Surabaya Siders' }));
     expect(push).toHaveBeenCalledWith('/news?anakUsaha=sidersvox%2Csurabaya-siders');
   });
 
-  it('selecting a relative Tanggal option pushes ?date=<option>', () => {
-    renderExplorer();
+  it('selecting a relative Tanggal option pushes ?date=<option>', async () => {
+    await renderExplorer();
     fireEvent.click(screen.getByRole('button', { name: /tanggal/i }));
     fireEvent.click(screen.getByRole('button', { name: '7 hari terakhir' }));
     expect(push).toHaveBeenCalledWith('/news?date=7d');
   });
 
-  it('selecting a second Tanggal option replaces the first', () => {
-    renderExplorer({ activeDateOption: '7d' });
+  it('selecting a second Tanggal option replaces the first', async () => {
+    await renderExplorer({ date: '7d' });
     fireEvent.click(screen.getByRole('button', { name: /tanggal 1/i }));
     fireEvent.click(screen.getByRole('button', { name: '30 hari terakhir' }));
     expect(push).toHaveBeenCalledWith('/news?date=30d');
   });
 
-  it('selecting Rentang khusus reveals from/to inputs and applies both on submit', () => {
-    renderExplorer();
+  it('selecting Rentang khusus reveals from/to inputs and applies both on submit', async () => {
+    await renderExplorer();
     fireEvent.click(screen.getByRole('button', { name: /tanggal/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Rentang khusus' }));
 
@@ -134,8 +141,8 @@ describe('NewsExplorer', () => {
     // A full first page (NEWS_PAGE_SIZE = 9) is required for the button to render at all.
     const firstPage = Array.from({ length: 9 }, (_, i) => makeArticle({ title: `Article ${i}` }));
     const nextPage = [makeArticle({ title: 'Extra article' })]; // fewer than NEWS_PAGE_SIZE -> no more after
+    await renderExplorer({}, firstPage);
     getArticlesMock.mockResolvedValueOnce(nextPage);
-    renderExplorer({ initialArticles: firstPage });
 
     fireEvent.click(screen.getByRole('button', { name: /load more/i }));
 
@@ -144,10 +151,10 @@ describe('NewsExplorer', () => {
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
   });
 
-  it('search narrows the currently loaded set without calling the API', () => {
+  it('search narrows the currently loaded set without calling the API again', async () => {
     const match = makeArticle({ title: 'Kerja remote di Surabaya' });
     const other = makeArticle({ title: 'Rute sepeda aman' });
-    renderExplorer({ initialArticles: [match, other] });
+    await renderExplorer({}, [match, other]);
 
     fireEvent.change(screen.getByPlaceholderText('Search this page…'), {
       target: { value: 'remote' },
@@ -155,11 +162,11 @@ describe('NewsExplorer', () => {
 
     expect(screen.getByText('Kerja remote di Surabaya')).toBeInTheDocument();
     expect(screen.queryByText('Rute sepeda aman')).not.toBeInTheDocument();
-    expect(getArticlesMock).not.toHaveBeenCalled();
+    expect(getArticlesMock).toHaveBeenCalledTimes(1);
   });
 
-  it('"Hapus semua" clears category, anak usaha, and date filters at once', () => {
-    renderExplorer({ activeCategorySlugs: ['kuliner'], activeAnakUsahaSlugs: ['sidersvox'], activeDateOption: '7d' });
+  it('"Hapus semua" clears category, anak usaha, and date filters at once', async () => {
+    await renderExplorer({ category: 'kuliner', anakUsaha: 'sidersvox', date: '7d' });
     fireEvent.click(screen.getByRole('button', { name: 'Hapus semua' }));
     expect(push).toHaveBeenCalledWith('/news');
   });

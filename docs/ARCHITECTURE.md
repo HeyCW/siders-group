@@ -40,7 +40,7 @@ The costs, stated plainly so nobody is surprised in week 11:
                                      │
     ┌─────────────────────────┐     ┌┴────────────────────────┐
     │  apps/web               │     │  apps/api               │
-    │  Next.js · SSR/ISR      │     │  Node + Express         │
+    │  Next.js · static export│     │  Node + Express         │
     │  Public site            │     │                         │
     └───────┬─────────────────┘     │  1. read session cookie │
             │  httpOnly cookies     │  2. verify own JWT      │
@@ -487,22 +487,26 @@ https://cdn.siders.id/cdn-cgi/image/width=800,quality=75,format=auto/media/cover
 
 ## 8. Frontend
 
-### 8.1 `apps/web` — Next.js public site
+### 8.1 `apps/web` — Next.js public site, static export
+
+`next.config.mjs` sets `output: 'export'`: `web` ships as plain HTML/CSS/JS with no Node server, because production is shared/cPanel hosting with a hard cap on Node processes (`making-static-for-web-and-admin`). This replaced the ISR + on-demand-revalidation design the table below once described.
 
 | Route | Strategy | Why |
 |---|---|---|
-| `/` | ISR, 60s + on-demand revalidate | Editors publish curation and see it within seconds |
-| `/news` | Server-rendered, searchParams-driven | Filters live in the URL, so results are shareable |
-| `/news/[slug]` | SSG + on-demand revalidate on publish | Fastest possible article load, correct OG tags |
+| `/` | Static, rebuilt on publish | Baked at build time; a rebuild is the only way to update it |
+| `/news` | Client-rendered, searchParams-driven | A static export can't read `searchParams` on the server, so `NewsExplorer` reads the URL and fetches articles itself (`useSearchParams` + `useEffect`) — filters still live in the URL, so results are still shareable |
+| `/news/[slug]` | SSG via `generateStaticParams`, rebuilt on publish | Every published slug is enumerated and rendered at build time; a slug published after the last build 404s until the next one |
 | `/contact` | Static | — |
 
-Server Components fetch from the API directly over the internal URL. Reader session state is deliberately **not** forwarded to them: `add-reader-web-sign-in` resolves it client-side instead, because reading the cookie header in a Server Component — even just in the root layout — would opt the whole route tree into dynamic rendering and kill ISR on `/` and SSG on `/news/[slug]`. Public content is identical for anonymous and signed-in readers; only the masthead's session-dependent control varies, and it resolves after the route's content is already rendered. This is revisited if an inherently-dynamic authenticated route (e.g. `/account`) is ever added to justify forwarding the cookie. Only genuinely interactive leaves — like button, comment composer, share sheet, reels player — are Client Components.
+**Publish → live is now a rebuild, not a revalidation.** `apps/api/src/lib/revalidate.ts` used to POST to a `/api/revalidate` route this app no longer has; it now triggers a rebuild via `DEPLOY_TRIGGER_URL` (a CI webhook — GitHub Actions `repository_dispatch` or equivalent) instead, once per write, same as before. Latency for a published change to appear went from ISR's ~60s to however long a rebuild + redeploy takes — a deliberate trade for zero Node processes, not an oversight. A burst of edits now means a burst of rebuild triggers; coalescing those is the CI/deploy system's job (e.g. GitHub Actions' `concurrency` + `cancel-in-progress`), not this process's.
+
+Server Components fetch from the API directly over the internal URL, at build time only. Reader session state is **not** forwarded to them: `add-reader-web-sign-in` resolves it client-side instead (`apps/web/lib/readerSession.tsx`) — there is no per-request server render left to opt out of, but the reasoning still holds, since public content is identical for anonymous and signed-in readers and only the masthead's session-dependent control varies. Only genuinely interactive leaves — like button, comment composer, share sheet, reels player, and now the entire `/news` filter UI — are Client Components.
 
 Client data fetching for comments and likes is a plain `useState`/`useEffect` hook per island (`apps/web/components/article/useArticleEngagement.ts`), with `credentials: 'include'` on every request so session cookies travel. A single fetch wrapper handles the 401 → refresh → retry cycle in one place; never scatter that logic across call sites — `apps/web/lib/authApi.ts` is this for reader session calls today.
 
 ### 8.2 `apps/admin` — Vite SPA
 
-No SEO requirement, so no SSR complexity. React Router for routing. Server state is fetched per page with `useState`/`useEffect` behind the shared `useAsyncAction` hook, and forms are controlled components validated against the shared Zod contracts directly.
+No SEO requirement, so no SSR complexity — deployed as `vite build`'s static output, served directly by Apache/LiteSpeed with zero Node process cost. React Router (`BrowserRouter`) handles client-side routing; `apps/admin/public/.htaccess` rewrites unmatched requests to `index.html` so deep links and refreshes still resolve. Server state is fetched per page with `useState`/`useEffect` behind the shared `useAsyncAction` hook, and forms are controlled components validated against the shared Zod contracts directly.
 
 > TanStack Query and react-hook-form were both named here originally and neither was ever added as a dependency to `apps/web` or `apps/admin`. This paragraph described libraries the project does not use for several changes before anyone checked. If either is adopted later, this line changes together with the `package.json`, not after it.
 
@@ -559,14 +563,16 @@ Per-route buckets keyed by user ID when signed in, hashed IP when not. Comments 
 | Staging | managed MySQL | `staging.siders.id` | `admin-staging.siders.id` | `api-staging.siders.id` |
 | Production | managed MySQL | `siders.id` | `admin.siders.id` | `api.siders.id` |
 
-All three production hostnames sit under one registrable domain so session cookies work with `SameSite=Lax`. Vercel for the two frontends, Fly.io or Railway for the API.
+All three production hostnames sit under one registrable domain so session cookies work with `SameSite=Lax`. Production targets shared/cPanel hosting rather than Vercel/Fly.io/Railway (`making-static-for-web-and-admin`): `web` and `admin` are static builds (`next build`'s `out/` and `vite build`'s `dist/`) uploaded to the host, `api` runs as its one Node App Selector entry, and nothing here needs Docker at that host — `docker-compose.yml` is local-dev-only, for the MySQL container.
 
 `pnpm db:up` earns its place locally: it runs `docker-compose.yml`'s MySQL service, so no developer needs cloud credentials. Only the database container is used.
 
 ### Environment variables
 
 ```
-# apps/web + apps/admin  (public — will be in the browser)
+# apps/web + apps/admin  (public — baked into the static build at build time, not read at
+# runtime: there is no server left to read process.env from once `next build`/`vite build` has
+# run, so these must be set wherever the build itself runs, e.g. CI)
 NEXT_PUBLIC_API_URL=https://api.siders.id
 NEXT_PUBLIC_CDN_URL=https://cdn.siders.id
 
@@ -586,7 +592,8 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET=
 
-REVALIDATE_SECRET=
+DEPLOY_TRIGGER_URL=         # CI webhook that rebuilds + redeploys web/admin; optional, unset = no-op
+DEPLOY_TRIGGER_TOKEN=
 SENTRY_DSN=
 ```
 
