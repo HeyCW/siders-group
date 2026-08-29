@@ -6687,18 +6687,20 @@ function createServer() {
 }
 var isMainModule = process.argv[1] !== void 0 && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMainModule) {
-  const env = loadEnv();
-  const logger = createLogger(env);
-  await ensureMediaStorageDir(env);
-  const app = createServer();
-  const scheduler = startScheduler(logger);
-  scheduler.registerJob(
-    "* * * * *",
-    createScheduledPublishJob(createArticleRepository(getDatabase(env)), env, logger)
-  );
-  app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT }, "api listening");
-  });
+  void (async () => {
+    const env = loadEnv();
+    const logger = createLogger(env);
+    await ensureMediaStorageDir(env);
+    const app = createServer();
+    const scheduler = startScheduler(logger);
+    scheduler.registerJob(
+      "* * * * *",
+      createScheduledPublishJob(createArticleRepository(getDatabase(env)), env, logger)
+    );
+    app.listen(env.PORT, () => {
+      logger.info({ port: env.PORT }, "api listening");
+    });
+  })();
 }
 export {
   createServer

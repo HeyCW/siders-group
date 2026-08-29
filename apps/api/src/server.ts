@@ -97,23 +97,28 @@ const isMainModule =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMainModule) {
-  const env = loadEnv();
-  const logger = createLogger(env);
-  // Best-effort: `storeUpload` also creates its dated subdirectory recursively on every write,
-  // so a missing root self-heals on first upload regardless. This is the boot-time guarantee
-  // for operational visibility (add-news-management-system/tasks.md - 4.3), not a correctness
-  // dependency of the upload path itself.
-  await ensureMediaStorageDir(env);
-  const app = createServer();
-  const scheduler = startScheduler(logger);
-  // Every minute, matching design.md - "Scheduling: status flag plus a lazy read-time
-  // fallback" - "A cron worker runs every minute". Correctness never depends on this job; see
-  // scheduledPublishWorker.ts.
-  scheduler.registerJob(
-    '* * * * *',
-    createScheduledPublishJob(createArticleRepository(getDatabase(env)), env, logger),
-  );
-  app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT }, 'api listening');
-  });
+  // Wrapped in an async IIFE rather than a top-level `await` — a bundled/CJS-required entry
+  // point with a genuine top-level await fails to load under loaders that `require()` it (e.g.
+  // LiteSpeed's lsnode.js) with ERR_REQUIRE_ASYNC_MODULE.
+  void (async () => {
+    const env = loadEnv();
+    const logger = createLogger(env);
+    // Best-effort: `storeUpload` also creates its dated subdirectory recursively on every write,
+    // so a missing root self-heals on first upload regardless. This is the boot-time guarantee
+    // for operational visibility (add-news-management-system/tasks.md - 4.3), not a correctness
+    // dependency of the upload path itself.
+    await ensureMediaStorageDir(env);
+    const app = createServer();
+    const scheduler = startScheduler(logger);
+    // Every minute, matching design.md - "Scheduling: status flag plus a lazy read-time
+    // fallback" - "A cron worker runs every minute". Correctness never depends on this job; see
+    // scheduledPublishWorker.ts.
+    scheduler.registerJob(
+      '* * * * *',
+      createScheduledPublishJob(createArticleRepository(getDatabase(env)), env, logger),
+    );
+    app.listen(env.PORT, () => {
+      logger.info({ port: env.PORT }, 'api listening');
+    });
+  })();
 }
