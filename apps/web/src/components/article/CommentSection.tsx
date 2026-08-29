@@ -3,6 +3,7 @@ import { COMMENT_MAX_LENGTH, type CommentResponse } from '@siders/contracts';
 import { ApiError } from '../../lib/authApi';
 import { formatCount } from '../../lib/formatCount';
 import { useReaderSession } from '../../lib/readerSession';
+import { CommentReportControl } from './CommentReportControl';
 import { SignInPrompt } from './SignInPrompt';
 
 function formatCommentDate(iso: string): string {
@@ -163,6 +164,11 @@ export function CommentSection({
                 </time>
               </div>
               <p className="mt-2 max-w-[66ch] whitespace-pre-wrap text-[15px] leading-[1.6]">{comment.body}</p>
+              {session.status === 'authenticated' && (
+                <div className="mt-2">
+                  <CommentReportControl commentId={comment.id} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
