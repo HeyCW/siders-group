@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\AnakUsahaController;
 use App\Http\Controllers\ArticleController;
-use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\StaffAuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ContactMessageController;
@@ -22,11 +21,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('staff')->group(function () {
     Route::post('/login', [StaffAuthController::class, 'login'])->middleware(['public', 'throttle:staff-login']);
     Route::post('/logout', [StaffAuthController::class, 'logout'])->middleware('auth:staff');
-});
-
-Route::prefix('auth/google')->group(function () {
-    Route::get('/redirect', [GoogleAuthController::class, 'redirect'])->middleware('public');
-    Route::get('/callback', [GoogleAuthController::class, 'callback'])->middleware(['public', 'throttle:google-callback']);
 });
 
 // Self-service — deliberately exempt from `staff.password_change_not_pending` (this is the one

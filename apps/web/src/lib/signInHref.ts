@@ -9,7 +9,10 @@ import { API_URL } from './env';
  * built, not of where it is built.
  */
 export function signInHref(currentLocation: string): string {
-  return `${API_URL}/auth/google?next=${encodeURIComponent(currentLocation)}`;
+  // Not /api-prefixed: this route lives in routes/web.php on the Laravel side (a full-page
+  // navigation through Google's own login page needs an unconditional session, which only the
+  // 'web' middleware group guarantees — see GoogleAuthController's class doc).
+  return `${API_URL}/auth/google/redirect?next=${encodeURIComponent(window.location.origin + currentLocation)}`;
 }
 
 /**
