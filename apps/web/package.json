@@ -4,16 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@siders/contracts": "workspace:^",
-    "next": "^14.2.5",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.25.1"
   },
   "devDependencies": {
     "@siders/config": "workspace:*",
@@ -27,6 +27,7 @@
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
     "typescript": "^5.5.3",
+    "vite": "^5.3.4",
     "vitest": "^2.0.2"
   }
 }

@@ -77,22 +77,11 @@ jobs:
           DATABASE_URL: mysql://root@127.0.0.1:3306/siders
         run: pnpm test
 
-      - name: Start mock API (apps/web's `/` needs a reachable API to statically render at build time)
-        run: |
-          node apps/web/scripts/ci-mock-api.mjs &
-          echo $! > /tmp/ci-mock-api.pid
-          for i in $(seq 1 20); do
-            curl -sf http://localhost:4310/home > /dev/null && exit 0
-            sleep 0.5
-          done
-          echo "mock API never came up" >&2
-          exit 1
-
+      # apps/web is a client-rendered SPA (making-csr) — the build no longer fetches anything at
+      # build time, so unlike the old static-export design this doesn't need a reachable API
+      # (mock or real) to succeed. VITE_API_URL is still supplied so the built bundle behaves
+      # the way a real deploy's would, matching `apps/web/src/lib/env.ts`'s eager-fail check.
       - name: Build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:4310
+          VITE_API_URL: http://localhost:4310
         run: pnpm build
-
-      - name: Stop mock API
-        if: always()
-        run: kill "$(cat /tmp/ci-mock-api.pid)" 2>/dev/null || true

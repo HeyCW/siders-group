@@ -1,0 +1,12 @@
+# Static SPA rewrite for react-router's BrowserRouter (src/main.tsx). Any request that isn't
+# a real file on disk falls through to index.html so client-side routing can take over — same
+# rule as apps/admin/public/.htaccess, now needed here too since making-csr moved apps/web off
+# Next.js's own server-side routing.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
