@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\StaffEmail;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
@@ -18,7 +19,7 @@ class StaffAuthService
      */
     public function attempt(string $email, string $password): ?User
     {
-        $user = User::where('email', $email)->first();
+        $user = User::where('email', StaffEmail::normalize($email))->first();
 
         $hash = $user?->password_hash ?? $this->dummyHash();
         $verified = Hash::check($password, $hash);

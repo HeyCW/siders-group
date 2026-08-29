@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\SessionRevocationService;
 use App\Services\StaffAuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,10 @@ use Illuminate\Support\Facades\Auth;
 
 class StaffAuthController extends Controller
 {
-    public function __construct(private readonly StaffAuthService $staffAuthService) {}
+    public function __construct(
+        private readonly StaffAuthService $staffAuthService,
+        private readonly SessionRevocationService $sessionRevocationService,
+    ) {}
 
     public function login(Request $request): JsonResponse
     {
@@ -31,6 +35,7 @@ class StaffAuthController extends Controller
 
         Auth::guard('staff')->login($user);
         $request->session()->regenerate();
+        $this->sessionRevocationService->bindCurrentSession($request, $user->id);
 
         return response()->json(['data' => [
             'id' => $user->id,

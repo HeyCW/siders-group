@@ -9,7 +9,9 @@ abstract class DomainException extends \RuntimeException
     public function __construct(
         string $message,
         private readonly int $status,
-        private readonly string $code,
+        // Not named $code: \Exception already declares a non-readonly $code (int), and PHP
+        // forbids redeclaring it as readonly.
+        private readonly string $errorCode,
     ) {
         parent::__construct($message);
     }
@@ -21,6 +23,6 @@ abstract class DomainException extends \RuntimeException
 
     public function getErrorCode(): string
     {
-        return $this->code;
+        return $this->errorCode;
     }
 }
