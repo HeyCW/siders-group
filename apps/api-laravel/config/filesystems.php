@@ -47,16 +47,6 @@ return [
             'report' => false,
         ],
 
-        // Dedicated disk for uploaded article/anak-usaha/partner/guide-pick media, served through
-        // a dedicated controller (not storage:link) so nosniff can be forced on every response —
-        // see routes/api.php's /media-files/{path} route and MediaFileController.
-        'media' => [
-            'driver' => 'local',
-            'root' => env('MEDIA_STORAGE_PATH', storage_path('app/media')),
-            'throw' => false,
-            'report' => false,
-        ],
-
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

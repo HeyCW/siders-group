@@ -168,17 +168,17 @@ class DemoContentSeeder extends Seeder
 
     private function placeholderImage(User $owner, string $tag): Media
     {
-        $path = "seed/{$tag}.jpg";
+        $path = "media/seed/{$tag}.jpg";
 
-        if (! Storage::disk('media')->exists($path)) {
-            Storage::disk('media')->put($path, base64_decode(self::PLACEHOLDER_JPEG_BASE64));
+        if (! Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->put($path, base64_decode(self::PLACEHOLDER_JPEG_BASE64));
         }
 
         return Media::firstOrCreate(
             ['storage_path' => $path],
             [
                 'mime' => 'image/jpeg',
-                'size_bytes' => Storage::disk('media')->size($path),
+                'size_bytes' => Storage::disk('public')->size($path),
                 'original_filename' => "{$tag}.jpg",
                 'uploaded_by' => $owner->id,
             ],
@@ -187,17 +187,17 @@ class DemoContentSeeder extends Seeder
 
     private function placeholderVideo(User $owner, string $tag): Media
     {
-        $path = "seed/{$tag}.mp4";
+        $path = "media/seed/{$tag}.mp4";
 
-        if (! Storage::disk('media')->exists($path)) {
-            Storage::disk('media')->put($path, hex2bin(str_replace(' ', '', self::PLACEHOLDER_MP4_HEX)).str_repeat("\0", 200));
+        if (! Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->put($path, hex2bin(str_replace(' ', '', self::PLACEHOLDER_MP4_HEX)).str_repeat("\0", 200));
         }
 
         return Media::firstOrCreate(
             ['storage_path' => $path],
             [
                 'mime' => 'video/mp4',
-                'size_bytes' => Storage::disk('media')->size($path),
+                'size_bytes' => Storage::disk('public')->size($path),
                 'original_filename' => "{$tag}.mp4",
                 'uploaded_by' => $owner->id,
             ],

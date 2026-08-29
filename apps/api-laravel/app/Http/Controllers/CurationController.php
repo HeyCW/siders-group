@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Article;
 use App\Services\HomeCurationService;
 use App\Services\HomeFeedService;
+use App\Support\ArticlePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -42,12 +43,6 @@ class CurationController extends Controller
         $limit = min((int) $request->query('limit', 10), 20);
         $articles = $this->homeFeedService->compose($limit);
 
-        return response()->json(['data' => $articles->map(fn (Article $a) => [
-            'id' => $a->id,
-            'title' => $a->title,
-            'slug' => $a->slug,
-            'excerpt' => $a->excerpt,
-            'publishedAt' => $a->published_at?->toIso8601String(),
-        ])]);
+        return response()->json(['data' => $articles->map(fn (Article $a) => ArticlePresenter::public($a))]);
     }
 }

@@ -12,13 +12,22 @@ use Illuminate\Support\Str;
 
 class MediaService
 {
+    /**
+     * Laravel's own `public` disk (storage/app/public, symlinked to public/storage via
+     * `php artisan storage:link`) — served directly by the web server as a static file, not
+     * through a dedicated controller.
+     */
+    private const DISK = 'public';
+
+    private const PREFIX = 'media';
+
     public function store(UploadedFile $file, ?string $alt, ?string $caption, User $uploader): Media
     {
         $extension = $file->getMimeType() === 'video/mp4' ? 'mp4' : $file->extension();
         $filename = Str::uuid()->toString().'.'.$extension;
-        $datedSubdir = now()->format('Y/m');
+        $datedSubdir = self::PREFIX.'/'.now()->format('Y/m');
 
-        $storagePath = Storage::disk('media')->putFileAs($datedSubdir, $file, $filename);
+        $storagePath = Storage::disk(self::DISK)->putFileAs($datedSubdir, $file, $filename);
 
         return Media::create([
             'storage_path' => $storagePath,
@@ -49,13 +58,11 @@ class MediaService
     {
         $path = $media->storage_path;
         $media->delete();
-        Storage::disk('media')->delete($path);
+        Storage::disk(self::DISK)->delete($path);
     }
 
     public function publicUrl(Media $media): string
     {
-        $base = rtrim((string) config('media.public_base_url'), '/');
-
-        return $base.'/'.$media->storage_path;
+        return Storage::disk(self::DISK)->url($media->storage_path);
     }
 }

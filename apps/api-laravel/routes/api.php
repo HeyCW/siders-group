@@ -11,7 +11,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EngagementController;
 use App\Http\Controllers\GuidePickController;
 use App\Http\Controllers\MediaController;
-use App\Http\Controllers\MediaFileController;
 use App\Http\Controllers\ModerationController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\ReaderMeController;
@@ -66,11 +65,6 @@ Route::middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pend
     Route::patch('/media/{id}', [MediaController::class, 'update']);
     Route::delete('/media/{id}', [MediaController::class, 'destroy']);
 });
-
-// express.static equivalent — public, unauthenticated file serving.
-Route::get('/media-files/{path}', [MediaFileController::class, 'show'])
-    ->where('path', '.*')
-    ->middleware('public');
 
 // --- Categories ---
 Route::get('/categories', [CategoryController::class, 'index'])->middleware('public');
