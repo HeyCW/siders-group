@@ -54,14 +54,19 @@ class GuidePickController extends Controller
         return response()->json(['data' => null]);
     }
 
+    /** Returns the reordered list, not null — GuidePicksPage replaces its local state with this
+     *  response directly after a drag-reorder (same pattern as PartnerController::reorder). */
     public function reorder(Request $request): JsonResponse
     {
         $request->validate(['guidePickIds' => ['required', 'array']]);
         $this->guidePickService->reorder($request->input('guidePickIds'));
 
-        return response()->json(['data' => null]);
+        $picks = GuidePick::with(['photoMedia', 'videoMedia'])->orderBy('sort_order')->get();
+
+        return response()->json(['data' => $picks->map(fn (GuidePick $p) => $this->shape($p))]);
     }
 
+    /** Matches packages/contracts/src/guidePick.ts's guidePickResponseSchema. */
     private function shape(GuidePick $pick): array
     {
         return [
@@ -73,6 +78,8 @@ class GuidePickController extends Controller
             'videoUrl' => $this->mediaService->publicUrl($pick->videoMedia),
             'sortOrder' => $pick->sort_order,
             'isActive' => $pick->is_active,
+            'createdAt' => $pick->created_at->toIso8601String(),
+            'updatedAt' => $pick->updated_at->toIso8601String(),
         ];
     }
 }

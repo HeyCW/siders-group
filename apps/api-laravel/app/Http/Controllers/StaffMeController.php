@@ -30,7 +30,10 @@ class StaffMeController extends Controller
             'email' => $staff->email,
             'name' => $staff->name,
             'roleId' => $staff->role_id,
+            'roleName' => $staff->role->name,
+            'status' => $staff->status,
             'mustChangePassword' => $staff->must_change_password,
+            'createdAt' => $staff->created_at->toIso8601String(),
             'isOwner' => $this->ownerRoleResolver->isOwner($staff->role_id),
             'permissionKeys' => $staff->role->permissions->pluck('key')->values(),
         ]]);

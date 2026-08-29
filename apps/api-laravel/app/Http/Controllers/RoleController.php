@@ -26,13 +26,7 @@ class RoleController extends Controller
     {
         $roles = $this->roleService->listWithHolderCounts();
 
-        return response()->json(['data' => $roles->map(fn (Role $role) => [
-            'id' => $role->id,
-            'name' => $role->name,
-            'slug' => $role->slug,
-            'isSystem' => $role->is_system,
-            'holderCount' => $role->users_count,
-        ])]);
+        return response()->json(['data' => $roles->map(fn (Role $role) => $this->summary($role))]);
     }
 
     public function show(string $id): JsonResponse
@@ -44,7 +38,7 @@ class RoleController extends Controller
 
     public function store(StoreRoleRequest $request): JsonResponse
     {
-        $role = $this->roleService->create($request->string('name')->value(), $request->input('permissionKeys'));
+        $role = $this->roleService->create($request->string('name')->value(), $request->input('permissions'));
 
         return response()->json(['data' => $this->detail($role->fresh('permissions'))], 201);
     }
@@ -55,7 +49,7 @@ class RoleController extends Controller
         $role = $this->roleService->update(
             $role,
             $request->has('name') ? $request->string('name')->value() : null,
-            $request->has('permissionKeys') ? $request->input('permissionKeys') : null,
+            $request->has('permissions') ? $request->input('permissions') : null,
         );
 
         return response()->json(['data' => $this->detail($role)]);
@@ -78,14 +72,24 @@ class RoleController extends Controller
         return response()->json(['data' => null]);
     }
 
-    private function detail(Role $role): array
+    /** Matches packages/contracts/src/role.ts's roleSummaryResponseSchema — no `permissions` field. */
+    private function summary(Role $role): array
     {
         return [
             'id' => $role->id,
             'name' => $role->name,
             'slug' => $role->slug,
             'isSystem' => $role->is_system,
-            'permissionKeys' => $role->permissions->pluck('key')->values(),
+            'holderCount' => $role->users_count ?? $role->users()->count(),
+        ];
+    }
+
+    /** Matches packages/contracts/src/role.ts's roleDetailResponseSchema (summary + permissions). */
+    private function detail(Role $role): array
+    {
+        return [
+            ...$this->summary($role),
+            'permissions' => $role->permissions->pluck('key')->values(),
         ];
     }
 }

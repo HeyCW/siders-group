@@ -10,6 +10,7 @@ use App\Models\Reader;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
+/** Every key here matches packages/contracts/src/dashboard.ts's dashboardResponseSchema exactly. */
 class DashboardService
 {
     private const CADENCE_WEEKS = 8;
@@ -31,9 +32,9 @@ class DashboardService
             'pipeline' => $this->pipeline(),
             'cadence' => $this->cadence($now),
             'contentDebt' => $this->contentDebt(),
-            'curationIntegrity' => $this->curationIntegrity($now),
+            'curationIntegrity' => $this->curationIntegrity(),
             'upNext' => $this->upNext($now),
-            'readerActivity' => $this->readerActivity($now),
+            'readers' => $this->readers($now),
             'readership' => $this->readership($now),
         ];
     }
@@ -83,17 +84,17 @@ class DashboardService
         return [
             'missingSeoDescription' => (clone $published)->where(fn ($q) => $q->whereNull('seo_description')->orWhere('seo_description', ''))->count(),
             'missingExcerpt' => (clone $published)->where(fn ($q) => $q->whereNull('excerpt')->orWhere('excerpt', ''))->count(),
-            'missingFeaturedMedia' => (clone $published)->whereNull('featured_media_id')->count(),
+            'missingFeaturedImage' => (clone $published)->whereNull('featured_media_id')->count(),
             'uncategorized' => (clone $published)->whereDoesntHave('categories')->count(),
         ];
     }
 
-    private function curationIntegrity(Carbon $now): array
+    private function curationIntegrity(): array
     {
         $entries = HomeCuration::with('article')->get();
         $visible = $entries->filter(fn (HomeCuration $c) => $c->article?->isCurrentlyVisible() ?? false)->count();
 
-        return ['total' => $entries->count(), 'visible' => $visible];
+        return ['home' => ['total' => $entries->count(), 'visible' => $visible]];
     }
 
     /**
@@ -106,24 +107,29 @@ class DashboardService
         $dueSoonQuery = Article::where('status', 'scheduled')
             ->whereBetween('published_at', [$now, $now->clone()->addHours(self::DUE_SOON_HOURS)]);
 
-        $dueSoon = (clone $dueSoonQuery)->orderBy('published_at')->limit(self::DUE_SOON_CAP)->get(['id', 'title', 'published_at']);
+        $dueSoon = (clone $dueSoonQuery)->orderBy('published_at')->limit(self::DUE_SOON_CAP)->get(['id', 'title', 'slug', 'published_at']);
 
-        $overdueUnpromoted = Article::where('status', 'scheduled')
+        $overdueUnpromotedCount = Article::where('status', 'scheduled')
             ->where('published_at', '<=', $now->clone()->subMinutes(self::OVERDUE_GRACE_MINUTES))
             ->count();
 
         return [
-            'dueSoon' => $dueSoon->map(fn (Article $a) => ['id' => $a->id, 'title' => $a->title, 'publishedAt' => $a->published_at->toIso8601String()]),
-            'dueSoonTotal' => (clone $dueSoonQuery)->count(),
-            'overdueUnpromoted' => $overdueUnpromoted,
+            'dueWithin48h' => $dueSoon->map(fn (Article $a) => [
+                'id' => $a->id,
+                'title' => $a->title,
+                'slug' => $a->slug,
+                'publishedAt' => $a->published_at->toIso8601String(),
+            ]),
+            'dueWithin48hTotal' => (clone $dueSoonQuery)->count(),
+            'overdueUnpromotedCount' => $overdueUnpromotedCount,
         ];
     }
 
-    private function readerActivity(Carbon $now): array
+    private function readers(Carbon $now): array
     {
         return [
-            'newReaders7d' => Reader::where('created_at', '>=', $now->clone()->subDays(7))->count(),
-            'activeReaders30d' => Reader::where('last_login_at', '>=', $now->clone()->subDays(30))->count(),
+            'newLast7d' => Reader::where('created_at', '>=', $now->clone()->subDays(7))->count(),
+            'activeLast30d' => Reader::where('last_login_at', '>=', $now->clone()->subDays(30))->count(),
         ];
     }
 
@@ -141,15 +147,20 @@ class DashboardService
         $topArticles = DB::table('article_views_daily')
             ->join('articles', 'articles.id', '=', 'article_views_daily.article_id')
             ->where('article_views_daily.date', '>=', $thirtyDaysAgo)
-            ->groupBy('articles.id', 'articles.title')
+            ->groupBy('articles.id', 'articles.title', 'articles.slug')
             ->orderByDesc(DB::raw('sum(article_views_daily.views)'))
             ->limit(self::TOP_ARTICLES_CAP)
-            ->get(['articles.id', 'articles.title', DB::raw('sum(article_views_daily.views) as views')]);
+            ->get(['articles.id', 'articles.title', 'articles.slug', DB::raw('sum(article_views_daily.views) as views')]);
 
         return [
-            'totalViews7d' => (int) ($totals->total_views ?? 0),
-            'uniqueViews7d' => (int) ($totals->total_unique_views ?? 0),
-            'topArticles30d' => $topArticles->map(fn ($row) => ['id' => $row->id, 'title' => $row->title, 'views' => (int) $row->views]),
+            'last7dViews' => (int) ($totals->total_views ?? 0),
+            'last7dUniqueViews' => (int) ($totals->total_unique_views ?? 0),
+            'topArticles' => $topArticles->map(fn ($row) => [
+                'id' => $row->id,
+                'title' => $row->title,
+                'slug' => $row->slug,
+                'views' => (int) $row->views,
+            ]),
         ];
     }
 }

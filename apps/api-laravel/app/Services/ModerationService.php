@@ -12,7 +12,6 @@ use App\Models\ModerationAction;
 use App\Models\Reader;
 use App\Models\User;
 use App\Support\PlanReaderModeration;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -29,7 +28,7 @@ class ModerationService
      */
     public function commentQueue(string $filter, ?string $cursor): array
     {
-        $query = Comment::with(['article', 'reader'])->orderByDesc('created_at')->orderByDesc('id');
+        $query = Comment::with(['article', 'reader', 'reports'])->orderByDesc('created_at')->orderByDesc('id');
 
         match ($filter) {
             'visible' => $query->where('status', 'visible'),
@@ -84,10 +83,10 @@ class ModerationService
             ]);
         });
 
-        return $comment->fresh();
+        return $comment->fresh(['article', 'reader', 'reports']);
     }
 
-    public function dismissReports(Comment $comment, User $actor, ?string $reason): void
+    public function dismissReports(Comment $comment, User $actor, ?string $reason): Comment
     {
         DB::transaction(function () use ($comment, $actor, $reason) {
             $resolved = CommentReport::where('comment_id', $comment->id)
@@ -106,6 +105,8 @@ class ModerationService
                 'reason' => $reason,
             ]);
         });
+
+        return $comment->fresh(['article', 'reader', 'reports']);
     }
 
     public function reportComment(Comment $comment, Reader $reporter, string $reason, ?string $note): CommentReport
@@ -122,15 +123,24 @@ class ModerationService
         ]);
     }
 
-    public function readerQueue(?string $search, ?string $statusFilter, int $page, int $perPage): LengthAwarePaginator
+    /**
+     * Offset-paginated per readerQueueQuerySchema — unlike the comment queue, a reader missing
+     * from one page of a search is just re-found by scrolling/re-searching, no keyset needed.
+     *
+     * @return Collection<int, Reader>
+     */
+    public function readerQueue(?string $search, ?string $statusFilter, int $limit, int $offset): Collection
     {
         return Reader::query()
+            ->withCount('comments')
             ->when($search, fn ($q, $s) => $q->where(fn ($q2) => $q2
                 ->where('name', 'like', '%'.addcslashes($s, '%_\\').'%')
                 ->orWhere('email', 'like', '%'.addcslashes($s, '%_\\').'%')))
             ->when($statusFilter && $statusFilter !== 'all', fn ($q) => $q->where('status', $statusFilter))
             ->orderBy('name')
-            ->paginate($perPage, page: $page);
+            ->skip($offset)
+            ->take($limit)
+            ->get();
     }
 
     /**
@@ -149,7 +159,7 @@ class ModerationService
         $actions = PlanReaderModeration::plan($reader, $touchesStatus, $status, $touchesMutedUntil, $mutedUntil);
 
         if ($actions === []) {
-            return $reader;
+            return $reader->loadCount('comments');
         }
 
         DB::transaction(function () use ($reader, $actor, $actions, $reason) {
@@ -166,7 +176,7 @@ class ModerationService
             }
         });
 
-        return $reader->fresh();
+        return $reader->fresh()->loadCount('comments');
     }
 
     private function encodeCursor(\DateTimeInterface $createdAt, string $id): string

@@ -16,21 +16,13 @@ class ModerationController extends Controller
 
     public function commentQueue(Request $request): JsonResponse
     {
-        $filter = $request->query('filter', 'all');
-        $result = $this->moderationService->commentQueue($filter, $request->query('cursor'));
+        $status = $request->query('status', 'all');
+        $result = $this->moderationService->commentQueue($status, $request->query('cursor'));
 
-        return response()->json([
-            'data' => $result['items']->map(fn (Comment $c) => [
-                'id' => $c->id,
-                'body' => $c->body,
-                'status' => $c->status,
-                'articleId' => $c->article_id,
-                'articleTitle' => $c->article?->title,
-                'readerName' => $c->reader?->name,
-                'createdAt' => $c->created_at->toIso8601String(),
-            ]),
-            'meta' => ['nextCursor' => $result['nextCursor']],
-        ]);
+        return response()->json(['data' => [
+            'items' => $result['items']->map(fn (Comment $c) => $this->commentRowShape($c))->values(),
+            'nextCursor' => $result['nextCursor'],
+        ]]);
     }
 
     public function moderateComment(Request $request, string $id): JsonResponse
@@ -38,15 +30,15 @@ class ModerationController extends Controller
         $data = $request->validate(['status' => ['required', 'in:visible,removed'], 'reason' => ['nullable', 'string']]);
         $comment = $this->moderationService->moderateComment(Comment::findOrFail($id), $data['status'], $request->user('staff'), $data['reason'] ?? null);
 
-        return response()->json(['data' => ['id' => $comment->id, 'status' => $comment->status]]);
+        return response()->json(['data' => $this->commentRowShape($comment)]);
     }
 
     public function dismissReports(Request $request, string $id): JsonResponse
     {
         $data = $request->validate(['reason' => ['nullable', 'string']]);
-        $this->moderationService->dismissReports(Comment::findOrFail($id), $request->user('staff'), $data['reason'] ?? null);
+        $comment = $this->moderationService->dismissReports(Comment::findOrFail($id), $request->user('staff'), $data['reason'] ?? null);
 
-        return response()->json(['data' => null]);
+        return response()->json(['data' => $this->commentRowShape($comment)]);
     }
 
     public function readerQueue(Request $request): JsonResponse
@@ -54,20 +46,11 @@ class ModerationController extends Controller
         $readers = $this->moderationService->readerQueue(
             $request->query('search'),
             $request->query('status'),
-            (int) $request->query('page', 1),
-            min((int) $request->query('perPage', 20), 50),
+            min((int) $request->query('limit', 20), 100),
+            max((int) $request->query('offset', 0), 0),
         );
 
-        return response()->json([
-            'data' => collect($readers->items())->map(fn (Reader $r) => [
-                'id' => $r->id,
-                'name' => $r->name,
-                'email' => $r->email,
-                'status' => $r->status,
-                'mutedUntil' => $r->muted_until?->toIso8601String(),
-            ]),
-            'meta' => ['total' => $readers->total(), 'page' => $readers->currentPage()],
-        ]);
+        return response()->json(['data' => $readers->map(fn (Reader $r) => $this->readerRowShape($r))->values()]);
     }
 
     public function moderateReader(Request $request, string $id): JsonResponse
@@ -92,11 +75,7 @@ class ModerationController extends Controller
             $data['reason'] ?? null,
         );
 
-        return response()->json(['data' => [
-            'id' => $reader->id,
-            'status' => $reader->status,
-            'mutedUntil' => $reader->muted_until?->toIso8601String(),
-        ]]);
+        return response()->json(['data' => $this->readerRowShape($reader)]);
     }
 
     public function reportComment(Request $request, string $id): JsonResponse
@@ -113,6 +92,53 @@ class ModerationController extends Controller
             $data['note'] ?? null,
         );
 
-        return response()->json(['data' => ['id' => $report->id]], 201);
+        return response()->json(['data' => [
+            'id' => $report->id,
+            'commentId' => $report->comment_id,
+            'reason' => $report->reason,
+            'note' => $report->note,
+            'createdAt' => $report->created_at->toIso8601String(),
+        ]], 201);
+    }
+
+    /** Matches packages/contracts/src/moderation.ts's commentQueueRowSchema. */
+    private function commentRowShape(Comment $comment): array
+    {
+        $openReports = $comment->reports->where('is_open', true);
+
+        $shape = [
+            'id' => $comment->id,
+            'body' => $comment->body,
+            'status' => $comment->status,
+            'articleId' => $comment->article_id,
+            'articleTitle' => $comment->article?->title,
+            'articleSlug' => $comment->article?->slug,
+            'authorName' => $comment->reader?->name,
+            'createdAt' => $comment->created_at->toIso8601String(),
+        ];
+
+        // Present only when the comment carries at least one unresolved report — absence, not
+        // zero, is how "no open reports" is represented.
+        if ($openReports->isNotEmpty()) {
+            $shape['openReportCount'] = $openReports->count();
+            $shape['reportReasons'] = $openReports->pluck('reason')->unique()->values();
+        }
+
+        return $shape;
+    }
+
+    /** Matches packages/contracts/src/moderation.ts's readerQueueRowSchema. */
+    private function readerRowShape(Reader $reader): array
+    {
+        return [
+            'id' => $reader->id,
+            'name' => $reader->name,
+            'email' => $reader->email,
+            'avatarUrl' => $reader->avatar_url,
+            'status' => $reader->status,
+            'mutedUntil' => $reader->muted_until?->toIso8601String(),
+            'commentCount' => $reader->comments_count ?? $reader->comments()->count(),
+            'createdAt' => $reader->created_at->toIso8601String(),
+        ];
     }
 }

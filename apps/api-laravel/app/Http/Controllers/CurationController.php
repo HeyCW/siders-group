@@ -18,15 +18,20 @@ class CurationController extends Controller
         private readonly HomeFeedService $homeFeedService,
     ) {}
 
+    /** Matches packages/contracts/src/curation.ts's homeCurationEntryResponseSchema. */
     public function adminIndex(): JsonResponse
     {
         $entries = $this->homeCurationService->listWithVisibility();
 
         return response()->json(['data' => $entries->map(fn ($e) => [
-            'articleId' => $e['article']?->id,
-            'title' => $e['article']?->title,
+            'article' => [
+                'id' => $e['article']?->id,
+                'title' => $e['article']?->title,
+                'slug' => $e['article']?->slug,
+            ],
+            'status' => $e['article']?->status,
             'position' => $e['position'],
-            'isVisible' => $e['isVisible'],
+            'isPubliclyVisible' => $e['isVisible'],
         ])]);
     }
 

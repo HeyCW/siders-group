@@ -56,6 +56,7 @@ class MediaController extends Controller
             'originalFilename' => $media->original_filename,
             'alt' => $media->alt,
             'caption' => $media->caption,
+            'createdAt' => $media->created_at->toIso8601String(),
         ];
     }
 }

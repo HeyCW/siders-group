@@ -82,12 +82,17 @@ class AnakUsahaController extends Controller
         return response()->json(['data' => null]);
     }
 
+    /** Returns the reordered list, not null — AnakUsahaPresentationPage replaces its local state
+     *  with this response directly after a drag-reorder (same pattern as
+     *  PartnerController::reorder). */
     public function reorderProfiles(Request $request): JsonResponse
     {
         $request->validate(['anakUsahaIds' => ['required', 'array']]);
         $this->anakUsahaService->reorderProfiles($request->input('anakUsahaIds'));
 
-        return response()->json(['data' => null]);
+        $entries = AnakUsaha::with('profile')->orderBy('name')->get();
+
+        return response()->json(['data' => $entries->map(fn (AnakUsaha $a) => $this->adminShape($a))]);
     }
 
     private function validatedProfileData(Request $request, bool $isUpdate = false): array

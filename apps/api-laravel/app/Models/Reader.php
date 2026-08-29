@@ -8,6 +8,7 @@ use App\Models\Concerns\HasMillisecondTimestamps;
 use App\Models\Concerns\HasUuidPrimaryKey;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\Access\Authorizable;
 use Illuminate\Auth\Authenticatable;
 
@@ -59,5 +60,12 @@ class Reader extends Model implements AuthenticatableContract
     public function canAuthorContent(): bool
     {
         return ! $this->isBanned() && ! $this->isMuted();
+    }
+
+    /** Every comment this reader has ever posted, regardless of status — used for the moderation
+     *  queue's `commentCount` (total activity, not just what's currently publicly visible). */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
     }
 }

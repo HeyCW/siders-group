@@ -19,6 +19,8 @@ class ReaderMeController extends Controller
             'name' => $reader->name,
             'email' => $reader->email,
             'avatarUrl' => $reader->avatar_url,
+            'status' => $reader->status,
+            'createdAt' => $reader->created_at->toIso8601String(),
         ]]);
     }
 

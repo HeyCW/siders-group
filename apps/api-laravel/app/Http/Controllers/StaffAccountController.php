@@ -58,6 +58,7 @@ class StaffAccountController extends Controller
         ]]);
     }
 
+    /** Matches packages/contracts/src/session.ts's staffAccountResponseSchema. */
     private function summary(User $user): array
     {
         return [
@@ -65,8 +66,10 @@ class StaffAccountController extends Controller
             'email' => $user->email,
             'name' => $user->name,
             'roleId' => $user->role_id,
+            'roleName' => $user->role?->name,
             'status' => $user->status,
             'mustChangePassword' => $user->must_change_password,
+            'createdAt' => $user->created_at->toIso8601String(),
         ];
     }
 }

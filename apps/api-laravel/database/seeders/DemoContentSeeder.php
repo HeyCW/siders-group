@@ -105,7 +105,16 @@ class DemoContentSeeder extends Seeder
                 ['slug' => $slug],
                 [
                     'title' => $spec['title'],
-                    'body_json' => ['type' => 'doc', 'content' => [['type' => 'paragraph']]],
+                    'body_json' => [
+                        'type' => 'doc',
+                        'content' => [[
+                            'type' => 'paragraph',
+                            'content' => [[
+                                'type' => 'text',
+                                'text' => 'Ini adalah konten demo untuk artikel "'.$spec['title'].'".',
+                            ]],
+                        ]],
+                    ],
                     'body_html' => '<p>Ini adalah konten demo untuk artikel "'.e($spec['title']).'".</p>',
                     'excerpt' => 'Ringkasan singkat demo untuk '.$spec['title'].'.',
                     'status' => $spec['status'],

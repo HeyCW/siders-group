@@ -6,7 +6,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Partner\StorePartnerRequest;
 use App\Http\Requests\Partner\UpdatePartnerRequest;
-use App\Models\Media;
 use App\Models\Partner;
 use App\Services\MediaService;
 use App\Services\PartnerService;
@@ -55,14 +54,19 @@ class PartnerController extends Controller
         return response()->json(['data' => null]);
     }
 
+    /** Returns the reordered list, not null — apps/admin/src/pages/PartnersPage.tsx replaces its
+     *  local state with this response directly after a drag-reorder. */
     public function reorder(Request $request): JsonResponse
     {
         $request->validate(['partnerIds' => ['required', 'array']]);
         $this->partnerService->reorder($request->input('partnerIds'));
 
-        return response()->json(['data' => null]);
+        $partners = Partner::with('logoMedia')->orderBy('sort_order')->get();
+
+        return response()->json(['data' => $partners->map(fn (Partner $p) => $this->shape($p))]);
     }
 
+    /** Matches packages/contracts/src/partner.ts's partnerResponseSchema. */
     private function shape(Partner $partner): array
     {
         return [
@@ -72,6 +76,8 @@ class PartnerController extends Controller
             'websiteUrl' => $partner->website_url,
             'sortOrder' => $partner->sort_order,
             'isActive' => $partner->is_active,
+            'createdAt' => $partner->created_at->toIso8601String(),
+            'updatedAt' => $partner->updated_at->toIso8601String(),
         ];
     }
 }

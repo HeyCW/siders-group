@@ -17,8 +17,8 @@ class UpdateRoleRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:191'],
-            'permissionKeys' => ['sometimes', 'array'],
-            'permissionKeys.*' => ['string', 'exists:permissions,key'],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['string', 'exists:permissions,key'],
         ];
     }
 }
