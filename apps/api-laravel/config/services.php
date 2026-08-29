@@ -41,4 +41,9 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'deploy_trigger' => [
+        'url' => env('DEPLOY_TRIGGER_URL'),
+        'token' => env('DEPLOY_TRIGGER_TOKEN'),
+    ],
+
 ];
