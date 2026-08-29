@@ -1,9 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { boolean, char, datetime, index, mysqlEnum, mysqlTable, text, uniqueIndex } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
-import { users } from './users';
-import { readers } from './readers';
-import { comments } from './engagement';
+import { newId } from '../newId.js';
+import { users } from './users.js';
+import { readers } from './readers.js';
+import { comments } from './engagement.js';
 
 export const MODERATION_TARGET_TYPE_VALUES = ['comment', 'reader'] as const;
 export type ModerationTargetTypeValue = (typeof MODERATION_TARGET_TYPE_VALUES)[number];

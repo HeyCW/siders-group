@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { char, datetime, index, mysqlEnum, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
+import { newId } from '../newId.js';
 
 export const CONTACT_MESSAGE_STATUS_VALUES = ['new', 'read'] as const;
 export type ContactMessageStatusValue = (typeof CONTACT_MESSAGE_STATUS_VALUES)[number];

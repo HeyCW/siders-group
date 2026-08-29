@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { char, datetime, index, mysqlEnum, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
+import { newId } from '../newId.js';
 
 export const SUBJECT_TYPE_VALUES = ['staff', 'reader'] as const;
 export type SubjectType = (typeof SUBJECT_TYPE_VALUES)[number];

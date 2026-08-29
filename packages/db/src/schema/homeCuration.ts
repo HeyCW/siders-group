@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { char, datetime, int, mysqlTable } from 'drizzle-orm/mysql-core';
-import { articles } from './articles';
+import { articles } from './articles.js';
 
 /**
  * One global, ordered list of articles leading the public homepage. `articleId` is the primary

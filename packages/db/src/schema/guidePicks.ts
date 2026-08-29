@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, char, datetime, int, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
-import { media } from './media';
+import { newId } from '../newId.js';
+import { media } from './media.js';
 
 /**
  * The city-guide picks backing the public home page's "Siders Guideline of the Week" section.

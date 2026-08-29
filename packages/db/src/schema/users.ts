@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, char, datetime, index, mysqlEnum, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
-import { roles } from './rbac';
+import { newId } from '../newId.js';
+import { roles } from './rbac.js';
 
 export const USER_STATUS_VALUES = ['active', 'disabled'] as const;
 export type UserStatus = (typeof USER_STATUS_VALUES)[number];

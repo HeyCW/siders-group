@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { char, date, datetime, index, int, mysqlEnum, mysqlTable, primaryKey, text, uniqueIndex, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
-import { articles } from './articles';
-import { readers } from './readers';
+import { newId } from '../newId.js';
+import { articles } from './articles.js';
+import { readers } from './readers.js';
 
 export const COMMENT_STATUS_VALUES = ['visible', 'removed'] as const;
 export type CommentStatusValue = (typeof COMMENT_STATUS_VALUES)[number];

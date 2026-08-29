@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/client.ts",
-  "types": "./src/client.ts",
+  "main": "./dist/client.js",
+  "types": "./dist/client.d.ts",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"

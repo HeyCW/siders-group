@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { char, datetime, index, int, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
-import { users } from './users';
+import { newId } from '../newId.js';
+import { users } from './users.js';
 
 /**
  * The canonical media record (openspec/changes/add-news-management-system/design.md -

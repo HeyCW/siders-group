@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { boolean, char, datetime, mysqlTable, primaryKey, text, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
+import { newId } from '../newId.js';
 
 /**
  * `slug` recognizes the seeded Owner role. `is_system` is set only by migration —

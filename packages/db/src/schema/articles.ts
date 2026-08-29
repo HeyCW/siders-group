@@ -1,9 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { char, datetime, index, json, mysqlEnum, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
-import { users } from './users';
-import { media } from './media';
-import { anakUsaha } from './anakUsaha';
+import { newId } from '../newId.js';
+import { users } from './users.js';
+import { media } from './media.js';
+import { anakUsaha } from './anakUsaha.js';
 
 export const ARTICLE_STATUS_VALUES = ['draft', 'scheduled', 'published'] as const;
 export type ArticleStatusValue = (typeof ARTICLE_STATUS_VALUES)[number];

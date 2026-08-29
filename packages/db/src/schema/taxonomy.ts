@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { char, datetime, index, mysqlTable, primaryKey, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
-import { articles } from './articles';
+import { newId } from '../newId.js';
+import { articles } from './articles.js';
 
 export const categories = mysqlTable('categories', {
   id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),

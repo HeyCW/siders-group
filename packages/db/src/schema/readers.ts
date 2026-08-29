@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { boolean, char, datetime, mysqlEnum, mysqlTable, text, varchar } from 'drizzle-orm/mysql-core';
-import { newId } from '../newId';
+import { newId } from '../newId.js';
 
 export const READER_STATUS_VALUES = ['active', 'banned'] as const;
 export type ReaderStatus = (typeof READER_STATUS_VALUES)[number];
