@@ -39,7 +39,7 @@ export function StickyNav() {
       className="fixed inset-x-0 top-0 z-[60] border-b border-ink bg-paper transition-transform duration-[180ms] ease-[cubic-bezier(.22,1,.36,1)]"
       style={{ transform: scrolled ? 'none' : 'translateY(-101%)' }}
     >
-      <div className="mx-auto flex h-14 w-full max-w-[1120px] items-baseline justify-between gap-6 px-[clamp(16px,4vw,40px)]">
+      <div className="mx-auto flex h-14 w-full max-w-[1120px] items-center justify-between gap-6 px-[clamp(16px,4vw,40px)]">
         <Link href="/" className="font-serif text-lg font-bold tracking-[0.14em]">
           SIDERS
         </Link>
