@@ -13,9 +13,11 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(PermissionCatalogSeeder::class);
 
-        // Local-dev convenience only — never seed a fixed-password account outside local dev.
+        // Local-dev convenience only — never seed a fixed-password account or demo content
+        // outside local dev.
         if (app()->environment('local')) {
             $this->call(DevOwnerSeeder::class);
+            $this->call(DemoContentSeeder::class);
         }
     }
 }
