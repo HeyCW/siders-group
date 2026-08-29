@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "abc0ef20-1750-4baa-a140-09f822605645",
-  "prevId": "5a797ce4-49e8-4530-afbf-139af1b8a3a8",
+  "id": "1d3f7c5e-35b7-448d-9737-31f27ca09374",
+  "prevId": "abc0ef20-1750-4baa-a140-09f822605645",
   "tables": {
     "permissions": {
       "name": "permissions",
@@ -819,7 +819,7 @@
         },
         "title": {
           "name": "title",
-          "type": "text",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

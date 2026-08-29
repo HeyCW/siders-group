@@ -220,7 +220,7 @@ CREATE TABLE `comment_reports` (
 	`created_at` datetime(3) NOT NULL,
 	`resolved_at` datetime(3),
 	`resolved_by` char(36),
-	`is_open` boolean GENERATED ALWAYS AS ((`resolved_at` is null)) STORED NOT NULL,
+	`is_open` boolean GENERATED ALWAYS AS ((`resolved_at` is null)) STORED,
 	CONSTRAINT `comment_reports_id` PRIMARY KEY(`id`),
 	CONSTRAINT `comment_reports_comment_reporter_unique` UNIQUE(`comment_id`,`reporter_id`)
 );

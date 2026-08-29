@@ -1756,7 +1756,7 @@
           "name": "is_open",
           "type": "boolean",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false,
           "generated": {
             "as": "(`resolved_at` is null)",

@@ -113,9 +113,10 @@ export const commentReports = mysqlTable(
     // the composite index below (`isOpen` leading) serves `moderation.repository.ts`'s
     // open-report aggregate (`WHERE resolved_at IS NULL GROUP BY comment_id`) exactly as
     // selectively as the partial index did.
-    isOpen: boolean('is_open')
-      .notNull()
-      .generatedAlwaysAs(sql`(\`resolved_at\` is null)`, { mode: 'stored' }),
+    // No `.notNull()` here even though the expression can never actually produce NULL (`IS NULL`
+    // always returns 0/1) — MariaDB's grammar rejects `NOT NULL` on a `STORED` generated column
+    // outright (`ER_PARSE_ERROR` right after `STORED`), unlike MySQL 8 which accepts it.
+    isOpen: boolean('is_open').generatedAlwaysAs(sql`(\`resolved_at\` is null)`, { mode: 'stored' }),
   },
   (table) => ({
     commentReporterUnique: uniqueIndex('comment_reports_comment_reporter_unique').on(table.commentId, table.reporterId),
