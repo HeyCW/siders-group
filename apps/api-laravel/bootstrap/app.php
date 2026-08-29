@@ -30,6 +30,22 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => EnsurePermission::class,
             'reader.can_author_content' => EnsureReaderCanAuthorContent::class,
         ]);
+
+        // Sanctum's statefulApi() decides "this request gets session+CSRF treatment" purely
+        // from Origin/Referer matching SANCTUM_STATEFUL_DOMAINS — not from whether the request
+        // actually carries a session cookie. CSRF is only ever checked on state-changing verbs
+        // (POST/PUT/PATCH/DELETE), so every plain GET (articles, home, categories, partners,
+        // guide-picks, anak-usaha) is already unaffected and needs no exemption; the one route
+        // that genuinely does is /contact-messages, whose caller is apps/web's fully anonymous
+        // public client (lib/api.ts) — it deliberately sends neither a cookie nor a CSRF header,
+        // mirroring the old Node app's requirePublic() routes, which never required CSRF. Every
+        // other public mutation (POST /articles/{id}/view, and the reader-session-gated
+        // like/comment/report routes) already goes through apps/web's credentialed client
+        // (lib/authApi.ts's readerRequest), which fetches/retries the CSRF cookie properly on a
+        // 419 — no exemption needed there.
+        $middleware->validateCsrfTokens(except: [
+            'api/contact-messages',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
