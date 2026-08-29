@@ -24,16 +24,19 @@ use Illuminate\Support\Str;
  * a fresh `migrate:fresh --seed` has something to look at: a few categories, anak-usaha profiles,
  * articles in each pipeline stage, partners, and guide picks ("reels").
  *
- * Media rows here point at placeholder bytes written directly to the media disk — a real 1x1
- * JPEG (so an <img> actually renders something) and a byte blob merely *shaped* like an MP4
- * header (not a real playable video) — this is demo filler, not a fixture for testing the
- * upload/sniffing pipeline itself.
+ * Media rows here point at placeholder bytes written directly to the media disk — a generated
+ * SVG (a colored card with a label, so an <img> actually shows *something* recognizable, not
+ * just a blank 1x1 pixel — this server has neither GD nor Imagick, so a real raster placeholder
+ * isn't an option) and, for guide picks, a byte blob merely *shaped* like an MP4 header (not a
+ * real playable video). This is demo filler, not a fixture for testing the upload/sniffing
+ * pipeline itself.
  */
 class DemoContentSeeder extends Seeder
 {
-    private const PLACEHOLDER_JPEG_BASE64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAv/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q==';
-
     private const PLACEHOLDER_MP4_HEX = '0000001c6674797069736f6d0000020069736f6d69736f32617663316d703431';
+
+    /** Cycled deterministically per tag so the same seed run always looks the same. */
+    private const PLACEHOLDER_COLORS = ['#2563eb', '#db2777', '#16a34a', '#d97706', '#7c3aed', '#0891b2'];
 
     public function run(): void
     {
@@ -168,21 +171,36 @@ class DemoContentSeeder extends Seeder
 
     private function placeholderImage(User $owner, string $tag): Media
     {
-        $path = "media/seed/{$tag}.jpg";
+        $path = "media/seed/{$tag}.svg";
 
         if (! Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->put($path, base64_decode(self::PLACEHOLDER_JPEG_BASE64));
+            Storage::disk('public')->put($path, $this->renderPlaceholderSvg($tag));
         }
 
         return Media::firstOrCreate(
             ['storage_path' => $path],
             [
-                'mime' => 'image/jpeg',
+                'mime' => 'image/svg+xml',
                 'size_bytes' => Storage::disk('public')->size($path),
-                'original_filename' => "{$tag}.jpg",
+                'original_filename' => "{$tag}.svg",
                 'uploaded_by' => $owner->id,
             ],
         );
+    }
+
+    /** A colored card with the tag as its label — visibly distinct per placeholder, not a blank pixel. */
+    private function renderPlaceholderSvg(string $tag): string
+    {
+        $color = self::PLACEHOLDER_COLORS[crc32($tag) % count(self::PLACEHOLDER_COLORS)];
+        $label = htmlspecialchars(str_replace('-', ' ', $tag), ENT_XML1);
+
+        return <<<SVG
+        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+          <rect width="800" height="450" fill="{$color}"/>
+          <text x="400" y="225" fill="#ffffff" font-family="sans-serif" font-size="32"
+                text-anchor="middle" dominant-baseline="middle">{$label}</text>
+        </svg>
+        SVG;
     }
 
     private function placeholderVideo(User $owner, string $tag): Media
