@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Comment;
+use App\Models\Reader;
 use App\Services\Contracts\DeployNotifierInterface;
 use App\Services\DeployNotifier;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +24,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Matches moderation_actions.target_type's DB enum values exactly.
+        Relation::enforceMorphMap([
+            'comment' => Comment::class,
+            'reader' => Reader::class,
+        ]);
     }
 }

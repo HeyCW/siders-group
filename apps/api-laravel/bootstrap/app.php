@@ -3,6 +3,7 @@
 use App\Exceptions\DomainException;
 use App\Http\Middleware\EnsurePasswordChangeNotPending;
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\EnsureReaderCanAuthorContent;
 use App\Http\Middleware\EnsureStaffActive;
 use App\Http\Middleware\MarkPublicRoute;
 use Illuminate\Foundation\Application;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'staff.active' => EnsureStaffActive::class,
             'staff.password_change_not_pending' => EnsurePasswordChangeNotPending::class,
             'permission' => EnsurePermission::class,
+            'reader.can_author_content' => EnsureReaderCanAuthorContent::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -76,5 +76,9 @@ class PermissionCatalogSeeder extends Seeder
                 ['id' => (string) Str::uuid(), 'name' => $entry['name']],
             );
         }
+
+        foreach (['partners', 'guide_picks', 'home_curation'] as $lockName) {
+            DB::table('reorder_locks')->updateOrInsert(['name' => $lockName]);
+        }
     }
 }

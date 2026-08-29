@@ -5,8 +5,13 @@ use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\StaffAuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CurationController;
+use App\Http\Controllers\EngagementController;
+use App\Http\Controllers\GuidePickController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\MediaFileController;
+use App\Http\Controllers\ModerationController;
+use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\ReaderMeController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StaffAccountController;
@@ -102,3 +107,53 @@ Route::prefix('admin/articles')
         Route::post('/{id}/unpublish', [ArticleController::class, 'unpublish']);
         Route::post('/{id}/schedule', [ArticleController::class, 'schedule']);
     });
+
+// --- Curation / Home feed ---
+Route::get('/home', [CurationController::class, 'publicFeed'])->middleware('public');
+Route::middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:news.manage'])->group(function () {
+    Route::get('/admin/curation', [CurationController::class, 'adminIndex']);
+    Route::put('/admin/curation', [CurationController::class, 'replace']);
+});
+
+// --- Partners (settings.manage — treated as site config, not editorial content) ---
+Route::get('/partners', [PartnerController::class, 'publicIndex'])->middleware('public');
+Route::middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:settings.manage'])->group(function () {
+    Route::get('/admin/partners', [PartnerController::class, 'adminIndex']);
+    Route::post('/admin/partners', [PartnerController::class, 'store']);
+    Route::patch('/admin/partners/{id}', [PartnerController::class, 'update']);
+    Route::delete('/admin/partners/{id}', [PartnerController::class, 'destroy']);
+    Route::put('/admin/partners/order', [PartnerController::class, 'reorder']);
+});
+
+// --- Guide Picks (news.manage — editorial content, unlike partners) ---
+Route::get('/guide-picks', [GuidePickController::class, 'publicIndex'])->middleware('public');
+Route::middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:news.manage'])->group(function () {
+    Route::get('/admin/guide-picks', [GuidePickController::class, 'adminIndex']);
+    Route::post('/admin/guide-picks', [GuidePickController::class, 'store']);
+    Route::patch('/admin/guide-picks/{id}', [GuidePickController::class, 'update']);
+    Route::delete('/admin/guide-picks/{id}', [GuidePickController::class, 'destroy']);
+    Route::put('/admin/guide-picks/order', [GuidePickController::class, 'reorder']);
+});
+
+// --- Engagement (mounted alongside public articles) ---
+Route::prefix('articles/{id}')->middleware('public')->group(function () {
+    Route::post('/view', [EngagementController::class, 'recordView']);
+    Route::get('/engagement', [EngagementController::class, 'summary']);
+    Route::get('/comments', [EngagementController::class, 'comments']);
+});
+Route::prefix('articles/{id}')->middleware(['auth:reader'])->group(function () {
+    Route::post('/like', [EngagementController::class, 'like']);
+    Route::post('/comments', [EngagementController::class, 'createComment'])->middleware('reader.can_author_content');
+});
+
+// --- Moderation ---
+Route::prefix('admin/comments')->middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:moderation.manage'])->group(function () {
+    Route::get('/', [ModerationController::class, 'commentQueue']);
+    Route::patch('/{id}', [ModerationController::class, 'moderateComment']);
+    Route::patch('/{id}/reports/dismiss', [ModerationController::class, 'dismissReports']);
+});
+Route::prefix('admin/readers')->middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:moderation.manage'])->group(function () {
+    Route::get('/', [ModerationController::class, 'readerQueue']);
+    Route::patch('/{id}', [ModerationController::class, 'moderateReader']);
+});
+Route::post('/comments/{id}/report', [ModerationController::class, 'reportComment'])->middleware(['auth:reader']);
