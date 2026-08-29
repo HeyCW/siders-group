@@ -5,7 +5,9 @@ use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\StaffAuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ContactMessageController;
 use App\Http\Controllers\CurationController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EngagementController;
 use App\Http\Controllers\GuidePickController;
 use App\Http\Controllers\MediaController;
@@ -19,20 +21,20 @@ use App\Http\Controllers\StaffMeController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('staff')->group(function () {
-    Route::post('/login', [StaffAuthController::class, 'login'])->middleware('public');
+    Route::post('/login', [StaffAuthController::class, 'login'])->middleware(['public', 'throttle:staff-login']);
     Route::post('/logout', [StaffAuthController::class, 'logout'])->middleware('auth:staff');
 });
 
 Route::prefix('auth/google')->group(function () {
     Route::get('/redirect', [GoogleAuthController::class, 'redirect'])->middleware('public');
-    Route::get('/callback', [GoogleAuthController::class, 'callback'])->middleware('public');
+    Route::get('/callback', [GoogleAuthController::class, 'callback'])->middleware(['public', 'throttle:google-callback']);
 });
 
 // Self-service — deliberately exempt from `staff.password_change_not_pending` (this is the one
 // pair of endpoints that must stay reachable while a password change is pending).
 Route::prefix('staff/me')->middleware(['auth:staff', 'staff.active'])->group(function () {
     Route::get('/', [StaffMeController::class, 'show']);
-    Route::post('/password', [StaffMeController::class, 'changePassword']);
+    Route::post('/password', [StaffMeController::class, 'changePassword'])->middleware('throttle:password-change');
 });
 
 Route::prefix('staff')->middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending'])->group(function () {
@@ -58,7 +60,7 @@ Route::prefix('reader')->middleware(['auth:reader'])->group(function () {
 
 // --- Media ---
 Route::middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:media.manage'])->group(function () {
-    Route::post('/media', [MediaController::class, 'store']);
+    Route::post('/media', [MediaController::class, 'store'])->middleware('throttle:media-upload');
     Route::get('/media/{id}', [MediaController::class, 'showById']);
     Route::patch('/media/{id}', [MediaController::class, 'update']);
     Route::delete('/media/{id}', [MediaController::class, 'destroy']);
@@ -137,13 +139,13 @@ Route::middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pend
 
 // --- Engagement (mounted alongside public articles) ---
 Route::prefix('articles/{id}')->middleware('public')->group(function () {
-    Route::post('/view', [EngagementController::class, 'recordView']);
+    Route::post('/view', [EngagementController::class, 'recordView'])->middleware('throttle:engagement-view');
     Route::get('/engagement', [EngagementController::class, 'summary']);
     Route::get('/comments', [EngagementController::class, 'comments']);
 });
 Route::prefix('articles/{id}')->middleware(['auth:reader'])->group(function () {
-    Route::post('/like', [EngagementController::class, 'like']);
-    Route::post('/comments', [EngagementController::class, 'createComment'])->middleware('reader.can_author_content');
+    Route::post('/like', [EngagementController::class, 'like'])->middleware('throttle:engagement-like');
+    Route::post('/comments', [EngagementController::class, 'createComment'])->middleware(['reader.can_author_content', 'throttle:engagement-comment']);
 });
 
 // --- Moderation ---
@@ -156,4 +158,19 @@ Route::prefix('admin/readers')->middleware(['auth:staff', 'staff.active', 'staff
     Route::get('/', [ModerationController::class, 'readerQueue']);
     Route::patch('/{id}', [ModerationController::class, 'moderateReader']);
 });
-Route::post('/comments/{id}/report', [ModerationController::class, 'reportComment'])->middleware(['auth:reader']);
+Route::post('/comments/{id}/report', [ModerationController::class, 'reportComment'])
+    ->middleware(['auth:reader', 'throttle:comment-report']);
+
+// --- Analytics ---
+Route::get('/admin/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:dashboard.view']);
+
+// --- Contact messages ---
+Route::post('/contact-messages', [ContactMessageController::class, 'submit'])->middleware(['public', 'throttle:contact-submit']);
+Route::prefix('admin/contact-messages')
+    ->middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:contact.manage'])
+    ->group(function () {
+        Route::get('/', [ContactMessageController::class, 'index']);
+        Route::get('/unread-count', [ContactMessageController::class, 'unreadCount']);
+        Route::patch('/{id}', [ContactMessageController::class, 'update']);
+    });
