@@ -6,7 +6,7 @@ import type { Config } from 'tailwindcss';
  * these ("paper" background, "ink" text, "signal" accent).
  */
 export default {
-  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -18,9 +18,9 @@ export default {
         muted: '#55534D',
       },
       fontFamily: {
-        // Populated by next/font/google in app/layout.tsx via CSS custom properties, so the
-        // font files are self-hosted at build time rather than fetched from Google's CDN at
-        // runtime (the prototype's own approach, via a <link> tag).
+        // Populated by <link> tags in index.html (making-csr — no more next/font/google to
+        // self-host these), via the same --font-serif/--font-sans custom properties set in
+        // src/index.css.
         serif: ['var(--font-serif)', 'Georgia', 'serif'],
         sans: ['var(--font-sans)', 'sans-serif'],
       },
