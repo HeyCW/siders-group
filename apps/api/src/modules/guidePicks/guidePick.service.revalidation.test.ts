@@ -12,7 +12,7 @@ import { createLogger } from '../../lib/logger.js';
  * file runs the real helper over a `fetch` that fails, and asserts the write still resolves.
  * Mirrors `partner.service.revalidation.test.ts`.
  */
-const env = { APP_ORIGIN: 'https://example.com', REVALIDATE_SECRET: 'c'.repeat(16) };
+const env = { DEPLOY_TRIGGER_URL: 'https://ci.example.com/dispatch', DEPLOY_TRIGGER_TOKEN: 'c'.repeat(16) };
 const logger = createLogger({ LOG_LEVEL: 'silent' as never, NODE_ENV: 'test' });
 
 const PHOTO_MEDIA_ID = '11111111-1111-1111-1111-000000000001';

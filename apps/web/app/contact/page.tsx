@@ -35,7 +35,7 @@ function InfoRow({
 }
 
 export default async function ContactPage() {
-  const anakUsahaList = await getAnakUsahaList({ next: { revalidate: 60 } }).catch(() => []);
+  const anakUsahaList = await getAnakUsahaList().catch(() => []);
   const brands = presentedAnakUsaha(anakUsahaList);
 
   return (

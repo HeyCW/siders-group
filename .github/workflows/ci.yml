@@ -48,6 +48,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # packages/contracts and packages/db resolve via their compiled `dist/` (package.json
+      # `main`/`types`) as of the `fix: build process` commit — apps/web, apps/admin, and
+      # apps/api's own typecheck all fail to resolve `@siders/contracts`/`@siders/db` without
+      # this running first.
+      - name: Build workspace packages
+        run: |
+          pnpm --filter @siders/contracts build
+          pnpm --filter @siders/db build
+
       - name: Lint
         run: pnpm lint
 

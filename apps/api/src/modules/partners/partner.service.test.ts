@@ -108,7 +108,7 @@ function createFakePartnerRepository(initial: PartnerRow[] = []) {
   };
 }
 
-const revalidateEnv = { APP_ORIGIN: 'https://example.com', REVALIDATE_SECRET: 'x'.repeat(16) };
+const revalidateEnv = { DEPLOY_TRIGGER_URL: 'https://ci.example.com/dispatch', DEPLOY_TRIGGER_TOKEN: 'x'.repeat(16) };
 const logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), fatal: vi.fn() } as unknown as Logger;
 
 describe('PartnerService.create', () => {

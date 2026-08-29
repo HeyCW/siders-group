@@ -1,11 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { AnakUsahaResponse, ArticlePublicCard, CategoryResponse } from '@siders/contracts';
 import { getArticles } from '../../lib/api';
 import { NEWS_PAGE_SIZE } from '../../lib/newsPageSize';
-import { NEWS_DATE_OPTIONS, resolveNewsDateRange, type NewsDateOption } from '../../lib/newsDateFilter';
+import {
+  NEWS_DATE_OPTIONS,
+  isNewsDateOption,
+  resolveNewsDateRange,
+  type NewsDateOption,
+} from '../../lib/newsDateFilter';
 import { ArticleCard } from './ArticleCard';
 import { FilterOption, FilterTrigger } from './FilterTrigger';
 
@@ -38,28 +43,41 @@ function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value];
 }
 
+function splitSlugs(value: string | null): string[] {
+  return value ? value.split(',').filter((slug) => slug.length > 0) : [];
+}
+
 export function NewsExplorer({
-  initialArticles,
   categories,
   anakUsahaOptions,
-  activeCategorySlugs,
-  activeAnakUsahaSlugs,
-  activeDateOption,
-  activeDateFrom,
-  activeDateTo,
 }: {
-  initialArticles: ArticlePublicCard[];
   categories: CategoryResponse[];
   anakUsahaOptions: AnakUsahaResponse[];
-  activeCategorySlugs: string[];
-  activeAnakUsahaSlugs: string[];
-  activeDateOption: NewsDateOption | undefined;
-  activeDateFrom: string | undefined;
-  activeDateTo: string | undefined;
 }) {
   const router = useRouter();
-  const [articles, setArticles] = useState(initialArticles);
-  const [hasMore, setHasMore] = useState(initialArticles.length === NEWS_PAGE_SIZE);
+  const searchParams = useSearchParams();
+
+  // Static export moved filtering off the server (`app/news/page.tsx` can no longer read
+  // `searchParams`), so this component now derives active filters from the URL itself and owns
+  // the article fetch — including the very first page, which used to arrive as a server-fetched
+  // `initialArticles` prop. That trades an instant server-rendered first paint for a brief
+  // client-side loading state on every visit to `/news`.
+  const activeCategorySlugs = useMemo(
+    () => splitSlugs(searchParams.get('category')),
+    [searchParams],
+  );
+  const activeAnakUsahaSlugs = useMemo(
+    () => splitSlugs(searchParams.get('anakUsaha')),
+    [searchParams],
+  );
+  const rawDate = searchParams.get('date') ?? undefined;
+  const activeDateOption = isNewsDateOption(rawDate) ? rawDate : undefined;
+  const activeDateFrom = searchParams.get('dateFrom') ?? undefined;
+  const activeDateTo = searchParams.get('dateTo') ?? undefined;
+
+  const [articles, setArticles] = useState<ArticlePublicCard[]>([]);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState('');
   const [openPopover, setOpenPopover] = useState<PopoverKey>(null);
@@ -88,6 +106,51 @@ export function NewsExplorer({
 
   const featured = !hasFilters && searchFiltered.length > 0 ? searchFiltered[0] : undefined;
   const gridItems = featured ? searchFiltered.slice(1) : searchFiltered;
+
+  // One key string per distinct filter combination — mirrors the `key={explorerKey}` the server
+  // version used to force a remount on filter change (app/news/page.tsx, pre-static-export). Here
+  // it drives a fetch instead of a remount, since the component itself no longer unmounts when
+  // the URL's filters change.
+  const filterKey = [
+    activeCategorySlugs.join(','),
+    activeAnakUsahaSlugs.join(','),
+    activeDateOption ?? '',
+    activeDateFrom ?? '',
+    activeDateTo ?? '',
+  ].join('|');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingInitial(true);
+    const { publishedAfter, publishedBefore } = resolveNewsDateRange(
+      activeDateOption,
+      activeDateFrom,
+      activeDateTo,
+      new Date(),
+    );
+    getArticles({
+      categorySlugs: activeCategorySlugs,
+      anakUsahaSlugs: activeAnakUsahaSlugs,
+      publishedAfter,
+      publishedBefore,
+      limit: NEWS_PAGE_SIZE,
+      offset: 0,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setArticles(result);
+        setHasMore(result.length === NEWS_PAGE_SIZE);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingInitial(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Re-fetches whenever the URL's filters change — everything the fetch needs is derived from
+    // `filterKey` alone, so it's the only dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]);
 
   function togglePopover(key: PopoverKey) {
     setOpenPopover((cur) => (cur === key ? null : key));
@@ -352,15 +415,23 @@ export function NewsExplorer({
         </span>
       </div>
 
-      {featured && <ArticleCard article={featured} featured />}
+      {loadingInitial && (
+        <div className="py-[clamp(32px,5vw,64px)] font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
+          Loading…
+        </div>
+      )}
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
-        {gridItems.map((article) => (
-          <ArticleCard key={article.id} article={article} />
-        ))}
-      </div>
+      {!loadingInitial && featured && <ArticleCard article={featured} featured />}
 
-      {searchFiltered.length === 0 && (
+      {!loadingInitial && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+          {gridItems.map((article) => (
+            <ArticleCard key={article.id} article={article} />
+          ))}
+        </div>
+      )}
+
+      {!loadingInitial && searchFiltered.length === 0 && (
         <div className="border-b border-ink py-[clamp(32px,5vw,64px)]">
           <div className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
             Tidak ada hasil

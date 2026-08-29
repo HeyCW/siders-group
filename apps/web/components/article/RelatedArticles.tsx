@@ -16,10 +16,7 @@ export async function RelatedArticles({
 }) {
   if (!categorySlug) return null;
 
-  const related = await getArticles(
-    { categorySlugs: [categorySlug], excludeIds: [excludeId], limit: 5 },
-    { next: { revalidate: 60 } },
-  );
+  const related = await getArticles({ categorySlugs: [categorySlug], excludeIds: [excludeId], limit: 5 });
   if (related.length === 0) return null;
 
   return (

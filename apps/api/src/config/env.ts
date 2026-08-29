@@ -40,7 +40,14 @@ const envSchema = z.object({
   // "SESSION_SECRET is repurposed, not orphaned"). Access credentials are EdDSA-signed and
   // refresh credentials are opaque hashed-at-rest values, so nothing else consumes this.
   SESSION_SECRET: z.string().min(32),
-  REVALIDATE_SECRET: z.string().min(16),
+
+  // `apps/web` is a static export with no `/api/revalidate` route to call (see
+  // apps/api/src/lib/revalidate.ts), so a content change instead triggers a rebuild via this
+  // webhook — a GitHub Actions `repository_dispatch` endpoint, or any CI system that accepts an
+  // authenticated POST to start a job. Both optional: unset in local dev and any environment
+  // that hasn't wired up a deploy pipeline yet, in which case revalidate.ts silently no-ops.
+  DEPLOY_TRIGGER_URL: z.string().url().optional(),
+  DEPLOY_TRIGGER_TOKEN: z.string().min(1).optional(),
 
   // Access-credential signing key pair (EdDSA). See apps/api/src/lib/tokens.ts.
   ACCESS_TOKEN_PRIVATE_KEY: pemPrivateKeySchema,

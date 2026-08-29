@@ -1,8 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // The `/news` and `/news/[slug]` pages use ISR (per docs/ARCHITECTURE.md §8.2:
-  // 60s + on-demand revalidate via /api/revalidate). Per-page revalidate values
-  // are set where each page is implemented (add-web-news-pages follow-up).
+  // Static export: the production host is shared/cPanel hosting with a hard cap on Node
+  // processes, so `web` ships as plain HTML/CSS/JS served by Apache rather than running
+  // `next start`. This replaces the ISR + on-demand revalidation setup described in
+  // docs/ARCHITECTURE.md §8.2 — publishing an article now triggers a full rebuild
+  // (apps/api/src/lib/revalidate.ts) instead of an in-place page revalidation.
+  output: 'export',
+  // Directory-style `index.html` output (`/news/index.html` instead of `/news.html`) so
+  // Apache serves clean URLs with no rewrite rules needed.
+  trailingSlash: true,
+  images: {
+    // No Next.js Image Optimization server exists for a static export; ConnectedPlatforms.tsx
+    // is the one `next/image` user left, so this disables the optimizer for it site-wide.
+    unoptimized: true,
+  },
 
   webpack: (config) => {
     // `@siders/contracts` (package.json `main: "./src/index.ts"`, consumed as raw TS source

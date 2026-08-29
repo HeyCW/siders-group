@@ -4,7 +4,6 @@ import { __resetEnvCacheForTests, loadEnv } from './env.js';
 const validEnv = {
   DATABASE_URL: 'mysql://user:pass@localhost:3306/db',
   SESSION_SECRET: 'a'.repeat(32),
-  REVALIDATE_SECRET: 'b'.repeat(16),
   ACCESS_TOKEN_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nZmFrZS1rZXk=\\n-----END PRIVATE KEY-----',
   ACCESS_TOKEN_PUBLIC_KEY: '-----BEGIN PUBLIC KEY-----\\nZmFrZS1rZXk=\\n-----END PUBLIC KEY-----',
   GOOGLE_CLIENT_ID: 'client-id',
