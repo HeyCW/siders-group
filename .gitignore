@@ -15,3 +15,4 @@ graphify-out/
 # Local-dev media storage root, if MEDIA_STORAGE_PATH is pointed at a repo-relative path
 # (add-news-management-system - local filesystem media storage)
 .data/
+docker-compose.override.yml
