@@ -59,9 +59,16 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Native Laravel connector config, not a raw PDO init command: 'isolation_level' runs
+            // the SQL-standard `SET SESSION TRANSACTION ISOLATION LEVEL ...` (portable across
+            // MySQL and MariaDB alike — unlike the `transaction_isolation` *variable name*, which
+            // MySQL 5.7.20+/8.0 use but MariaDB does not recognize, causing
+            // "Unknown system variable 'transaction_isolation'"). 'timezone' likewise runs its
+            // own plain `SET time_zone=...` via MySqlConnector::configureConnection().
+            'isolation_level' => 'READ COMMITTED',
+            'timezone' => '+00:00',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                Mysql::ATTR_INIT_COMMAND => "SET SESSION transaction_isolation = 'READ-COMMITTED', SESSION time_zone = '+00:00'",
             ]) : [],
         ],
 
@@ -80,6 +87,8 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            'isolation_level' => 'READ COMMITTED',
+            'timezone' => '+00:00',
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
