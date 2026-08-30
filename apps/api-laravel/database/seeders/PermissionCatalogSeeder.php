@@ -63,11 +63,14 @@ class PermissionCatalogSeeder extends Seeder
             ]);
         }
 
+        // The live brands, and the only ones an editor can file an article under. Slugs are the
+        // `Str::slug(name)` form AnakUsahaSeeder derives, so the two seeders can't fork a brand
+        // into two rows; 2026_08_31_100001_canonicalize_anak_usaha_catalog repairs databases
+        // seeded before that ("SidersVox"/`sidersvox`, plus the dropped "Siders Culture").
         $anakUsaha = [
-            ['name' => 'Siders Culture', 'slug' => 'siders-culture'],
             ['name' => 'Jakarta Siders', 'slug' => 'jakarta-siders'],
             ['name' => 'Surabaya Siders', 'slug' => 'surabaya-siders'],
-            ['name' => 'SidersVox', 'slug' => 'sidersvox'],
+            ['name' => 'Siders Vox', 'slug' => 'siders-vox'],
         ];
 
         foreach ($anakUsaha as $entry) {

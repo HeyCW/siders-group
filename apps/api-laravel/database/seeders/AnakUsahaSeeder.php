@@ -19,7 +19,8 @@ use Illuminate\Support\Str;
  *
  * Everything is upserted by slug rather than skipped-if-present, so re-running also repairs a row
  * left behind by an earlier seed — e.g. a profile still pointing at a `media/seed/...` placeholder
- * logo. DemoContentSeeder deliberately no longer seeds these profiles.
+ * logo. The catalog rows themselves come from PermissionCatalogSeeder (which runs first, and in
+ * every environment); DemoContentSeeder deliberately no longer seeds these profiles.
  */
 class AnakUsahaSeeder extends Seeder
 {
@@ -88,7 +89,9 @@ class AnakUsahaSeeder extends Seeder
                 ],
             );
 
-            $anakUsaha = AnakUsaha::firstOrCreate(['slug' => $slug], ['name' => $entry['name']]);
+            // PermissionCatalogSeeder already inserted the catalog row under this slug; this is a
+            // no-op there and a safety net when only this seeder runs.
+            $anakUsaha = AnakUsaha::updateOrCreate(['slug' => $slug], ['name' => $entry['name']]);
 
             AnakUsahaProfile::updateOrCreate(
                 ['anak_usaha_id' => $anakUsaha->id],
