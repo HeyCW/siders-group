@@ -107,20 +107,26 @@ export interface SubBrand {
  *  (that data drives `AnakUsahaTiles.tsx` further down the page instead), so this row never
  *  changes just because an admin edits a profile. */
 export const SUB_BRANDS: SubBrand[] = [
-  { name: 'SidersVox', kind: 'News & Community', tile: 'transparent', tileInk: '#F7F6F2', logo: '/siders-vox-bulat.png' },
+  {
+    name: 'SidersVox',
+    kind: 'News & Community',
+    tile: 'transparent',
+    tileInk: '#F7F6F2',
+    logo: `${import.meta.env.BASE_URL}siders-vox-bulat.png`,
+  },
   {
     name: 'Surabaya Siders',
     kind: 'Media Platform',
     tile: 'transparent',
     tileInk: '#141414',
-    logo: '/surabaya-siders-bulat.png',
+    logo: `${import.meta.env.BASE_URL}surabaya-siders-bulat.png`,
   },
   {
     name: 'Jakarta Siders',
     kind: 'Media Platform',
     tile: 'transparent',
     tileInk: '#F7F6F2',
-    logo: '/jakarta-siders-bulat.png',
+    logo: `${import.meta.env.BASE_URL}jakarta-siders-bulat.png`,
   },
 ];
 

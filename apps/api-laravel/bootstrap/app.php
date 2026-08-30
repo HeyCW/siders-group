@@ -23,6 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
 
+        // This app is API-only and has no 'login' route. Left at the framework default
+        // (redirectGuestsTo(fn () => route('login'))), any guest request that doesn't send
+        // Accept: application/json hits Authenticate::redirectTo() -> route('login') ->
+        // RouteNotFoundException (500) instead of the 401 JSON handled below.
+        $middleware->redirectGuestsTo(fn () => null);
+
         $middleware->alias([
             'public' => MarkPublicRoute::class,
             'staff.active' => EnsureStaffActive::class,
