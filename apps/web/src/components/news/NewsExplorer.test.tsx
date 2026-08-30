@@ -78,28 +78,28 @@ async function renderExplorer(
 describe('NewsExplorer', () => {
   it('navigates to ?category=<slug> when a category is selected', async () => {
     await renderExplorer();
-    fireEvent.click(screen.getByRole('button', { name: /kategori/i }));
+    fireEvent.click(screen.getByRole('button', { name: /category/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Kuliner' }));
     expect(navigate).toHaveBeenCalledWith('/news?category=kuliner');
   });
 
   it('selecting a second category adds it rather than replacing the first', async () => {
     await renderExplorer({ category: 'kuliner' });
-    fireEvent.click(screen.getByRole('button', { name: /kategori 1/i }));
+    fireEvent.click(screen.getByRole('button', { name: /category 1/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Wisata' }));
     expect(navigate).toHaveBeenCalledWith('/news?category=kuliner%2Cwisata');
   });
 
   it('deselecting one category leaves the other active', async () => {
     await renderExplorer({ category: 'kuliner,wisata' });
-    fireEvent.click(screen.getByRole('button', { name: /kategori 2/i }));
+    fireEvent.click(screen.getByRole('button', { name: /category 2/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Kuliner' }));
     expect(navigate).toHaveBeenCalledWith('/news?category=wisata');
   });
 
   it('clears the category filter via the panel Reset control', async () => {
     await renderExplorer({ category: 'kuliner' });
-    fireEvent.click(screen.getByRole('button', { name: /kategori 1/i }));
+    fireEvent.click(screen.getByRole('button', { name: /category 1/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
     expect(navigate).toHaveBeenCalledWith('/news');
   });
@@ -119,30 +119,46 @@ describe('NewsExplorer', () => {
     expect(navigate).toHaveBeenCalledWith('/news?anakUsaha=sidersvox%2Csurabaya-siders');
   });
 
-  it('selecting a relative Tanggal option pushes ?date=<option>', async () => {
+  it('selecting a relative Date option pushes ?date=<option>', async () => {
     await renderExplorer();
-    fireEvent.click(screen.getByRole('button', { name: /tanggal/i }));
-    fireEvent.click(screen.getByRole('button', { name: '7 hari terakhir' }));
+    fireEvent.click(screen.getByRole('button', { name: /date/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
     expect(navigate).toHaveBeenCalledWith('/news?date=7d');
   });
 
-  it('selecting a second Tanggal option replaces the first', async () => {
+  it('selecting a second Date option replaces the first', async () => {
     await renderExplorer({ date: '7d' });
-    fireEvent.click(screen.getByRole('button', { name: /tanggal 1/i }));
-    fireEvent.click(screen.getByRole('button', { name: '30 hari terakhir' }));
+    fireEvent.click(screen.getByRole('button', { name: /date 1/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Last 30 days' }));
     expect(navigate).toHaveBeenCalledWith('/news?date=30d');
   });
 
-  it('selecting Rentang khusus reveals from/to inputs and applies both on submit', async () => {
+  it('selecting Custom range reveals from/to inputs and applies both on submit', async () => {
     await renderExplorer();
-    fireEvent.click(screen.getByRole('button', { name: /tanggal/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Rentang khusus' }));
+    fireEvent.click(screen.getByRole('button', { name: /date/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom range' }));
 
-    fireEvent.change(screen.getByLabelText('Dari'), { target: { value: '2026-07-01' } });
-    fireEvent.change(screen.getByLabelText('Sampai'), { target: { value: '2026-07-31' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Terapkan' }));
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-07-01' } });
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-07-31' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(navigate).toHaveBeenCalledWith('/news?date=custom&dateFrom=2026-07-01&dateTo=2026-07-31');
+  });
+
+  it('toggling sort flips the label and re-fetches with the opposite order', async () => {
+    await renderExplorer();
+    expect(screen.getByRole('button', { name: /sort: newest/i })).toBeInTheDocument();
+
+    getArticlesMock.mockResolvedValueOnce([makeArticle()]);
+    fireEvent.click(screen.getByRole('button', { name: /sort: newest/i }));
+    await waitFor(() => expect(getArticlesMock).toHaveBeenCalledTimes(2));
+    expect(getArticlesMock).toHaveBeenLastCalledWith(expect.objectContaining({ order: 'oldest' }));
+    expect(screen.getByRole('button', { name: /sort: oldest/i })).toBeInTheDocument();
+
+    getArticlesMock.mockResolvedValueOnce([makeArticle()]);
+    fireEvent.click(screen.getByRole('button', { name: /sort: oldest/i }));
+    await waitFor(() => expect(getArticlesMock).toHaveBeenCalledTimes(3));
+    expect(getArticlesMock).toHaveBeenLastCalledWith(expect.objectContaining({ order: 'newest' }));
   });
 
   it('load-more appends fetched articles, and hides itself once a page returns fewer than a full page', async () => {

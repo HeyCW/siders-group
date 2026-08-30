@@ -97,6 +97,7 @@ export const articlePublicListQuerySchema = z.object({
     publishedAfter: z.coerce.date().optional(),
     publishedBefore: z.coerce.date().optional(),
     excludeIds: commaSeparatedList(z.string().uuid()),
+    order: z.enum(['newest', 'oldest']).default('newest'),
 });
 /** The card shape used by both the public list and by any consumer composing a listing page. */
 export const articlePublicCardSchema = z.object({

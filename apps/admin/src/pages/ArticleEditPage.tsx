@@ -173,7 +173,7 @@ export function ArticleEditPage() {
     if (!pending) return;
     let uploaded: Awaited<ReturnType<typeof mediaApi.upload>>;
     try {
-      uploaded = await mediaApi.upload(file);
+      uploaded = await mediaApi.upload(file, { context: 'articles' });
     } catch (err) {
       // Reported before touching the document: the `/image` trigger cleanup below is best-effort
       // and must never be able to throw away the only feedback the user gets about the failure.
@@ -189,7 +189,7 @@ export function ArticleEditPage() {
 
   async function handleFeaturedImageChosen(file: File) {
     try {
-      const uploaded = await mediaApi.upload(file);
+      const uploaded = await mediaApi.upload(file, { context: 'articles' });
       patchForm({ featuredMediaId: uploaded.id, featuredImageUrl: uploaded.url });
     } catch (err) {
       window.alert(errorMessage(err, 'Image upload failed'));

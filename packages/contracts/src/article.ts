@@ -110,6 +110,7 @@ export const articlePublicListQuerySchema = z.object({
   publishedAfter: z.coerce.date().optional(),
   publishedBefore: z.coerce.date().optional(),
   excludeIds: commaSeparatedList(z.string().uuid()),
+  order: z.enum(['newest', 'oldest']).default('newest'),
 });
 export type ArticlePublicListQuery = z.infer<typeof articlePublicListQuerySchema>;
 

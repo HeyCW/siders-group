@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-/** The one shared trigger+popover shell behind Anak usaha, Kategori, and Tanggal. */
+/** The one shared trigger+popover shell behind Anak usaha, Category, and Date. */
 export function FilterTrigger({
   label,
   valueLabel,

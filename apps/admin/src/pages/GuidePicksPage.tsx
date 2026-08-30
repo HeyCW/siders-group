@@ -117,7 +117,7 @@ export function GuidePicksPage() {
     }
     setUploadingPhoto(true);
     try {
-      const media = await mediaApi.upload(file);
+      const media = await mediaApi.upload(file, { context: 'guide-picks' });
       setPhotoPreviewUrl(media.url);
       setPhotoMediaId(media.id);
     } catch (err) {
@@ -138,7 +138,7 @@ export function GuidePicksPage() {
     }
     setUploadingVideo(true);
     try {
-      const uploaded = await mediaApi.upload(file);
+      const uploaded = await mediaApi.upload(file, { context: 'guide-picks' });
       setVideoPreviewUrl(uploaded.url);
       setVideoMediaId(uploaded.id);
     } catch (err) {
@@ -206,7 +206,7 @@ export function GuidePicksPage() {
     if (!file) return;
     setEditUploadingPhoto(true);
     try {
-      const media = await mediaApi.upload(file);
+      const media = await mediaApi.upload(file, { context: 'guide-picks' });
       setEditPhotoPreviewUrl(media.url);
       setEditPhotoMediaId(media.id);
     } catch (err) {
@@ -223,7 +223,7 @@ export function GuidePicksPage() {
     if (!file) return;
     setEditUploadingVideo(true);
     try {
-      const uploaded = await mediaApi.upload(file);
+      const uploaded = await mediaApi.upload(file, { context: 'guide-picks' });
       setEditVideoPreviewUrl(uploaded.url);
       setEditVideoMediaId(uploaded.id);
     } catch (err) {

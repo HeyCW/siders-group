@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNotNull, lte, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import {
   articles,
   articleCategories,
@@ -80,6 +80,7 @@ export interface PublicListFilter {
   publishedAfter?: Date | undefined;
   publishedBefore?: Date | undefined;
   excludeIds?: string[] | undefined;
+  order?: 'newest' | 'oldest' | undefined;
   now: Date;
 }
 
@@ -413,14 +414,19 @@ export function createArticleRepository(db: Database): ArticleRepository {
         conditions.push(notInArray(articles.id, filter.excludeIds));
       }
 
+      // `id` breaks ties deterministically when two articles share a publishedAt instant, so
+      // paging never repeats or skips an article across requests, in either direction
+      // (specs/public-news-api/spec.md - "Stable ordering across pages").
+      const orderBy =
+        filter.order === 'oldest'
+          ? [asc(articles.publishedAt), asc(articles.id)]
+          : [desc(articles.publishedAt), desc(articles.id)];
+
       const rows = await db
         .select()
         .from(articles)
         .where(and(...conditions))
-        // `id` breaks ties deterministically when two articles share a publishedAt instant, so
-        // paging never repeats or skips an article across requests
-        // (specs/public-news-api/spec.md - "Stable ordering across pages").
-        .orderBy(desc(articles.publishedAt), desc(articles.id))
+        .orderBy(...orderBy)
         .limit(filter.limit)
         .offset(filter.offset);
 

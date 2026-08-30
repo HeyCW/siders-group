@@ -88,8 +88,11 @@ export function ContactPage() {
                 href="https://t.me/+jx87X8Lrx4M5ZmM1"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mark-hover mt-2 inline-block border-b-2 border-ink pb-[3px] text-[15px]"
+                className="mark-hover mt-2 inline-flex items-center gap-2 border-b-2 border-ink pb-[3px] text-[20px] font-bold"
               >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 shrink-0" aria-hidden="true">
+                  <path d="M21.94 4.6 18.6 20.36c-.25 1.12-.9 1.4-1.83.87l-5.07-3.74-2.45 2.36c-.27.27-.5.5-1.02.5l.36-5.16 9.4-8.49c.41-.36-.09-.56-.63-.2L6.5 13.08l-5.05-1.58c-1.1-.34-1.12-1.1.23-1.63L20.57 3.24c.91-.34 1.71.2 1.37 1.36Z" />
+                </svg>
                 Join us on Telegram! →︎
               </a>
               <div className="mt-2.5 flex flex-wrap gap-2">

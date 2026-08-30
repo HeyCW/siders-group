@@ -1,10 +1,10 @@
 export type NewsDateOption = '7d' | '30d' | 'year' | 'custom';
 
 export const NEWS_DATE_OPTIONS: { value: NewsDateOption; label: string }[] = [
-  { value: '7d', label: '7 hari terakhir' },
-  { value: '30d', label: '30 hari terakhir' },
-  { value: 'year', label: 'Tahun ini' },
-  { value: 'custom', label: 'Rentang khusus' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: 'year', label: 'This year' },
+  { value: 'custom', label: 'Custom range' },
 ];
 
 export function isNewsDateOption(value: string | undefined): value is NewsDateOption {

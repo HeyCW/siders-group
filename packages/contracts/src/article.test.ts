@@ -152,4 +152,18 @@ describe('articlePublicListQuerySchema', () => {
     expect(parsed.publishedAfter).toBeUndefined();
     expect(parsed.publishedBefore).toBeUndefined();
   });
+
+  it('defaults order to newest', () => {
+    const parsed = articlePublicListQuerySchema.parse({});
+    expect(parsed.order).toBe('newest');
+  });
+
+  it('accepts oldest as an explicit order', () => {
+    const parsed = articlePublicListQuerySchema.parse({ order: 'oldest' });
+    expect(parsed.order).toBe('oldest');
+  });
+
+  it('rejects an order value outside newest/oldest', () => {
+    expect(articlePublicListQuerySchema.safeParse({ order: 'random' }).success).toBe(false);
+  });
 });

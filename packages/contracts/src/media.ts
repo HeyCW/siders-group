@@ -18,6 +18,16 @@ export function isVideoMimeType(mime: string): mime is (typeof MEDIA_VIDEO_MIME_
 }
 
 /**
+ * Which feature an upload belongs to. Routes the stored file into a matching subfolder
+ * (`storage/app/media/{Y}/{m}/{context}`) so uploads from different admin screens don't pile up
+ * in one flat dated directory — purely a storage-layout concern, never persisted on the media
+ * record itself (a media row has no `context` column).
+ */
+export const MEDIA_CONTEXTS = ['articles', 'partners', 'guide-picks', 'anak-perusahaan'] as const;
+export const mediaContextSchema = z.enum(MEDIA_CONTEXTS);
+export type MediaContext = z.infer<typeof mediaContextSchema>;
+
+/**
  * Upload itself travels as multipart form data, not JSON — this schema covers only the
  * optional metadata fields alongside the file (specs/media-management/spec.md -
  * "Alt text and caption").
@@ -26,6 +36,7 @@ export const mediaUploadMetadataSchema = z
   .object({
     alt: z.string().max(500).optional(),
     caption: z.string().max(1000).optional(),
+    context: mediaContextSchema.optional(),
   })
   .strict();
 export type MediaUploadMetadata = z.infer<typeof mediaUploadMetadataSchema>;

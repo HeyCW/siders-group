@@ -124,7 +124,7 @@ export function AnakUsahaPresentationPage() {
     if (!file) return;
     setForm({ ...form, uploadingLogo: true, logoUploadError: null });
     try {
-      const media = await mediaApi.upload(file);
+      const media = await mediaApi.upload(file, { context: 'anak-perusahaan' });
       setForm((prev) => (prev ? { ...prev, logoMediaId: media.id, logoPreviewUrl: media.url, uploadingLogo: false } : prev));
     } catch (err) {
       setForm((prev) =>

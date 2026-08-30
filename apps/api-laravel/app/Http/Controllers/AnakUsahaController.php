@@ -61,18 +61,18 @@ class AnakUsahaController extends Controller
     public function storeProfile(Request $request, string $id): JsonResponse
     {
         $data = $this->validatedProfileData($request);
-        $profile = $this->anakUsahaService->createProfile(AnakUsaha::findOrFail($id), $data);
+        $this->anakUsahaService->createProfile(AnakUsaha::findOrFail($id), $data);
 
-        return response()->json(['data' => $this->profileShape($profile)], 201);
+        return response()->json(['data' => $this->adminShape(AnakUsaha::with('profile')->findOrFail($id))], 201);
     }
 
     public function updateProfile(Request $request, string $id): JsonResponse
     {
         $data = $this->validatedProfileData($request, true);
         $profile = AnakUsahaProfile::where('anak_usaha_id', $id)->firstOrFail();
-        $profile = $this->anakUsahaService->updateProfile($profile, $data);
+        $this->anakUsahaService->updateProfile($profile, $data);
 
-        return response()->json(['data' => $this->profileShape($profile)]);
+        return response()->json(['data' => $this->adminShape(AnakUsaha::with('profile')->findOrFail($id))]);
     }
 
     public function destroyProfile(string $id): JsonResponse
@@ -106,7 +106,7 @@ class AnakUsahaController extends Controller
             'kind' => [$rulePrefix, 'string', 'in:Media Platform,News & Community'],
             'links' => ['sometimes', 'array', 'max:10'],
             'links.*.label' => ['required_with:links', 'string'],
-            'links.*.url' => ['required_with:links', 'url', 'regex:/^https?:\/\//'],
+            'links.*.href' => ['required_with:links', 'url', 'regex:/^https?:\/\//'],
             'sortOrder' => ['sometimes', 'integer'],
             'isActive' => ['sometimes', 'boolean'],
         ]);

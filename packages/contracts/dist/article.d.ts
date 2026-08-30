@@ -162,9 +162,11 @@ export declare const articlePublicListQuerySchema: z.ZodObject<{
     publishedAfter: z.ZodOptional<z.ZodDate>;
     publishedBefore: z.ZodOptional<z.ZodDate>;
     excludeIds: z.ZodEffects<z.ZodOptional<z.ZodArray<z.ZodString, "many">>, string[] | undefined, unknown>;
+    order: z.ZodDefault<z.ZodEnum<["newest", "oldest"]>>;
 }, "strip", z.ZodTypeAny, {
     limit: number;
     offset: number;
+    order: "newest" | "oldest";
     categorySlugs?: string[] | undefined;
     anakUsahaSlugs?: string[] | undefined;
     publishedAfter?: Date | undefined;
@@ -178,6 +180,7 @@ export declare const articlePublicListQuerySchema: z.ZodObject<{
     publishedAfter?: Date | undefined;
     publishedBefore?: Date | undefined;
     excludeIds?: unknown;
+    order?: "newest" | "oldest" | undefined;
 }>;
 export type ArticlePublicListQuery = z.infer<typeof articlePublicListQuerySchema>;
 /** The card shape used by both the public list and by any consumer composing a listing page. */

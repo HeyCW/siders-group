@@ -16,7 +16,7 @@ export function IntroBlurb() {
         </p>
       </div>
       <div className="motion-safe:animate-riseIn pl-0 sm:pl-[clamp(14px,2vw,28px)]" style={{ animationDelay: '480ms' }}>
-        <p className="indent-[1.5em] text-left text-[clamp(16px,2vw,20px)] leading-[1.6]">{second}</p>
+        <p className="text-left text-[clamp(16px,2vw,20px)] leading-[1.6]">{second}</p>
       </div>
     </div>
   );

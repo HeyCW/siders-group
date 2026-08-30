@@ -21,6 +21,7 @@ class MediaController extends Controller
             $request->input('alt'),
             $request->input('caption'),
             $request->user('staff'),
+            $request->input('context'),
         );
 
         return response()->json(['data' => $this->show($media)], 201);

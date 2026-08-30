@@ -123,7 +123,7 @@ export function PartnersPage() {
     }
     setUploadingLogo(true);
     try {
-      const media = await mediaApi.upload(file);
+      const media = await mediaApi.upload(file, { context: 'partners' });
       setLogoPreviewUrl(media.url);
       setLogoMediaId(media.id);
     } catch (err) {
@@ -177,7 +177,7 @@ export function PartnersPage() {
     }
     setEditUploadingLogo(true);
     try {
-      const media = await mediaApi.upload(file);
+      const media = await mediaApi.upload(file, { context: 'partners' });
       setEditLogoPreviewUrl(media.url);
       setEditLogoMediaId(media.id);
     } catch (err) {

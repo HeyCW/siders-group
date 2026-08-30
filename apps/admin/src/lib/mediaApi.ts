@@ -1,4 +1,4 @@
-import type { MediaResponse } from '@siders/contracts';
+import type { MediaContext, MediaResponse } from '@siders/contracts';
 import { apiFetch, apiUpload } from './api.js';
 
 interface Envelope<T> {
@@ -7,11 +7,12 @@ interface Envelope<T> {
 }
 
 export const mediaApi = {
-  upload(file: File, metadata: { alt?: string; caption?: string } = {}): Promise<MediaResponse> {
+  upload(file: File, metadata: { alt?: string; caption?: string; context?: MediaContext } = {}): Promise<MediaResponse> {
     const formData = new FormData();
     formData.append('file', file);
     if (metadata.alt) formData.append('alt', metadata.alt);
     if (metadata.caption) formData.append('caption', metadata.caption);
+    if (metadata.context) formData.append('context', metadata.context);
     return apiUpload<Envelope<MediaResponse>>('/media', formData).then((r) => r.data);
   },
 

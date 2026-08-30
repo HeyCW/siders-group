@@ -21,11 +21,16 @@ class MediaService
 
     private const PREFIX = 'media';
 
-    public function store(UploadedFile $file, ?string $alt, ?string $caption, User $uploader): Media
+    /**
+     * `$context` (e.g. `anak-perusahaan`, `partners`) only shapes where the file lands on disk —
+     * matches `packages/contracts/src/media.ts`'s `mediaContextSchema` — it is never stored on
+     * the `Media` row itself.
+     */
+    public function store(UploadedFile $file, ?string $alt, ?string $caption, User $uploader, ?string $context = null): Media
     {
         $extension = $file->getMimeType() === 'video/mp4' ? 'mp4' : $file->extension();
         $filename = Str::uuid()->toString().'.'.$extension;
-        $datedSubdir = self::PREFIX.'/'.now()->format('Y/m');
+        $datedSubdir = self::PREFIX.'/'.now()->format('Y/m').($context ? '/'.$context : '');
 
         $storagePath = Storage::disk(self::DISK)->putFileAs($datedSubdir, $file, $filename);
 

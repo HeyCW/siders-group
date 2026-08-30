@@ -67,6 +67,7 @@ export interface GetArticlesParams {
   limit?: number;
   offset?: number;
   excludeIds?: string[];
+  order?: 'newest' | 'oldest' | undefined;
 }
 
 function buildQuery(params: Record<string, string | number | string[] | undefined>): string {
@@ -95,6 +96,7 @@ export function getArticles(
     limit: params.limit,
     offset: params.offset,
     excludeIds: params.excludeIds,
+    order: params.order,
   });
   return apiFetch<ArticlePublicCard[]>(`/articles${qs}`, init);
 }

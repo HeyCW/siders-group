@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
         // outside local dev.
         if (app()->environment('local')) {
             $this->call(DevOwnerSeeder::class);
+            $this->call(PartnerSeeder::class);
+            $this->call(AnakUsahaSeeder::class);
             $this->call(DemoContentSeeder::class);
         }
     }

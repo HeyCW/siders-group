@@ -77,8 +77,9 @@ export function NewsExplorer({
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [openPopover, setOpenPopover] = useState<PopoverKey>(null);
-  // Tanggal is the one filter with a two-step commit (pick "Rentang khusus", then fill in and
+  // Date is the one filter with a two-step commit (pick "Custom range", then fill in and
   // apply a range), so its popover needs a draft selection distinct from the committed,
   // URL-sourced `activeDateOption` prop — otherwise the custom-range inputs could only appear
   // after a full round trip through the URL and back (design.md - "Date range").
@@ -112,6 +113,7 @@ export function NewsExplorer({
     activeDateOption ?? '',
     activeDateFrom ?? '',
     activeDateTo ?? '',
+    sortOrder,
   ].join('|');
 
   useEffect(() => {
@@ -130,6 +132,7 @@ export function NewsExplorer({
       publishedBefore,
       limit: NEWS_PAGE_SIZE,
       offset: 0,
+      order: sortOrder,
     })
       .then((result) => {
         if (cancelled) return;
@@ -175,7 +178,7 @@ export function NewsExplorer({
   function selectDate(option: NewsDateOption) {
     const next = option === draftDateOption ? undefined : option;
     setDraftDateOption(next);
-    // Only a non-custom pick commits immediately; "Rentang khusus" waits for Terapkan so an
+    // Only a non-custom pick commits immediately; "Custom range" waits for Apply so an
     // incomplete range never gets pushed to the URL.
     if (next !== 'custom') {
       setOpenPopover(null);
@@ -194,6 +197,10 @@ export function NewsExplorer({
     setDateFromDraft('');
     setDateToDraft('');
     pushFilters({ dateOption: undefined, dateFrom: undefined, dateTo: undefined });
+  }
+
+  function toggleSortOrder() {
+    setSortOrder((cur) => (cur === 'newest' ? 'oldest' : 'newest'));
   }
 
   function clearAllFilters() {
@@ -220,6 +227,7 @@ export function NewsExplorer({
         publishedBefore,
         limit: NEWS_PAGE_SIZE,
         offset: articles.length,
+        order: sortOrder,
       });
       setArticles((prev) => [...prev, ...next]);
       setHasMore(next.length === NEWS_PAGE_SIZE);
@@ -272,14 +280,14 @@ export function NewsExplorer({
           </FilterTrigger>
 
           <FilterTrigger
-            label="Kategori"
+            label="Category"
             valueLabel={activeCategories.length > 0 ? String(activeCategories.length) : undefined}
             active={activeCategories.length > 0}
             open={openPopover === 'kat'}
             onToggle={() => togglePopover('kat')}
           >
             <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-              Kategori — pilih beberapa
+              Category — pick multiple
             </span>
             {categories.map((cat) => (
               <FilterOption
@@ -301,14 +309,14 @@ export function NewsExplorer({
           </FilterTrigger>
 
           <FilterTrigger
-            label="Tanggal"
+            label="Date"
             valueLabel={activeDateLabel ? '1' : undefined}
             active={Boolean(activeDateOption)}
             open={openPopover === 'tgl'}
             onToggle={() => togglePopover('tgl')}
           >
             <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-              Tanggal — pilih satu
+              Date — pick one
             </span>
             {NEWS_DATE_OPTIONS.map((option) => (
               <FilterOption
@@ -321,7 +329,7 @@ export function NewsExplorer({
             {draftDateOption === 'custom' && (
               <div className="mt-3 flex flex-col gap-2 border-t border-rule pt-3">
                 <label className="flex flex-col gap-1 text-[12px]">
-                  Dari
+                  From
                   <input
                     type="date"
                     value={dateFromDraft}
@@ -330,7 +338,7 @@ export function NewsExplorer({
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-[12px]">
-                  Sampai
+                  To
                   <input
                     type="date"
                     value={dateToDraft}
@@ -344,7 +352,7 @@ export function NewsExplorer({
                   disabled={!dateFromDraft || !dateToDraft}
                   className="border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest disabled:opacity-50"
                 >
-                  Terapkan
+                  Apply
                 </button>
               </div>
             )}
@@ -362,9 +370,10 @@ export function NewsExplorer({
 
         <button
           type="button"
+          onClick={toggleSortOrder}
           className="inline-flex items-center gap-2 whitespace-nowrap border border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper"
         >
-          Urutkan: Terbaru ⇅
+          Sort: {sortOrder === 'newest' ? 'Newest' : 'Oldest'} ⇅
         </button>
       </div>
 
@@ -386,7 +395,7 @@ export function NewsExplorer({
             onClick={() => toggleCategory(cat.slug)}
             className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-signal focus-visible:bg-ink focus-visible:text-signal"
           >
-            Kategori <span className="font-serif font-bold normal-case tracking-normal">{cat.name}</span> ×
+            Category <span className="font-serif font-bold normal-case tracking-normal">{cat.name}</span> ×
           </button>
         ))}
         {activeDateLabel && (
@@ -395,7 +404,7 @@ export function NewsExplorer({
             onClick={() => pushFilters({ dateOption: undefined, dateFrom: undefined, dateTo: undefined })}
             className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-signal focus-visible:bg-ink focus-visible:text-signal"
           >
-            Tanggal <span className="font-serif font-bold normal-case tracking-normal">{activeDateLabel}</span> ×
+            Date <span className="font-serif font-bold normal-case tracking-normal">{activeDateLabel}</span> ×
           </button>
         )}
         {hasFilters && (

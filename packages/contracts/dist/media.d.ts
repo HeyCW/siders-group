@@ -12,6 +12,15 @@ export declare const mediaMimeTypeSchema: z.ZodEnum<["image/jpeg", "image/png", 
 export type MediaMimeType = z.infer<typeof mediaMimeTypeSchema>;
 export declare function isVideoMimeType(mime: string): mime is (typeof MEDIA_VIDEO_MIME_TYPES)[number];
 /**
+ * Which feature an upload belongs to. Routes the stored file into a matching subfolder
+ * (`storage/app/media/{Y}/{m}/{context}`) so uploads from different admin screens don't pile up
+ * in one flat dated directory — purely a storage-layout concern, never persisted on the media
+ * record itself (a media row has no `context` column).
+ */
+export declare const MEDIA_CONTEXTS: readonly ["articles", "partners", "guide-picks", "anak-perusahaan"];
+export declare const mediaContextSchema: z.ZodEnum<["articles", "partners", "guide-picks", "anak-perusahaan"]>;
+export type MediaContext = z.infer<typeof mediaContextSchema>;
+/**
  * Upload itself travels as multipart form data, not JSON — this schema covers only the
  * optional metadata fields alongside the file (specs/media-management/spec.md -
  * "Alt text and caption").
@@ -19,12 +28,15 @@ export declare function isVideoMimeType(mime: string): mime is (typeof MEDIA_VID
 export declare const mediaUploadMetadataSchema: z.ZodObject<{
     alt: z.ZodOptional<z.ZodString>;
     caption: z.ZodOptional<z.ZodString>;
+    context: z.ZodOptional<z.ZodEnum<["articles", "partners", "guide-picks", "anak-perusahaan"]>>;
 }, "strict", z.ZodTypeAny, {
     alt?: string | undefined;
     caption?: string | undefined;
+    context?: "articles" | "partners" | "guide-picks" | "anak-perusahaan" | undefined;
 }, {
     alt?: string | undefined;
     caption?: string | undefined;
+    context?: "articles" | "partners" | "guide-picks" | "anak-perusahaan" | undefined;
 }>;
 export type MediaUploadMetadata = z.infer<typeof mediaUploadMetadataSchema>;
 export declare const mediaUpdateRequestSchema: z.ZodObject<{
