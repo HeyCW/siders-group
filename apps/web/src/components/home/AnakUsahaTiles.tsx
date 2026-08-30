@@ -55,7 +55,7 @@ export function AnakUsahaTiles({ brands }: { brands: PresentedAnakUsaha[] }) {
                       rel="noopener noreferrer"
                       className="border-b-2 border-ink pb-0.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-signal"
                     >
-                      {link.label} ↗
+                      {link.label} ↗︎
                     </a>
                   ))}
                 </div>

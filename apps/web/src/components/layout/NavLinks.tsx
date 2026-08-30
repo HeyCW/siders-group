@@ -20,7 +20,7 @@ export function NavLinks({
 }) {
   const pathname = useLocation().pathname;
   return (
-    <span className={`flex ${stacked ? 'flex-col' : 'gap-0.5'} ${className}`}>
+    <span className={`flex items-center ${stacked ? 'flex-col' : 'gap-0.5'} ${className}`}>
       {NAV_ITEMS.map((item) => {
         const active = isActive(pathname, item.href);
         return (

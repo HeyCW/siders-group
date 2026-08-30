@@ -38,7 +38,7 @@ export const TEAM: TeamMember[] = [
     id: 'mikhael',
     name: 'Mikhael Jonathan',
     role: 'Founder, Siders Media',
-    photoUrl: '/team/mikhael.jpg',
+    photoUrl: `${import.meta.env.BASE_URL}images/team/mikhael.jpg`,
     message: [
       {
         type: 'p',
@@ -75,7 +75,7 @@ export const TEAM: TeamMember[] = [
     id: 'melvin',
     name: 'Melvin Tenggara',
     role: 'Investor & Strategic Partner, Siders Media',
-    photoUrl: '/team/melvin.jpg',
+    photoUrl: `${import.meta.env.BASE_URL}images/team/melvin.jpg`,
     message: [
       {
         type: 'p',

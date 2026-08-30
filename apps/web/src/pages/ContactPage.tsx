@@ -90,7 +90,7 @@ export function ContactPage() {
                 rel="noopener noreferrer"
                 className="mark-hover mt-2 inline-block border-b-2 border-ink pb-[3px] text-[15px]"
               >
-                Join us on Telegram! →
+                Join us on Telegram! →︎
               </a>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {brands.map((brand) => {

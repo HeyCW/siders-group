@@ -48,11 +48,11 @@ export function SiteFooter({ brands }: { brands: PresentedAnakUsaha[] }) {
                 'group flex justify-between gap-3 border-b border-rule py-2.5 text-sm transition-[border-bottom-width,border-color] duration-hover ease-hover hover:border-b-[3px] hover:border-ink focus-visible:border-b-[3px] focus-visible:border-ink';
               return link ? (
                 <a key={brand.id} href={link.href} target="_blank" rel="noopener noreferrer" className={className}>
-                  <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
+                  <span className="mark-group">{brand.name}</span> <span className="text-muted">↗︎</span>
                 </a>
               ) : (
                 <Link key={brand.id} to="/news" className={className}>
-                  <span className="mark-group">{brand.name}</span> <span className="text-muted">↗</span>
+                  <span className="mark-group">{brand.name}</span> <span className="text-muted">↗︎</span>
                 </Link>
               );
             })}

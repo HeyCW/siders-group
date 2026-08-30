@@ -4,9 +4,9 @@
 # replaces now that admin is deployed as static files rather than to Vercel.
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
+  RewriteBase /siders-admin/
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  RewriteRule . /siders-admin/index.html [L]
 </IfModule>

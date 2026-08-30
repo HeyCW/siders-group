@@ -240,127 +240,129 @@ export function NewsExplorer({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-rule py-[clamp(14px,2vw,20px)]">
-        <FilterTrigger
-          label="Group Companies"
-          valueLabel={activeAnakUsaha.length > 0 ? String(activeAnakUsaha.length) : undefined}
-          active={activeAnakUsaha.length > 0}
-          open={openPopover === 'anak'}
-          onToggle={() => togglePopover('anak')}
-        >
-          <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-            Group Companies — pilih beberapa
-          </span>
-          {anakUsahaOptions.map((entry) => (
-            <FilterOption
-              key={entry.id}
-              label={entry.name}
-              selected={activeAnakUsahaSlugs.includes(entry.slug)}
-              onClick={() => toggleAnakUsaha(entry.slug)}
-            />
-          ))}
-          {activeAnakUsahaSlugs.length > 0 && (
-            <button
-              type="button"
-              onClick={() => pushFilters({ anakUsahaSlugs: [] })}
-              className="mt-3 border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest"
-            >
-              Reset
-            </button>
-          )}
-        </FilterTrigger>
-
-        <FilterTrigger
-          label="Kategori"
-          valueLabel={activeCategories.length > 0 ? String(activeCategories.length) : undefined}
-          active={activeCategories.length > 0}
-          open={openPopover === 'kat'}
-          onToggle={() => togglePopover('kat')}
-        >
-          <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-            Kategori — pilih beberapa
-          </span>
-          {categories.map((cat) => (
-            <FilterOption
-              key={cat.id}
-              label={cat.name}
-              selected={activeCategorySlugs.includes(cat.slug)}
-              onClick={() => toggleCategory(cat.slug)}
-            />
-          ))}
-          {activeCategorySlugs.length > 0 && (
-            <button
-              type="button"
-              onClick={() => pushFilters({ categorySlugs: [] })}
-              className="mt-3 border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest"
-            >
-              Reset
-            </button>
-          )}
-        </FilterTrigger>
-
-        <FilterTrigger
-          label="Tanggal"
-          valueLabel={activeDateLabel ? '1' : undefined}
-          active={Boolean(activeDateOption)}
-          open={openPopover === 'tgl'}
-          onToggle={() => togglePopover('tgl')}
-        >
-          <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-            Tanggal — pilih satu
-          </span>
-          {NEWS_DATE_OPTIONS.map((option) => (
-            <FilterOption
-              key={option.value}
-              label={option.label}
-              selected={draftDateOption === option.value}
-              onClick={() => selectDate(option.value)}
-            />
-          ))}
-          {draftDateOption === 'custom' && (
-            <div className="mt-3 flex flex-col gap-2 border-t border-rule pt-3">
-              <label className="flex flex-col gap-1 text-[12px]">
-                Dari
-                <input
-                  type="date"
-                  value={dateFromDraft}
-                  onChange={(e) => setDateFromDraft(e.target.value)}
-                  className="border border-ink bg-transparent px-2 py-1.5 text-[13px] outline-none"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-[12px]">
-                Sampai
-                <input
-                  type="date"
-                  value={dateToDraft}
-                  onChange={(e) => setDateToDraft(e.target.value)}
-                  className="border border-ink bg-transparent px-2 py-1.5 text-[13px] outline-none"
-                />
-              </label>
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-rule py-[clamp(14px,2vw,20px)]">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <FilterTrigger
+            label="Group Companies"
+            valueLabel={activeAnakUsaha.length > 0 ? String(activeAnakUsaha.length) : undefined}
+            active={activeAnakUsaha.length > 0}
+            open={openPopover === 'anak'}
+            onToggle={() => togglePopover('anak')}
+          >
+            <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
+              Group Companies — pilih beberapa
+            </span>
+            {anakUsahaOptions.map((entry) => (
+              <FilterOption
+                key={entry.id}
+                label={entry.name}
+                selected={activeAnakUsahaSlugs.includes(entry.slug)}
+                onClick={() => toggleAnakUsaha(entry.slug)}
+              />
+            ))}
+            {activeAnakUsahaSlugs.length > 0 && (
               <button
                 type="button"
-                onClick={applyCustomRange}
-                disabled={!dateFromDraft || !dateToDraft}
-                className="border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest disabled:opacity-50"
+                onClick={() => pushFilters({ anakUsahaSlugs: [] })}
+                className="mt-3 border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest"
               >
-                Terapkan
+                Reset
               </button>
-            </div>
-          )}
-          {draftDateOption && (
-            <button
-              type="button"
-              onClick={resetDate}
-              className="mt-3 border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest"
-            >
-              Reset
-            </button>
-          )}
-        </FilterTrigger>
+            )}
+          </FilterTrigger>
+
+          <FilterTrigger
+            label="Kategori"
+            valueLabel={activeCategories.length > 0 ? String(activeCategories.length) : undefined}
+            active={activeCategories.length > 0}
+            open={openPopover === 'kat'}
+            onToggle={() => togglePopover('kat')}
+          >
+            <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
+              Kategori — pilih beberapa
+            </span>
+            {categories.map((cat) => (
+              <FilterOption
+                key={cat.id}
+                label={cat.name}
+                selected={activeCategorySlugs.includes(cat.slug)}
+                onClick={() => toggleCategory(cat.slug)}
+              />
+            ))}
+            {activeCategorySlugs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => pushFilters({ categorySlugs: [] })}
+                className="mt-3 border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest"
+              >
+                Reset
+              </button>
+            )}
+          </FilterTrigger>
+
+          <FilterTrigger
+            label="Tanggal"
+            valueLabel={activeDateLabel ? '1' : undefined}
+            active={Boolean(activeDateOption)}
+            open={openPopover === 'tgl'}
+            onToggle={() => togglePopover('tgl')}
+          >
+            <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
+              Tanggal — pilih satu
+            </span>
+            {NEWS_DATE_OPTIONS.map((option) => (
+              <FilterOption
+                key={option.value}
+                label={option.label}
+                selected={draftDateOption === option.value}
+                onClick={() => selectDate(option.value)}
+              />
+            ))}
+            {draftDateOption === 'custom' && (
+              <div className="mt-3 flex flex-col gap-2 border-t border-rule pt-3">
+                <label className="flex flex-col gap-1 text-[12px]">
+                  Dari
+                  <input
+                    type="date"
+                    value={dateFromDraft}
+                    onChange={(e) => setDateFromDraft(e.target.value)}
+                    className="border border-ink bg-transparent px-2 py-1.5 text-[13px] outline-none"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[12px]">
+                  Sampai
+                  <input
+                    type="date"
+                    value={dateToDraft}
+                    onChange={(e) => setDateToDraft(e.target.value)}
+                    className="border border-ink bg-transparent px-2 py-1.5 text-[13px] outline-none"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={applyCustomRange}
+                  disabled={!dateFromDraft || !dateToDraft}
+                  className="border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest disabled:opacity-50"
+                >
+                  Terapkan
+                </button>
+              </div>
+            )}
+            {draftDateOption && (
+              <button
+                type="button"
+                onClick={resetDate}
+                className="mt-3 border-2 border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest"
+              >
+                Reset
+              </button>
+            )}
+          </FilterTrigger>
+        </div>
 
         <button
           type="button"
-          className="ml-auto inline-flex items-center gap-2 whitespace-nowrap border border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper"
+          className="inline-flex items-center gap-2 whitespace-nowrap border border-ink px-3.5 py-2 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-paper focus-visible:bg-ink focus-visible:text-paper"
         >
           Urutkan: Terbaru ⇅
         </button>

@@ -16,13 +16,13 @@ export function CtaBand() {
             to="/contact"
             className="mark-hover border-b-2 border-ink pb-[3px] font-sans text-[11px] font-bold uppercase tracking-widest"
           >
-            Hubungi aja →
+            Hubungi aja →︎
           </Link>
           <Link
             to="/news"
             className="mark-hover border-b-2 border-ink pb-[3px] font-sans text-[11px] font-bold uppercase tracking-widest"
           >
-            Baca News →
+            Baca News →︎
           </Link>
         </div>
       </Reveal>

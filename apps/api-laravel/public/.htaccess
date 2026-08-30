@@ -5,6 +5,15 @@
 
     RewriteEngine On
 
+    # apps/web and apps/admin's static SPA builds live at public/siders and
+    # public/siders-admin (see the outer public_html .htaccess's `public/$1` rewrite) —
+    # let their own .htaccess files handle routing instead of falling through to Laravel's
+    # front controller below, which has no matching route and would 404 every client-side
+    # path (e.g. /siders/news, /siders-admin/dashboard) on refresh.
+    RewriteCond %{REQUEST_URI} ^/siders/ [NC,OR]
+    RewriteCond %{REQUEST_URI} ^/siders-admin/ [NC]
+    RewriteRule ^ - [L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
