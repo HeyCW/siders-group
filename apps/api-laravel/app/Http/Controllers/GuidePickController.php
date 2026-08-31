@@ -74,7 +74,7 @@ class GuidePickController extends Controller
             'city' => $pick->city,
             'place' => $pick->place,
             'description' => $pick->description,
-            'photoUrl' => $this->mediaService->publicUrl($pick->photoMedia),
+            'photoUrl' => $pick->photoMedia ? $this->mediaService->publicUrl($pick->photoMedia) : null,
             'videoUrl' => $this->mediaService->publicUrl($pick->videoMedia),
             'sortOrder' => $pick->sort_order,
             'isActive' => $pick->is_active,

@@ -18,11 +18,9 @@ import { groupGuidePicksByCity } from '../../lib/guidePicks';
  * are sized like a reel — a portrait 9:16 video — rather than the wide 4:3 card this section used
  * before self-hosted video replaced photos.
  *
- * Each video renders poster-first (`preload="none"`, native `poster`) and only begins loading or
- * playing on user activation — the native `<video>` element does this without any of the
- * lightbox/iframe machinery a third-party embed needed
- * (specs/web-public-site/spec.md - "Guideline videos render poster-first with playback on
- * activation"). Activating one video pauses every other one via the shared `videoRefs` list,
+ * Each video only begins loading or playing on user activation (`preload="none"`) — the native
+ * `<video>` element does this without any of the lightbox/iframe machinery a third-party embed
+ * needed. Activating one video pauses every other one via the shared `videoRefs` list,
  * satisfying "activating one pick SHALL NOT begin playback for any other pick".
  */
 export function GuideOfWeek({ guides }: { guides: PublicGuidePick[] }) {
@@ -96,7 +94,6 @@ export function GuideOfWeek({ guides }: { guides: PublicGuidePick[] }) {
                       else videoRefs.current.delete(key);
                     }}
                     src={guide.videoUrl}
-                    poster={guide.photoUrl}
                     preload="none"
                     muted
                     loop

@@ -92,8 +92,8 @@ export function HomePage() {
         <Showcase articles={articles} />
       </Container>
       <Container>
-        <AnakUsahaTiles brands={anakUsahaBrands} />
         <PartnerGrid partners={partners} />
+        <AnakUsahaTiles brands={anakUsahaBrands} />
         <CtaBand />
       </Container>
     </div>

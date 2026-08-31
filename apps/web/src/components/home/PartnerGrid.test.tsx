@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { PublicPartner } from '@siders/contracts';
 import { PartnerGrid } from './PartnerGrid.js';
 
@@ -73,22 +73,26 @@ describe('PartnerGrid', () => {
   });
 
   /**
-   * Pinning the two interaction states apart, because they are not the same and the difference is
-   * the fix for a measured bug: hover pauses in place, keyboard focus *clears* the animation so the
-   * track snaps back to `translateX(0)` where the tabbable copies live. With `focus-within` merely
-   * pausing, a link tabbed to mid-cycle measured 0 of 160px visible inside the `overflow-hidden`
-   * clip in Chromium — a transform does not move scroll position, so nothing recovered it. Scoped
-   * to `:focus-visible` (via `has-[:focus-visible]`) rather than plain `:focus-within`, so a mouse
-   * click on a partner link — which also focuses it — doesn't trigger the same backward snap; only
-   * a keyboard Tab does. jsdom cannot evaluate either state, so this asserts the class contract
-   * that produces them; the behaviour itself is verified in a real browser (tasks.md 8.2).
+   * The scroll never pauses for a pointer hover (specs/web-public-site/spec.md - "The ticker
+   * pauses only for keyboard interaction") — only keyboard focus clears it, so a tabbed-to link
+   * doesn't ride offscreen mid-scroll. With `focus-within` merely pausing, a link tabbed to
+   * mid-cycle measured 0 of 160px visible inside the `overflow-hidden` clip in Chromium — a
+   * transform does not move scroll position, so nothing recovered it. Scoped to `:focus-visible`
+   * (via `has-[:focus-visible]`) rather than plain `:focus-within`, so a mouse click on a partner
+   * link — which also focuses it — doesn't trigger the same backward snap; only a keyboard Tab
+   * does. jsdom cannot evaluate `:focus-visible`, so this asserts the class contract that produces
+   * it; the behaviour itself is verified in a real browser.
    */
-  it('pauses on hover but clears the animation on keyboard focus, so a focused tile returns to view', () => {
+  it('never pauses for hover and has no `:hover` class, but clears the animation on keyboard focus so a focused tile returns to view', () => {
     render(<PartnerGrid partners={partners} />);
 
     const track = screen.getByTestId('partner-ticker').firstElementChild as HTMLElement;
 
-    expect(track.className).toContain('hover:[animation-play-state:paused]');
+    expect(track.className).not.toMatch(/hover:/);
+    expect(track.style.animationPlayState).toBe('');
+    fireEvent.mouseEnter(track);
+    expect(track.style.animationPlayState).toBe('');
+
     expect(track.className).toContain('has-[:focus-visible]:[animation:none]');
     expect(track.className).not.toContain('focus-within:[animation:none]');
     expect(track.className).not.toContain('has-[:focus-visible]:[animation-play-state:paused]');

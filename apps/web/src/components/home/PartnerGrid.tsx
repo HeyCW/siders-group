@@ -83,8 +83,10 @@ const STATIC_TILE = 'flex h-36 items-center justify-center border-b border-r bor
  * from `PartnerTile`, so link-through is not something a reduced-motion reader silently loses.
  * Only one branch is ever displayed, so neither duplicates the other for assistive tech.
  *
- * Hover pauses in place (`animation-play-state`), but focus *clears* the animation rather than
- * pausing it, and the difference is load-bearing. The tabbable copies are the first `partners.length`
+ * The scroll never pauses for a pointer hover — it keeps moving continuously regardless of the
+ * mouse (specs/web-public-site/spec.md - "The ticker pauses only for keyboard interaction").
+ * Keyboard focus is the one thing that stops it, and it *clears* the animation rather than pausing
+ * it, and the difference is load-bearing. The tabbable copies are the first `partners.length`
  * tiles, at the very start of the track; pausing mid-cycle would freeze a focused link exactly where
  * the transform had already carried it — measured at 0 of 160px visible inside the `overflow-hidden`
  * clip. Nothing recovers it, because a transform does not move scroll position, so the browser's
@@ -126,7 +128,7 @@ export function PartnerGrid({ partners }: { partners: PublicPartner[] }) {
 
         <div data-testid="partner-ticker" className="motion-reduce:hidden overflow-hidden">
           <div
-            className="flex w-max motion-safe:animate-marquee hover:[animation-play-state:paused] has-[:focus-visible]:[animation:none]"
+            className="flex w-max motion-safe:animate-marquee has-[:focus-visible]:[animation:none]"
             style={{ animationDuration: `${durationSeconds}s` }}
           >
             {track.map((partner, index) => (

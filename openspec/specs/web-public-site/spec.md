@@ -299,13 +299,13 @@ looping seamlessly regardless of how many partners exist.
 - **WHEN** the number of active partners is small enough that they would not otherwise fill one row's width
 - **THEN** the row still scrolls continuously with no visible gap, rather than sitting static or showing a partial row
 
-### Requirement: The ticker pauses while the reader is interacting with it
-The partner ticker SHALL pause its scrolling while a pointer hovers over it and while keyboard
-focus is within it, and SHALL resume when neither condition holds.
+### Requirement: The ticker pauses only for keyboard interaction
+The partner ticker SHALL keep scrolling continuously regardless of pointer hover, and SHALL pause
+its scrolling only while keyboard focus is within it, resuming when focus leaves.
 
-#### Scenario: Hovering pauses the scroll
+#### Scenario: Hovering does not pause the scroll
 - **WHEN** a pointer hovers over the partner ticker
-- **THEN** the scrolling stops until the pointer leaves
+- **THEN** the scrolling continues uninterrupted
 
 #### Scenario: Keyboard focus pauses the scroll
 - **WHEN** keyboard focus moves to a partner link inside the ticker

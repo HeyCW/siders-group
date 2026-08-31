@@ -2,36 +2,31 @@
 
 ### Requirement: Guide-pick CRUD
 The system SHALL expose admin endpoints to create, list, update, and delete guide picks. Each
-guide pick SHALL have a city, a place name, a description, a video, a poster photo, and an active
-flag defaulting to active.
+guide pick SHALL have a city, a place name, a description, a video, an optional photo, and an
+active flag defaulting to active.
 
 #### Scenario: Create a guide pick
-- **WHEN** a staff member holding `news.manage` submits a valid city, place, description, video, and
-  poster photo
+- **WHEN** a staff member holding `news.manage` submits a valid city, place, description, and video,
+  with or without a photo
 - **THEN** the system persists the guide pick and returns its representation including its id
 
 #### Scenario: Admin list includes inactive guide picks
 - **WHEN** a staff member holding `news.manage` lists guide picks
 - **THEN** the response includes both active and inactive guide picks
 
-#### Scenario: Admin list reports both media references
+#### Scenario: Admin list reports the photo reference when present
 - **WHEN** a staff member holding `news.manage` lists guide picks
-- **THEN** each entry reports both its video and its poster photo, so a pick missing neither can be
-  distinguished from one that is complete
+- **THEN** each entry reports its video, and its photo only when the pick has one
 
-### Requirement: A guide pick requires a photo
-A guide pick SHALL reference a photo image stored by this system as a media record. A guide pick
-SHALL NOT be created or left without one. The photo SHALL be an ordinary image subject to the
-existing media rules.
+### Requirement: A guide pick's photo is optional
+A guide pick MAY reference a photo image stored by this system as a media record. When present, the
+photo SHALL be an ordinary image subject to the existing media rules. A guide pick with no photo is
+valid and complete on its own — the public homepage does not render a photo before video playback,
+so there is no degraded state a missing photo would need to guard against.
 
-The photo SHALL serve as the poster for the guide pick's video: it is what a visitor sees before
-playback begins, and it is what remains presentable if the video itself cannot be played. It is
-therefore required whether or not a poster could be derived from the video by other means — the
-system SHALL NOT extract a poster frame from the video in place of this photo.
-
-#### Scenario: Photo is required at creation
-- **WHEN** a staff member attempts to create a guide pick without a photo
-- **THEN** the system rejects the request and creates no guide pick
+#### Scenario: A guide pick may be created without a photo
+- **WHEN** a staff member creates a guide pick without a photo
+- **THEN** the system persists the guide pick with no photo reference
 
 #### Scenario: Photo reference must be an existing media record
 - **WHEN** a staff member submits a guide pick referencing a photo identifier that does not match
@@ -49,8 +44,9 @@ system SHALL NOT extract a poster frame from the video in place of this photo.
 
 ### Requirement: Public read serves only active guide picks in order
 The system SHALL expose a public endpoint that returns active guide picks in their stored order,
-each with its city, place, description, poster photo URL, and video URL. The endpoint SHALL require
-no authentication and SHALL NOT include inactive guide picks or any admin-only field.
+each with its city, place, description, photo URL (when the pick has one), and video URL. The
+endpoint SHALL require no authentication and SHALL NOT include inactive guide picks or any
+admin-only field.
 
 The endpoint SHALL return a single flat ordered collection. It SHALL NOT group entries by city:
 the city travels with each entry, and grouping is a presentation concern of the consuming page, so
@@ -62,8 +58,8 @@ that the stored order remains the single source of truth for ordering.
 
 #### Scenario: Public shape omits admin-only fields
 - **WHEN** a client reads the public guide-pick listing
-- **THEN** each entry contains city, place, description, poster photo URL, and video URL only — no
-  active flag, no sort-order value, no internal id
+- **THEN** each entry contains city, place, description, video URL, and a photo URL only when the
+  pick has one — no active flag, no sort-order value, no internal id
 
 #### Scenario: Entries are flat, not grouped
 - **WHEN** a client reads the public guide-pick listing and the active picks span several cities

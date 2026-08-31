@@ -58,7 +58,7 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
         city: input.city,
         place: input.place,
         description: input.description,
-        photoMediaId: input.photoMediaId,
+        photoMediaId: input.photoMediaId ?? null,
         videoMediaId: input.videoMediaId,
         isActive: input.isActive ?? true,
       });

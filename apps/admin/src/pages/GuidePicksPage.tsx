@@ -26,14 +26,14 @@ function IconGrip({ className }: { className?: string }) {
 
 /**
  * The guide-pick list: create, edit, delete, reorder, and toggle active picks backing the public
- * home page's "Siders Guideline of the Week" section. A photo and a video are both required
- * before a pick can be created (specs/guide-of-the-week-management/spec.md - "A guide pick
- * requires a photo", "A guide pick requires a self-hosted video") — the photo now serves as the
- * video's poster — mirroring `PartnersPage.tsx`'s required-logo upload. Reordering saves
- * immediately on drop — a guide pick has no separate "pick from a pool" step to batch with the
- * reorder, so there is nothing to gain by deferring the write behind an explicit save button
- * (design.md - "Guide picks are directly-owned entities, not a curated selection"). No UI-side
- * limit on how many picks can be added (design.md - "No maximum pick count").
+ * home page's "Siders Guideline of the Week" section. Only a video is required before a pick can
+ * be created (specs/guide-of-the-week-management/spec.md - "A guide pick requires a
+ * self-hosted video") — the photo is optional and has no upload field here; the public homepage
+ * does not render one. Reordering saves immediately on drop — a guide pick has no separate "pick
+ * from a pool" step to batch with the reorder, so there is nothing to gain by deferring the write
+ * behind an explicit save button (design.md - "Guide picks are directly-owned entities, not a
+ * curated selection"). No UI-side limit on how many picks can be added (design.md - "No maximum
+ * pick count").
  */
 export function GuidePicksPage() {
   const [guidePicks, setGuidePicks] = useState<GuidePickResponse[]>([]);
@@ -44,13 +44,6 @@ export function GuidePicksPage() {
   const [city, setCity] = useState('');
   const [place, setPlace] = useState('');
   const [description, setDescription] = useState('');
-  const [photoMediaId, setPhotoMediaId] = useState<string | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  /** Bumped after a successful create so the file input remounts empty. Without it the input keeps
-   *  the previous selection and re-picking the same file fires no `change` event. */
-  const [photoInputKey, setPhotoInputKey] = useState(0);
 
   const [videoMediaId, setVideoMediaId] = useState<string | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
@@ -62,10 +55,6 @@ export function GuidePicksPage() {
   const [editCity, setEditCity] = useState('');
   const [editPlace, setEditPlace] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [editPhotoMediaId, setEditPhotoMediaId] = useState<string | null>(null);
-  const [editPhotoPreviewUrl, setEditPhotoPreviewUrl] = useState<string | null>(null);
-  const [editPhotoUploadError, setEditPhotoUploadError] = useState<string | null>(null);
-  const [editUploadingPhoto, setEditUploadingPhoto] = useState(false);
 
   const [editVideoMediaId, setEditVideoMediaId] = useState<string | null>(null);
   const [editVideoPreviewUrl, setEditVideoPreviewUrl] = useState<string | null>(null);
@@ -94,10 +83,8 @@ export function GuidePicksPage() {
     city.trim().length > 0 &&
     place.trim().length > 0 &&
     description.trim().length > 0 &&
-    photoMediaId !== null &&
     videoMediaId !== null &&
     !createState.loading &&
-    !uploadingPhoto &&
     !uploadingVideo;
 
   const canSaveEdit =
@@ -105,29 +92,7 @@ export function GuidePicksPage() {
     editPlace.trim().length > 0 &&
     editDescription.trim().length > 0 &&
     !updateState.loading &&
-    !editUploadingPhoto &&
     !editUploadingVideo;
-
-  async function handlePhotoSelected(file: File | null) {
-    setPhotoUploadError(null);
-    if (!file) {
-      setPhotoPreviewUrl(null);
-      setPhotoMediaId(null);
-      return;
-    }
-    setUploadingPhoto(true);
-    try {
-      const media = await mediaApi.upload(file, { context: 'guide-picks' });
-      setPhotoPreviewUrl(media.url);
-      setPhotoMediaId(media.id);
-    } catch (err) {
-      setPhotoUploadError(err instanceof ApiError ? err.message : 'Photo upload failed');
-      setPhotoPreviewUrl(null);
-      setPhotoMediaId(null);
-    } finally {
-      setUploadingPhoto(false);
-    }
-  }
 
   async function handleVideoSelected(file: File | null) {
     setVideoUploadError(null);
@@ -151,22 +116,18 @@ export function GuidePicksPage() {
   }
 
   async function handleCreate() {
-    if (!photoMediaId || !videoMediaId || !canCreate) return;
+    if (!videoMediaId || !canCreate) return;
     try {
       const created = await runCreate({
         city: city.trim(),
         place: place.trim(),
         description: description.trim(),
-        photoMediaId,
         videoMediaId,
       });
       setGuidePicks((prev) => [...prev, created]);
       setCity('');
       setPlace('');
       setDescription('');
-      setPhotoPreviewUrl(null);
-      setPhotoMediaId(null);
-      setPhotoInputKey((k) => k + 1);
       setVideoPreviewUrl(null);
       setVideoMediaId(null);
       setVideoInputKey((k) => k + 1);
@@ -180,9 +141,6 @@ export function GuidePicksPage() {
     setEditCity(pick.city);
     setEditPlace(pick.place);
     setEditDescription(pick.description);
-    setEditPhotoMediaId(null);
-    setEditPhotoPreviewUrl(pick.photoUrl);
-    setEditPhotoUploadError(null);
     setEditVideoMediaId(null);
     setEditVideoPreviewUrl(pick.videoUrl);
     setEditVideoUploadError(null);
@@ -193,29 +151,9 @@ export function GuidePicksPage() {
     setEditCity('');
     setEditPlace('');
     setEditDescription('');
-    setEditPhotoMediaId(null);
-    setEditPhotoPreviewUrl(null);
-    setEditPhotoUploadError(null);
     setEditVideoMediaId(null);
     setEditVideoPreviewUrl(null);
     setEditVideoUploadError(null);
-  }
-
-  async function handleEditPhotoSelected(file: File | null) {
-    setEditPhotoUploadError(null);
-    if (!file) return;
-    setEditUploadingPhoto(true);
-    try {
-      const media = await mediaApi.upload(file, { context: 'guide-picks' });
-      setEditPhotoPreviewUrl(media.url);
-      setEditPhotoMediaId(media.id);
-    } catch (err) {
-      setEditPhotoUploadError(err instanceof ApiError ? err.message : 'Photo upload failed');
-      setEditPhotoPreviewUrl(editingId ? (guidePicks.find((p) => p.id === editingId)?.photoUrl ?? null) : null);
-      setEditPhotoMediaId(null);
-    } finally {
-      setEditUploadingPhoto(false);
-    }
   }
 
   async function handleEditVideoSelected(file: File | null) {
@@ -242,7 +180,6 @@ export function GuidePicksPage() {
         city: editCity.trim(),
         place: editPlace.trim(),
         description: editDescription.trim(),
-        ...(editPhotoMediaId ? { photoMediaId: editPhotoMediaId } : {}),
         ...(editVideoMediaId ? { videoMediaId: editVideoMediaId } : {}),
       });
       setGuidePicks((prev) => prev.map((p) => (p.id === editingId ? updated : p)));
@@ -360,25 +297,6 @@ export function GuidePicksPage() {
           </div>
 
           <div>
-            <label className={FIELD_LABEL}>Photo (required)</label>
-            <div className="flex items-center gap-3">
-              <label className={FILE_LABEL}>
-                Choose file
-                <input
-                  key={photoInputKey}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handlePhotoSelected(e.target.files?.[0] ?? null)}
-                  className="hidden"
-                />
-              </label>
-              {uploadingPhoto && <span className="font-mono text-xs text-[var(--muted)]">Uploading…</span>}
-              {photoPreviewUrl && <img src={photoPreviewUrl} alt="" className="h-14 w-14 rounded-md object-cover" />}
-            </div>
-            {photoUploadError && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{photoUploadError}</p>}
-          </div>
-
-          <div>
             <label className={FIELD_LABEL}>Video (required, MP4)</label>
             <div className="flex items-center gap-3">
               <label className={FILE_LABEL}>
@@ -470,27 +388,6 @@ export function GuidePicksPage() {
                     />
                   </div>
                   <div>
-                    <label className={FIELD_LABEL}>Replace photo (optional)</label>
-                    <div className="flex items-center gap-3">
-                      <label className={FILE_LABEL}>
-                        Choose file
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleEditPhotoSelected(e.target.files?.[0] ?? null)}
-                          className="hidden"
-                        />
-                      </label>
-                      {editUploadingPhoto && <span className="font-mono text-xs text-[var(--muted)]">Uploading…</span>}
-                      {editPhotoPreviewUrl && (
-                        <img src={editPhotoPreviewUrl} alt="" className="h-14 w-14 rounded-md object-cover" />
-                      )}
-                    </div>
-                    {editPhotoUploadError && (
-                      <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{editPhotoUploadError}</p>
-                    )}
-                  </div>
-                  <div>
                     <label className={FIELD_LABEL}>Replace video (optional, MP4)</label>
                     <div className="flex items-center gap-3">
                       <label className={FILE_LABEL}>
@@ -536,7 +433,9 @@ export function GuidePicksPage() {
                   }`}
                 >
                   <IconGrip className="h-4 w-4 shrink-0 text-[var(--muted)]/50" />
-                  <img src={pick.photoUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                  {pick.photoUrl && (
+                    <img src={pick.photoUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-[var(--ink)]">
                       {pick.place} <span className="text-[var(--muted)]">— {pick.city}</span>

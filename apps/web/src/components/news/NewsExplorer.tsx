@@ -258,7 +258,7 @@ export function NewsExplorer({
             onToggle={() => togglePopover('anak')}
           >
             <span className="block border-b border-rule pb-2.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-              Group Companies — pilih beberapa
+              Group Companies — PICK MULTIPLE
             </span>
             {anakUsahaOptions.map((entry) => (
               <FilterOption

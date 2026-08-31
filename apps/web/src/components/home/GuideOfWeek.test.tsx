@@ -54,16 +54,13 @@ describe('GuideOfWeek', () => {
     expect(screen.getAllByText('Surabaya')).toHaveLength(1);
   });
 
-  /** specs/web-public-site/spec.md - "Guideline videos render poster-first with playback on
-   *  activation": the video element renders with its poster and does not eagerly load the
-   *  source. */
-  it('renders each pick as a poster-first video that does not preload', () => {
+  it('renders each pick as a video that does not preload and has no poster', () => {
     const guides = [pick({ place: 'Seven Cafe' })];
     const { container } = render(<GuideOfWeek guides={guides} />);
 
     const video = container.querySelector('video') as HTMLVideoElement;
     expect(video).toBeTruthy();
-    expect(video.getAttribute('poster')).toBe('https://cdn.example.com/seven-cafe.webp');
+    expect(video.getAttribute('poster')).toBeNull();
     expect(video.getAttribute('src')).toBe('https://cdn.example.com/seven-cafe.mp4');
     expect(video.getAttribute('preload')).toBe('none');
   });

@@ -15,8 +15,9 @@ rail on the same homepage. It is removed rather than left to compete.
 
 ## What Changes
 
-- **BREAKING** A guide pick SHALL require a self-hosted video. Its existing photo is retained and
-  stays required, but is redefined as the video's poster.
+- **BREAKING** A guide pick SHALL require a self-hosted video. Its existing photo is retained but
+  becomes optional: the public homepage no longer renders a photo before video playback, so nothing
+  else depends on a pick having one.
 - **BREAKING** Existing guide picks cannot satisfy the new requirement — no video exists anywhere
   in the system to backfill them with. Every guide pick present at migration time is either given
   a video by hand beforehand or removed. There is no automatic backfill.
@@ -47,10 +48,10 @@ None. This change reshapes existing capabilities and removes one.
 - `media-management`: accepted types extend to video; the single maximum-size requirement splits
   into per-kind limits; upload handling becomes streaming, which changes what "leaves no residue"
   must guarantee on rejection.
-- `guide-of-the-week-management`: a guide pick requires a video; the required photo is redefined as
-  that video's poster; public output carries the video URL and the grouping-relevant city.
-- `web-public-site`: the homepage's guideline section renders grouped video with poster-first
-  playback; every reels-rail requirement is removed.
+- `guide-of-the-week-management`: a guide pick requires a video; its photo becomes optional; public
+  output carries the video URL, a photo URL only when present, and the grouping-relevant city.
+- `web-public-site`: the homepage's guideline section renders grouped video with playback only on
+  activation; every reels-rail requirement is removed.
 - `reels-curation`: removed entirely.
 
 ## Impact

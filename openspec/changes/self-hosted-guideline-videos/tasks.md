@@ -93,9 +93,8 @@
       group; group order follows first appearance, not alphabetical; a single-city input yields one
       group; empty input yields no groups.
 - [x] 5.3 Update `GuideOfWeek.tsx` to render one labeled group per city (heading + grid), each pick
-      showing its poster (`photoUrl`) by default with a `<video>` element (`preload="none"`,
-      `poster={photoUrl}`, `src={videoUrl}`) that begins playback only on user activation, replacing
-      the always-visible `<img>`.
+      showing a `<video>` element (`preload="none"`, no `poster`, `src={videoUrl}`) that begins
+      playback only on user activation, replacing the always-visible `<img>`.
 - [x] 5.4 Ensure only one pick plays at a time: activating a pick's video pauses/resets any other
       currently-playing pick in the section.
 - [x] 5.5 Delete `apps/web/components/home/ReelsRail.tsx` and `ReelsRail.test.tsx`; remove its
@@ -160,3 +159,39 @@
       works (range requests), confirm an oversized or non-MP4 upload is rejected with a clear error,
       confirm the reels admin nav entries and homepage reels rail are gone.
 - [x] 8.4 Run `openspec validate self-hosted-guideline-videos --strict` before archiving.
+
+## 9. Follow-up: the photo becomes optional
+
+The live backend is `apps/api-laravel`, not the Node/Drizzle `apps/api` — see design.md addendum
+below. Both are updated for parity; the Laravel side is the one actually deployed.
+
+- [x] 9.1 Laravel: new migration
+      `2026_08_31_110001_make_guide_pick_photo_optional.php` runs `MODIFY photo_media_id CHAR(36)
+      NULL` (additive, no data loss — existing rows keep their photo). Applied to the local dev DB.
+      `StoreGuidePickRequest.photoMediaId` changed from `required` to `sometimes`;
+      `GuidePickService::create` defaults the column to `null` when omitted;
+      `GuidePickController::shape()` returns `photoUrl: null` when the pick has no photo (mirrors
+      the existing `logoUrl`/`featuredMedia` nullable-media pattern already used by
+      `PartnerController`/`ArticlePresenter`).
+      Node/Drizzle parity (not the live path, kept in sync for the shared workspace type-check):
+      `packages/db/src/schema/guidePicks.ts` drops `.notNull()` from `photoMediaId`; no new
+      `db/migrations/*.sql` was generated since that migration history is stale relative to the
+      Laravel schema (guide_picks' own video-column migration was never added there either).
+- [x] 9.2 `packages/contracts/src/guidePick.ts`: `photoMediaId` optional in
+      `guidePickCreateRequestSchema`; `photoUrl` nullable in `guidePickResponseSchema` and
+      `publicGuidePickSchema`. Rebuilt (`npm run build`) so consuming apps pick up the change.
+- [x] 9.3 `apps/api/src/modules/guidePicks/guidePick.repository.ts`: the `photoMediaId` join is now
+      a `leftJoin`; `photoStoragePath`/`photoMediaId` are nullable on `GuidePickRow`.
+- [x] 9.4 `apps/api/src/modules/guidePicks/guidePick.mapper.ts`: derives `photoUrl` only when
+      `photoStoragePath` is present, `null` otherwise.
+- [x] 9.5 `apps/admin/src/pages/GuidePicksPage.tsx`: removed the photo upload field from the create
+      form and the "Replace photo" field from the edit form; dropped `photoMediaId` from
+      `canCreate`; guarded the list row's photo thumbnail (`pick.photoUrl` may now be `null`).
+- [x] 9.6 Updated `guidePick.service.test.ts` (repository fake) and `GuidePicksPage.test.tsx`
+      (create-form tests, no-photo-field assertion) to match. `guidePick.repository.test.ts` and
+      `guidePick.service.revalidation.test.ts` needed no changes and still pass.
+- [x] 9.7 Ran the affected test suites (`apps/api` guidePicks module, `apps/admin`
+      `GuidePicksPage.test.tsx`, `apps/web` `GuideOfWeek`/`guidePicks` tests) and `tsc --noEmit` for
+      `packages/contracts`, `apps/admin`, `apps/web`, `apps/api` — all clean. Ran
+      `openspec validate self-hosted-guideline-videos --strict` — valid. No PHPUnit tests exist for
+      `GuidePick` to update; `php -l` checked the edited/new PHP files.

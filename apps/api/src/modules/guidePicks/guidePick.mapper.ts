@@ -3,14 +3,15 @@ import { publicUrlFor } from '../../lib/mediaStorage.js';
 import type { GuidePickRow } from './guidePick.repository.js';
 
 /** `photoUrl` is derived from the joined media's `storage_path` here, at map time — never stored
- *  on the row, mirroring `partner.mapper.ts`'s `toPartnerResponse`. */
+ *  on the row, mirroring `partner.mapper.ts`'s `toPartnerResponse`. `null` when the pick has no
+ *  photo. */
 export function toGuidePickResponse(env: { MEDIA_PUBLIC_BASE_URL: string }, row: GuidePickRow): GuidePickResponse {
   return {
     id: row.id,
     city: row.city,
     place: row.place,
     description: row.description,
-    photoUrl: publicUrlFor(env, row.photoStoragePath),
+    photoUrl: row.photoStoragePath === null ? null : publicUrlFor(env, row.photoStoragePath),
     videoUrl: publicUrlFor(env, row.videoStoragePath),
     isActive: row.isActive,
     sortOrder: row.sortOrder,
@@ -28,7 +29,7 @@ export function toPublicGuidePick(env: { MEDIA_PUBLIC_BASE_URL: string }, row: G
     city: row.city,
     place: row.place,
     description: row.description,
-    photoUrl: publicUrlFor(env, row.photoStoragePath),
+    photoUrl: row.photoStoragePath === null ? null : publicUrlFor(env, row.photoStoragePath),
     videoUrl: publicUrlFor(env, row.videoStoragePath),
   };
 }

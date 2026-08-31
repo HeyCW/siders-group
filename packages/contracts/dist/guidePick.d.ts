@@ -1,31 +1,31 @@
 import { z } from 'zod';
 /**
- * A guide pick requires a photo and a video at creation — mirrors
- * `partnerCreateRequestSchema.logoMediaId` (specs/guide-of-the-week-management/spec.md - "A guide
- * pick requires a photo", "A guide pick requires a self-hosted video"). The photo now serves as
- * the video's poster. `isActive` defaults to active, matching the stored column default.
+ * A guide pick requires a video at creation; its photo is optional
+ * (specs/guide-of-the-week-management/spec.md - "A guide pick's photo is optional", "A guide pick
+ * requires a self-hosted video"). `isActive` defaults to active, matching the stored column
+ * default.
  */
 export declare const guidePickCreateRequestSchema: z.ZodObject<{
     city: z.ZodString;
     place: z.ZodString;
     description: z.ZodString;
-    photoMediaId: z.ZodString;
+    photoMediaId: z.ZodOptional<z.ZodString>;
     videoMediaId: z.ZodString;
     isActive: z.ZodOptional<z.ZodBoolean>;
 }, "strict", z.ZodTypeAny, {
     description: string;
     city: string;
     place: string;
-    photoMediaId: string;
     videoMediaId: string;
     isActive?: boolean | undefined;
+    photoMediaId?: string | undefined;
 }, {
     description: string;
     city: string;
     place: string;
-    photoMediaId: string;
     videoMediaId: string;
     isActive?: boolean | undefined;
+    photoMediaId?: string | undefined;
 }>;
 export type GuidePickCreateRequest = z.infer<typeof guidePickCreateRequestSchema>;
 /**
@@ -84,7 +84,7 @@ export declare const guidePickResponseSchema: z.ZodObject<{
     city: z.ZodString;
     place: z.ZodString;
     description: z.ZodString;
-    photoUrl: z.ZodString;
+    photoUrl: z.ZodNullable<z.ZodString>;
     videoUrl: z.ZodString;
     isActive: z.ZodBoolean;
     sortOrder: z.ZodNumber;
@@ -99,7 +99,7 @@ export declare const guidePickResponseSchema: z.ZodObject<{
     description: string;
     city: string;
     place: string;
-    photoUrl: string;
+    photoUrl: string | null;
     videoUrl: string;
 }, {
     isActive: boolean;
@@ -110,7 +110,7 @@ export declare const guidePickResponseSchema: z.ZodObject<{
     description: string;
     city: string;
     place: string;
-    photoUrl: string;
+    photoUrl: string | null;
     videoUrl: string;
 }>;
 export type GuidePickResponse = z.infer<typeof guidePickResponseSchema>;
@@ -127,19 +127,19 @@ export declare const publicGuidePickSchema: z.ZodObject<{
     city: z.ZodString;
     place: z.ZodString;
     description: z.ZodString;
-    photoUrl: z.ZodString;
+    photoUrl: z.ZodNullable<z.ZodString>;
     videoUrl: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     description: string;
     city: string;
     place: string;
-    photoUrl: string;
+    photoUrl: string | null;
     videoUrl: string;
 }, {
     description: string;
     city: string;
     place: string;
-    photoUrl: string;
+    photoUrl: string | null;
     videoUrl: string;
 }>;
 export type PublicGuidePick = z.infer<typeof publicGuidePickSchema>;

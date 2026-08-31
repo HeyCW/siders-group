@@ -20,7 +20,7 @@ class StoreGuidePickRequest extends FormRequest
             'city' => ['required', 'string', 'max:255'],
             'place' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'photoMediaId' => ['required', 'string', 'exists:media,id', new MatchesMediaKind('image')],
+            'photoMediaId' => ['sometimes', 'string', 'exists:media,id', new MatchesMediaKind('image')],
             'videoMediaId' => ['required', 'string', 'exists:media,id', new MatchesMediaKind('video')],
             'isActive' => ['sometimes', 'boolean'],
         ];

@@ -79,23 +79,21 @@ groups. The label displayed for a group SHALL be the city value as first encount
 - **WHEN** every active guide pick shares the same city
 - **THEN** the homepage renders exactly one group, with no empty group for any other city
 
-### Requirement: Guideline videos render poster-first with playback on activation
-Each guideline pick SHALL render its poster image on initial render. Video playback SHALL begin only
-when a visitor activates that pick, and activating one pick SHALL NOT begin playback for any other
-pick.
+### Requirement: Guideline videos play only on activation
+Video playback for each guideline pick SHALL begin only when a visitor activates that pick, and
+activating one pick SHALL NOT begin playback for any other pick.
 
-#### Scenario: Poster renders before activation
+#### Scenario: No video plays before activation
 - **WHEN** the homepage's guideline section renders and a visitor does not interact with it
-- **THEN** every pick displays its poster image and no video is playing
+- **THEN** no pick's video is playing
 
 #### Scenario: Activation plays exactly one video
 - **WHEN** a visitor activates a single guideline pick
-- **THEN** that pick's video begins playback, and every other pick continues to display its poster
+- **THEN** that pick's video begins playback, and every other pick's video remains unplayed
 
-#### Scenario: Closing playback returns to the poster
+#### Scenario: Closing playback stops cleanly
 - **WHEN** a visitor closes an actively playing guideline pick
-- **THEN** that pick returns to displaying its poster image, with no video left playing in the
-  background
+- **THEN** that pick's video stops, with no video left playing in the background
 
 ## REMOVED Requirements
 
@@ -103,8 +101,7 @@ pick.
 
 **Reason**: The reels capability is removed. The vertical-video section it served is superseded by
 the guideline-of-the-week section rendering self-hosted video, which needs no third-party embed to
-defer in the first place — see "Guideline videos render poster-first with playback on activation"
-above.
+defer in the first place — see "Guideline videos play only on activation" above.
 
 **Migration**: There is no reels rail to migrate; it is deleted from the homepage along with its
 admin surface. Visitors who previously saw the reels rail now see only the guideline-of-the-week

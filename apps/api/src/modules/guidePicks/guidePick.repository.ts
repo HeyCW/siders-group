@@ -12,10 +12,11 @@ export interface GuidePickRow {
   city: string;
   place: string;
   description: string;
-  photoMediaId: string;
+  photoMediaId: string | null;
   /** Joined from `app.media` at read time so the mapper can derive a photo URL without a second
-   *  round trip — mirrors `PartnerRow.logoStoragePath` (partner.repository.ts). */
-  photoStoragePath: string;
+   *  round trip — mirrors `PartnerRow.logoStoragePath` (partner.repository.ts). `null` when the
+   *  pick has no photo — left-joined, unlike the video's required inner join. */
+  photoStoragePath: string | null;
   videoMediaId: string;
   /** Joined from a second, aliased reference to `app.media` — a guide pick's photo now serves as
    *  its video's poster, so both references are resolved in the same read
@@ -31,7 +32,7 @@ export interface CreateGuidePickInput {
   city: string;
   place: string;
   description: string;
-  photoMediaId: string;
+  photoMediaId?: string | undefined;
   videoMediaId: string;
   isActive?: boolean | undefined;
 }
@@ -152,7 +153,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
     const [row] = await db
       .select(SELECT_COLUMNS)
       .from(guidePicks)
-      .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+      .leftJoin(media, eq(media.id, guidePicks.photoMediaId))
       .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
       .where(eq(guidePicks.id, id))
       .limit(1);
@@ -163,7 +164,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
     return db
       .select(SELECT_COLUMNS)
       .from(guidePicks)
-      .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+      .leftJoin(media, eq(media.id, guidePicks.photoMediaId))
       .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
       .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt));
   }
@@ -172,7 +173,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
     return db
       .select(SELECT_COLUMNS)
       .from(guidePicks)
-      .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+      .leftJoin(media, eq(media.id, guidePicks.photoMediaId))
       .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
       .where(eq(guidePicks.isActive, true))
       .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt));
@@ -196,7 +197,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
             city: input.city,
             place: input.place,
             description: input.description,
-            photoMediaId: input.photoMediaId,
+            photoMediaId: input.photoMediaId ?? null,
             videoMediaId: input.videoMediaId,
             isActive: input.isActive ?? true,
             sortOrder: maxRow.nextSortOrder,
@@ -241,7 +242,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
           tx
             .select(SELECT_COLUMNS)
             .from(guidePicks)
-            .innerJoin(media, eq(media.id, guidePicks.photoMediaId))
+            .leftJoin(media, eq(media.id, guidePicks.photoMediaId))
             .innerJoin(videoMedia, eq(videoMedia.id, guidePicks.videoMediaId))
             .orderBy(asc(guidePicks.sortOrder), asc(guidePicks.createdAt)),
         onInvalidSet: invalidGuidePickSetError,

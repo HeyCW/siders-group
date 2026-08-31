@@ -22,7 +22,7 @@ class GuidePickService
             'city' => $data['city'],
             'place' => $data['place'],
             'description' => $data['description'],
-            'photo_media_id' => $data['photoMediaId'],
+            'photo_media_id' => $data['photoMediaId'] ?? null,
             'video_media_id' => $data['videoMediaId'],
             'sort_order' => $sortOrder,
             'is_active' => $data['isActive'] ?? true,

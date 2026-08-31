@@ -1,17 +1,17 @@
 import { z } from 'zod';
 
 /**
- * A guide pick requires a photo and a video at creation — mirrors
- * `partnerCreateRequestSchema.logoMediaId` (specs/guide-of-the-week-management/spec.md - "A guide
- * pick requires a photo", "A guide pick requires a self-hosted video"). The photo now serves as
- * the video's poster. `isActive` defaults to active, matching the stored column default.
+ * A guide pick requires a video at creation; its photo is optional
+ * (specs/guide-of-the-week-management/spec.md - "A guide pick's photo is optional", "A guide pick
+ * requires a self-hosted video"). `isActive` defaults to active, matching the stored column
+ * default.
  */
 export const guidePickCreateRequestSchema = z
   .object({
     city: z.string().min(1).max(200),
     place: z.string().min(1).max(200),
     description: z.string().min(1).max(1000),
-    photoMediaId: z.string().uuid(),
+    photoMediaId: z.string().uuid().optional(),
     videoMediaId: z.string().uuid(),
     isActive: z.boolean().optional(),
   })
@@ -64,7 +64,7 @@ export const guidePickResponseSchema = z.object({
   city: z.string(),
   place: z.string(),
   description: z.string(),
-  photoUrl: z.string(),
+  photoUrl: z.string().nullable(),
   videoUrl: z.string(),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
@@ -86,7 +86,7 @@ export const publicGuidePickSchema = z.object({
   city: z.string(),
   place: z.string(),
   description: z.string(),
-  photoUrl: z.string(),
+  photoUrl: z.string().nullable(),
   videoUrl: z.string(),
 });
 export type PublicGuidePick = z.infer<typeof publicGuidePickSchema>;
