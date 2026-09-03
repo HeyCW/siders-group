@@ -8,7 +8,7 @@ export function Showcase({ articles }: { articles: ArticlePublicCard[] }) {
 
   return (
     <div className="pt-[clamp(32px,5vw,64px)]">
-      <SectionHeading title="SidersVox — News & Community" trailing="Guide by Siders" />
+      <SectionHeading title="HYPERLOCAL NEWS" />
       <Reveal delayMs={90} className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
         {articles.map((article) => (
           <ArticleCard key={article.id} article={article} />
