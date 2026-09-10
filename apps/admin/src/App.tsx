@@ -11,8 +11,9 @@ import { PartnersPage } from './pages/PartnersPage.js';
 import { AnakUsahaPresentationPage } from './pages/AnakUsahaPresentationPage.js';
 import { GuidePicksPage } from './pages/GuidePicksPage.js';
 import { ContactMessagesPage } from './pages/ContactMessagesPage.js';
-import { CommentModerationPage } from './pages/CommentModerationPage.js';
-import { ReaderModerationPage } from './pages/ReaderModerationPage.js';
+// Comment/reader moderation isn't used, disabled for now.
+// import { CommentModerationPage } from './pages/CommentModerationPage.js';
+// import { ReaderModerationPage } from './pages/ReaderModerationPage.js';
 import { RolesPage } from './pages/RolesPage.js';
 import { StaffPage } from './pages/StaffPage.js';
 import { anakUsahaApi, categoriesApi } from './lib/taxonomyApi.js';
@@ -77,8 +78,10 @@ export default function App() {
             <Route path="/partners" element={<PartnersPage />} />
             <Route path="/guide-picks" element={<GuidePicksPage />} />
             <Route path="/messages" element={<ContactMessagesPage />} />
+            {/* Comment/reader moderation isn't used, disabled for now.
             <Route path="/moderation/comments" element={<CommentModerationPage />} />
             <Route path="/moderation/readers" element={<ReaderModerationPage />} />
+            */}
             <Route path="/roles" element={<RolesPage />} />
             <Route path="/staff" element={<StaffPage />} />
           </Route>

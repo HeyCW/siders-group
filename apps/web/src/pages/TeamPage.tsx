@@ -1,10 +1,12 @@
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { useMetaDescription } from '../lib/useMetaDescription';
 import { Container } from '../components/layout/Container';
 import { MediaSlot } from '../components/ui/MediaSlot';
 import { TEAM } from '../lib/content';
 
 export function TeamPage() {
-  useDocumentTitle('Team — Siders');
+  useDocumentTitle('Behind The Siders — Team');
+  useMetaDescription('Meet the people behind Siders — the founders and partners building a hyperlocal media and community platform.');
 
   return (
     <div>

@@ -1,8 +1,9 @@
 import { formatCount } from '../../lib/formatCount';
 import { useReaderSession } from '../../lib/readerSession';
-import { CommentSection } from './CommentSection';
-import { LikeButton } from './LikeButton';
-import { SignInPrompt } from './SignInPrompt';
+// Login-gated features, disabled for now.
+// import { CommentSection } from './CommentSection';
+// import { LikeButton } from './LikeButton';
+// import { SignInPrompt } from './SignInPrompt';
 import { useArticleEngagement } from './useArticleEngagement';
 
 /**
@@ -48,8 +49,9 @@ function Skeleton() {
 export function EngagementBar({ articleId }: { articleId: string }) {
   const { session } = useReaderSession();
   const readerId = session.status === 'authenticated' ? session.account.id : null;
-  const { state, likePending, loadingMoreComments, toggleLike, submitComment, loadMoreComments } =
-    useArticleEngagement(articleId, readerId);
+  // likePending/toggleLike/loadingMoreComments/submitComment/loadMoreComments unused while the
+  // login-gated like and comment features are disabled.
+  const { state } = useArticleEngagement(articleId, readerId);
 
   if (state.status === 'loading') return <Skeleton />;
 
@@ -63,15 +65,12 @@ export function EngagementBar({ articleId }: { articleId: string }) {
     );
   }
 
-  const { summary, comments, hasMoreComments } = state;
+  const { summary } = state;
 
   return (
     <>
       <BarFrame>
-        {/* Nothing in this slot while the session resolves. An anonymous-looking prompt shown to
-            what turns out to be a signed-in reader is worse than a brief gap — the same call
-            `ReaderControl` makes in the masthead (specs/web-public-site/spec.md - "Neither
-            control is shown before the session is known"). */}
+        {/* Login-gated like control disabled for now.
         {session.status === 'anonymous' && <SignInPrompt action="untuk menyukai artikel ini." />}
         {session.status === 'authenticated' && (
           <LikeButton
@@ -81,15 +80,19 @@ export function EngagementBar({ articleId }: { articleId: string }) {
             onToggle={() => void toggleLike()}
           />
         )}
+        */}
 
         <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted tabular-nums">
-          {formatCount(summary.viewCount)} kali dibaca
+          {formatCount(summary.viewCount)} views
         </span>
+        {/* Login-gated comment feature disabled for now, so the count is hidden too.
         <span className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted tabular-nums">
           {formatCount(summary.commentCount)} komentar
         </span>
+        */}
       </BarFrame>
 
+      {/* Login-gated comment feature disabled for now.
       <CommentSection
         comments={comments}
         commentCount={summary.commentCount}
@@ -98,6 +101,7 @@ export function EngagementBar({ articleId }: { articleId: string }) {
         onLoadMore={() => void loadMoreComments()}
         onSubmit={submitComment}
       />
+      */}
     </>
   );
 }

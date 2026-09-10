@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { StickyNav } from './StickyNav';
 import { NavLinks } from './NavLinks';
 import { Container } from './Container';
-import { ReaderControl } from './ReaderControl';
+// Login-gated feature, disabled for now.
+// import { ReaderControl } from './ReaderControl';
 
 export function SiteHeader() {
   return (
@@ -13,7 +14,7 @@ export function SiteHeader() {
         {/* Dateline row — masthead furniture, not app chrome (design.md - "The utility slot
             renders in both header surfaces"). */}
         <div className="flex justify-end">
-          <ReaderControl />
+          {/* Login-gated sign-in/out control disabled for now. <ReaderControl /> */}
         </div>
         <div className="h-[clamp(8px,1vw,16px)]" />
         <div className="origin-left motion-safe:animate-ruledraw border-t-[3px] border-ink" />

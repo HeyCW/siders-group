@@ -14,9 +14,13 @@ import { CtaBand } from '../components/home/CtaBand';
 import { presentedAnakUsaha } from '../lib/anakUsaha';
 import { getAnakUsahaList } from '../lib/api';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { useMetaDescription } from '../lib/useMetaDescription';
 
 export function HomePage() {
-  useDocumentTitle('Siders');
+  useDocumentTitle('Siders — Hyperlocal Media and Community');
+  useMetaDescription(
+    'Siders is a hyperlocal media and community platform connecting stories, brands, and people across Surabaya and Jakarta. Everyone has a voice, everyone has a story, everyone is Siders.',
+  );
 
   const [articles, setArticles] = useState<ArticlePublicCard[]>([]);
   const [partners, setPartners] = useState<PublicPartner[]>([]);

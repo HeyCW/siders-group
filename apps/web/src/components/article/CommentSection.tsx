@@ -3,8 +3,9 @@ import { COMMENT_MAX_LENGTH, type CommentResponse } from '@siders/contracts';
 import { ApiError } from '../../lib/authApi';
 import { formatCount } from '../../lib/formatCount';
 import { useReaderSession } from '../../lib/readerSession';
-import { CommentReportControl } from './CommentReportControl';
-import { SignInPrompt } from './SignInPrompt';
+// Login-gated features, disabled for now.
+// import { CommentReportControl } from './CommentReportControl';
+// import { SignInPrompt } from './SignInPrompt';
 
 function formatCommentDate(iso: string): string {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -124,15 +125,14 @@ export function CommentSection({
         </span>
       </div>
 
-      {/* Nothing while the session is still resolving — an anonymous-looking prompt shown to what
-          turns out to be a signed-in reader is worse than a brief blank, the same call
-          `ReaderControl` makes for the masthead. */}
+      {/* Login-gated comment composer disabled for now.
       {session.status === 'anonymous' && (
         <div className="border-b border-rule py-[clamp(14px,2vw,20px)]">
           <SignInPrompt action="untuk ikut berkomentar." />
         </div>
       )}
       {session.status === 'authenticated' && <CommentComposer onSubmit={onSubmit} />}
+      */}
 
       {comments.length === 0 ? (
         <p className="py-[clamp(20px,3vw,32px)] font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
@@ -164,11 +164,13 @@ export function CommentSection({
                 </time>
               </div>
               <p className="mt-2 max-w-[66ch] whitespace-pre-wrap text-[15px] leading-[1.6]">{comment.body}</p>
+              {/* Login-gated comment report control disabled for now.
               {session.status === 'authenticated' && (
                 <div className="mt-2">
                   <CommentReportControl commentId={comment.id} />
                 </div>
               )}
+              */}
             </li>
           ))}
         </ul>

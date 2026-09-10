@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { NavLinks } from './NavLinks';
-import { ReaderControl } from './ReaderControl';
+// Login-gated feature, disabled for now.
+// import { ReaderControl } from './ReaderControl';
 
 /**
  * Hidden above the fold (the full masthead is already visible there) and slides in once the
@@ -46,7 +47,7 @@ export function StickyNav() {
             both header surfaces"). */}
         <div className="hidden items-center gap-4 lg:flex">
           <NavLinks />
-          <ReaderControl className="shrink-0" />
+          {/* Login-gated sign-in/out control disabled for now. <ReaderControl className="shrink-0" /> */}
         </div>
         <button
           type="button"
@@ -62,7 +63,7 @@ export function StickyNav() {
         <div id="sticky-nav-menu" className="border-t border-rule bg-paper px-[clamp(16px,4vw,40px)] pb-4 lg:hidden">
           <NavLinks stacked />
           <div className="border-t border-ink pt-3.5">
-            <ReaderControl />
+            {/* Login-gated sign-in/out control disabled for now. <ReaderControl /> */}
           </div>
         </div>
       )}

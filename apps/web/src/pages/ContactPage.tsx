@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { getAnakUsahaList } from '../lib/api';
 import { presentedAnakUsaha, type PresentedAnakUsaha } from '../lib/anakUsaha';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { useMetaDescription } from '../lib/useMetaDescription';
 import { Container } from '../components/layout/Container';
 import { ContactForm } from '../components/contact/ContactForm';
 import { CONTACT_INFO } from '../lib/content';
@@ -32,6 +33,9 @@ function InfoRow({
 
 export function ContactPage() {
   useDocumentTitle('Contact — Siders');
+  useMetaDescription(
+    'Get in touch with Siders for collaborations, story pitches, brand partnerships, or community inquiries.',
+  );
 
   const [brands, setBrands] = useState<PresentedAnakUsaha[]>([]);
 

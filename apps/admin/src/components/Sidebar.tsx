@@ -197,13 +197,14 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/messages', label: 'Messages', icon: IconMessages, permission: 'contact.manage' },
     ],
   },
-  {
-    label: 'Community',
-    items: [
-      { to: '/moderation/comments', label: 'Comments', icon: IconComments, permission: 'moderation.manage' },
-      { to: '/moderation/readers', label: 'Readers', icon: IconReaders, permission: 'moderation.manage' },
-    ],
-  },
+  // Comment/reader moderation isn't used, disabled for now.
+  // {
+  //   label: 'Community',
+  //   items: [
+  //     { to: '/moderation/comments', label: 'Comments', icon: IconComments, permission: 'moderation.manage' },
+  //     { to: '/moderation/readers', label: 'Readers', icon: IconReaders, permission: 'moderation.manage' },
+  //   ],
+  // },
   {
     label: 'Access',
     items: [

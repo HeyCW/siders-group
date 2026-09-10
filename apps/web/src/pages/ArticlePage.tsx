@@ -4,6 +4,7 @@ import type { ArticlePublicDetail } from '@siders/contracts';
 import { ApiError, getArticleBySlug } from '../lib/api';
 import { estimateReadMinutes } from '../lib/readingTime';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { useMetaDescription } from '../lib/useMetaDescription';
 import { Container } from '../components/layout/Container';
 import { MediaSlot } from '../components/ui/MediaSlot';
 import { EngagementBar } from '../components/article/EngagementBar';
@@ -42,6 +43,11 @@ export function ArticlePage() {
 
   useDocumentTitle(
     state.status === 'ready' ? `${state.article.seoTitle ?? state.article.title} — Siders` : 'Siders',
+  );
+  useMetaDescription(
+    state.status === 'ready'
+      ? (state.article.seoDescription ?? state.article.excerpt ?? state.article.title)
+      : 'Siders is a hyperlocal media and community platform. Everyone has a voice, everyone has a story, everyone is Siders.',
   );
 
   if (state.status === 'loading') {

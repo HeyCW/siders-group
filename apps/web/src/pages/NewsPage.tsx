@@ -4,6 +4,7 @@ import { getAnakUsahaList, getCategories } from '../lib/api';
 import { Container } from '../components/layout/Container';
 import { NewsExplorer } from '../components/news/NewsExplorer';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { useMetaDescription } from '../lib/useMetaDescription';
 
 /**
  * Of the four anak usaha sub-brands (`0010_bored_silhouette.sql`), only Surabaya Siders and
@@ -13,7 +14,10 @@ import { useDocumentTitle } from '../lib/useDocumentTitle';
 const ARTICLE_ANAK_USAHA_SLUGS = ['surabaya-siders', 'jakarta-siders'];
 
 export function NewsPage() {
-  useDocumentTitle('News — Siders');
+  useDocumentTitle('Hyperlocal News — Siders');
+  useMetaDescription(
+    'Read the latest hyperlocal news, stories, and community updates from Siders — covering Surabaya, Jakarta, and the brands connected to them.',
+  );
 
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [anakUsahaOptions, setAnakUsahaOptions] = useState<AnakUsahaResponse[]>([]);

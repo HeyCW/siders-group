@@ -103,7 +103,7 @@ describe('EngagementBar — loading', () => {
     renderAnonymous();
 
     expect(screen.getByText(/memuat aktivitas artikel/i)).toBeInTheDocument();
-    expect(screen.queryByText(/kali dibaca/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/views/i)).not.toBeInTheDocument();
   });
 
   it('reserves the loaded bar"s height, so the article below does not shift', async () => {
@@ -131,7 +131,7 @@ describe('EngagementBar — the mount sequence', () => {
 
     renderAnonymous();
 
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     expect(order[0]).toBe('view');
     expect(order).toContain('engagement');
   });
@@ -141,7 +141,7 @@ describe('EngagementBar — the mount sequence', () => {
 
     renderAnonymous();
 
-    expect(await screen.findByText('1.200 kali dibaca')).toBeInTheDocument();
+    expect(await screen.findByText('1.200 views')).toBeInTheDocument();
   });
 
   it('reports unavailability rather than rendering zeroes when the counts fail to load', async () => {
@@ -150,24 +150,24 @@ describe('EngagementBar — the mount sequence', () => {
     renderAnonymous();
 
     expect(await screen.findByText(/sedang tidak tersedia/i)).toBeInTheDocument();
-    expect(screen.queryByText(/kali dibaca/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/views/i)).not.toBeInTheDocument();
   });
 
   it('skips the view POST on a second mount for the same article the same day', async () => {
     const { unmount } = renderAnonymous();
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     expect(recordArticleView).toHaveBeenCalledTimes(1);
     unmount();
 
     renderAnonymous();
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     expect(recordArticleView).toHaveBeenCalledTimes(1);
   });
 
   it('still records a view for a different article', async () => {
     const OTHER_ARTICLE = '44444444-4444-4444-8444-444444444444';
     const { unmount } = renderAnonymous();
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     unmount();
 
     setCsrfCookie(null);
@@ -177,7 +177,7 @@ describe('EngagementBar — the mount sequence', () => {
         <EngagementBar articleId={OTHER_ARTICLE} />
       </ReaderSessionProvider>,
     );
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     expect(recordArticleView).toHaveBeenCalledTimes(2);
     expect(recordArticleView).toHaveBeenLastCalledWith(OTHER_ARTICLE);
   });
@@ -185,13 +185,13 @@ describe('EngagementBar — the mount sequence', () => {
   it('retries the view POST next load when the previous attempt failed', async () => {
     recordArticleView.mockRejectedValueOnce(new Error('429'));
     const { unmount } = renderAnonymous();
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     expect(recordArticleView).toHaveBeenCalledTimes(1);
     unmount();
 
     recordArticleView.mockResolvedValue(undefined);
     renderAnonymous();
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     expect(recordArticleView).toHaveBeenCalledTimes(2);
   });
 
@@ -210,7 +210,7 @@ describe('EngagementBar — the mount sequence', () => {
       </StrictMode>,
     );
 
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     expect(recordArticleView).toHaveBeenCalledTimes(1);
   });
 
@@ -251,32 +251,36 @@ describe('EngagementBar — the mount sequence', () => {
 
     resolveView?.();
 
-    expect(await screen.findByText('1 kali dibaca')).toBeInTheDocument();
+    expect(await screen.findByText('1 views')).toBeInTheDocument();
   });
 });
 
 describe('EngagementBar — signed out', () => {
-  it('renders a sign-in prompt in place of the like control, not a disabled button', async () => {
+  // Like control is a login-gated feature, disabled for now.
+  it.skip('renders a sign-in prompt in place of the like control, not a disabled button', async () => {
     renderAnonymous();
 
     await screen.findByText(/untuk menyukai artikel ini/i);
     expect(screen.queryByRole('button', { name: /like/i })).not.toBeInTheDocument();
   });
 
-  it('renders a sign-in prompt in place of the comment composer', async () => {
+  // Comment composer is a login-gated feature, disabled for now.
+  it.skip('renders a sign-in prompt in place of the comment composer', async () => {
     renderAnonymous();
 
     await screen.findByText(/untuk ikut berkomentar/i);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('still shows existing comments, replacing only the composer', async () => {
+  // Comment section is a login-gated feature, disabled for now.
+  it.skip('still shows existing comments, replacing only the composer', async () => {
     renderAnonymous();
 
     expect(await screen.findByText('Bagus sekali')).toBeInTheDocument();
   });
 
-  it('returns the reader to the article they were reading', async () => {
+  // Sign-in prompt is a login-gated feature, disabled for now.
+  it.skip('returns the reader to the article they were reading', async () => {
     renderAnonymous();
 
     const links = await screen.findAllByRole('link', { name: /sign in/i });
@@ -284,7 +288,8 @@ describe('EngagementBar — signed out', () => {
     expect(href).toContain(encodeURIComponent('/news/some-article'));
   });
 
-  it('offers no reply control on any comment', async () => {
+  // Comment section is a login-gated feature, disabled for now.
+  it.skip('offers no reply control on any comment', async () => {
     renderAnonymous();
 
     await screen.findByText('Bagus sekali');
@@ -293,14 +298,16 @@ describe('EngagementBar — signed out', () => {
 });
 
 describe('EngagementBar — signed in', () => {
-  it('renders the like control rather than a prompt', async () => {
+  // Like control is a login-gated feature, disabled for now.
+  it.skip('renders the like control rather than a prompt', async () => {
     renderAuthenticated();
 
     expect(await screen.findByRole('button', { name: /like/i })).toBeInTheDocument();
     expect(screen.queryByText(/untuk menyukai artikel ini/i)).not.toBeInTheDocument();
   });
 
-  it('re-reads the summary once the session resolves, correcting a like state read anonymously', async () => {
+  // Like control is a login-gated feature, disabled for now.
+  it.skip('re-reads the summary once the session resolves, correcting a like state read anonymously', async () => {
     // The mount load's `GET /engagement` typically races the session's own resolution and loses
     // it — the first call here stands in for that anonymous read, reporting no like even though
     // the reader has one, exactly as the API would if it received the request before the access
@@ -319,12 +326,13 @@ describe('EngagementBar — signed in', () => {
   it('does not re-read the summary a second time for a signed-out visitor', async () => {
     renderAnonymous();
 
-    await screen.findByText(/kali dibaca/i);
+    await screen.findByText(/views/i);
     // No session ever resolves to authenticated, so the session-aware effect never fires.
     expect(getArticleEngagement).toHaveBeenCalledTimes(1);
   });
 
-  it('updates the like optimistically and then settles on the server"s count', async () => {
+  // Like control is a login-gated feature, disabled for now.
+  it.skip('updates the like optimistically and then settles on the server"s count', async () => {
     let resolveToggle: ((value: { liked: boolean; likeCount: number }) => void) | undefined;
     toggleArticleLike.mockReturnValue(
       new Promise<{ liked: boolean; likeCount: number }>((resolve) => {
@@ -345,7 +353,8 @@ describe('EngagementBar — signed in', () => {
     await waitFor(() => expect(button.textContent).toContain('9'));
   });
 
-  it('rolls the like back when the toggle fails', async () => {
+  // Like control is a login-gated feature, disabled for now.
+  it.skip('rolls the like back when the toggle fails', async () => {
     toggleArticleLike.mockRejectedValue(new Error('offline'));
 
     renderAuthenticated();
@@ -357,7 +366,8 @@ describe('EngagementBar — signed in', () => {
     expect(button.textContent).toContain('3');
   });
 
-  it('places a submitted comment at the top of the list and raises the count', async () => {
+  // Comment composer is a login-gated feature, disabled for now.
+  it.skip('places a submitted comment at the top of the list and raises the count', async () => {
     postArticleComment.mockResolvedValue(
       comment({ id: 'new-comment', body: 'Komentar baru', createdAt: '2026-08-18T04:00:00.000Z' }),
     );
@@ -374,7 +384,8 @@ describe('EngagementBar — signed in', () => {
     expect(await screen.findByText('2 komentar')).toBeInTheDocument();
   });
 
-  it('clears the composer only after the server accepts the comment', async () => {
+  // Comment composer is a login-gated feature, disabled for now.
+  it.skip('clears the composer only after the server accepts the comment', async () => {
     postArticleComment.mockResolvedValue(comment({ id: 'new-comment', body: 'Komentar baru' }));
 
     renderAuthenticated();
@@ -386,7 +397,8 @@ describe('EngagementBar — signed in', () => {
     await waitFor(() => expect(input.value).toBe(''));
   });
 
-  it('keeps the reader"s text and reports the reason when the comment is rejected', async () => {
+  // Comment composer is a login-gated feature, disabled for now.
+  it.skip('keeps the reader"s text and reports the reason when the comment is rejected', async () => {
     const { ApiError } = await import('../../lib/authApi');
     postArticleComment.mockRejectedValue(new ApiError('Reader is muted', 403, 'reader_muted'));
 
@@ -401,7 +413,8 @@ describe('EngagementBar — signed in', () => {
   });
 });
 
-describe('EngagementBar — comment paging', () => {
+// Comment section is a login-gated feature, disabled for now.
+describe.skip('EngagementBar — comment paging', () => {
   it('offers a load-older control only when a full page came back', async () => {
     getArticleComments.mockResolvedValue(
       Array.from({ length: 10 }, (_, i) => comment({ id: `c-${i}`, body: `Komentar ${i}` })),
