@@ -84,6 +84,13 @@ class ArticleController extends Controller
         return response()->json(['data' => ArticlePresenter::admin($article)]);
     }
 
+    /** Renders the same public shape a reader would see, regardless of the article's current
+     *  status — lets staff preview a draft before it's published. */
+    public function preview(string $id): JsonResponse
+    {
+        return response()->json(['data' => ArticlePresenter::public(Article::findOrFail($id))]);
+    }
+
     // --- Public ---
 
     public function publicIndex(Request $request): JsonResponse

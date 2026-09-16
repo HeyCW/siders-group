@@ -97,6 +97,7 @@ Route::prefix('admin/articles')
         Route::post('/{id}/publish', [ArticleController::class, 'publish']);
         Route::post('/{id}/unpublish', [ArticleController::class, 'unpublish']);
         Route::post('/{id}/schedule', [ArticleController::class, 'schedule']);
+        Route::get('/{id}/preview', [ArticleController::class, 'preview']);
     });
 
 // --- Curation / Home feed ---
