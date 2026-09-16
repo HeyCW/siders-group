@@ -117,7 +117,12 @@ export function PartnerGrid({ partners }: { partners: PublicPartner[] }) {
       </Reveal>
       <RuleDraw className="border-b border-ink" />
 
-      <Reveal delayMs={90}>
+      {/* The logo row sits in the band between this section's rule and the next section's
+          (`AnakUsahaTiles`, `pt-[clamp(20px,3vw,40px)]`). The tiles' own `py-2` is the only space
+          above it, so without a matching top pad the row hugs the heading rule and reads
+          off-centre in the band. Mirroring the next section's top pad puts equal air on both
+          sides. */}
+      <Reveal delayMs={90} className="pt-[clamp(20px,3vw,40px)]">
         <div data-testid="partner-static-grid" className="hidden overflow-hidden motion-reduce:block">
           <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] border-l border-t border-rule">
             {partners.map((partner, index) => (
