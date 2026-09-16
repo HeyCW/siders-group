@@ -8,7 +8,9 @@
  * ordering table — a guide pick has no independent existence outside this section, so there is no
  * pool to select from (design.md - "Guide picks are directly-owned entities, not a curated
  * selection"). No maximum-count constraint anywhere in this table, deliberately — the list is
- * bounded only by how many rows exist (design.md - "No maximum pick count").
+ * bounded only by how many rows exist (design.md - "No maximum pick count"). `instagramUrl` is
+ * optional, plain `text` like `partners.websiteUrl` — no foreign key, no derived storage path, just
+ * an admin-supplied outbound link (openspec/changes/add-guide-pick-instagram-link).
  */
 export declare const guidePicks: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
     name: "guide_picks";
@@ -107,6 +109,23 @@ export declare const guidePicks: import("drizzle-orm/mysql-core").MySqlTableWith
             data: string;
             driverParam: string | number;
             notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, object>;
+        instagramUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+            name: "instagram_url";
+            tableName: "guide_picks";
+            dataType: "string";
+            columnType: "MySqlText";
+            data: string;
+            driverParam: string;
+            notNull: false;
             hasDefault: false;
             isPrimaryKey: false;
             isAutoincrement: false;

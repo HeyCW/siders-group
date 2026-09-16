@@ -1,9 +1,18 @@
 import { z } from 'zod';
+import { isHttpUrl } from './partner.js';
+/**
+ * Same rule as `partner.ts`'s `websiteUrlSchema`: `z.string().url()` alone accepts `javascript:`
+ * and `data:` schemes, and this value reaches an `href` on the public home page
+ * (`apps/web/components/home/GuideOfWeek.tsx`), so the scheme allowlist is required, not optional
+ * (specs/guide-of-the-week-management/spec.md - "A guide pick may carry an optional Instagram
+ * link").
+ */
+const instagramUrlSchema = z.string().url().refine(isHttpUrl, { message: 'Instagram URL must use http or https' });
 /**
  * A guide pick requires a video at creation; its photo is optional
  * (specs/guide-of-the-week-management/spec.md - "A guide pick's photo is optional", "A guide pick
  * requires a self-hosted video"). `isActive` defaults to active, matching the stored column
- * default.
+ * default. `instagramUrl` is optional, mirroring `partnerCreateRequestSchema.websiteUrl`.
  */
 export const guidePickCreateRequestSchema = z
     .object({
@@ -12,6 +21,7 @@ export const guidePickCreateRequestSchema = z
     description: z.string().min(1).max(1000),
     photoMediaId: z.string().uuid().optional(),
     videoMediaId: z.string().uuid(),
+    instagramUrl: instagramUrlSchema.nullable().optional(),
     isActive: z.boolean().optional(),
 })
     .strict();
@@ -22,6 +32,9 @@ export const guidePickCreateRequestSchema = z
  * `videoMediaId` may be updated to a new video but, like `photoMediaId`, has no way to be cleared
  * to empty — there is no nullable variant of either field
  * (specs/guide-of-the-week-management/spec.md - "A guide pick cannot be left without its video").
+ * `instagramUrl` is `.nullable()` on top of `.optional()`, the same shape as
+ * `partnerUpdateRequestSchema.websiteUrl`: absent means "leave it as it is", `null` means "clear
+ * it".
  */
 export const guidePickUpdateRequestSchema = z
     .object({
@@ -30,6 +43,7 @@ export const guidePickUpdateRequestSchema = z
     description: z.string().min(1).max(1000).optional(),
     photoMediaId: z.string().uuid().optional(),
     videoMediaId: z.string().uuid().optional(),
+    instagramUrl: instagramUrlSchema.nullable().optional(),
     isActive: z.boolean().optional(),
 })
     .strict();
@@ -59,6 +73,7 @@ export const guidePickResponseSchema = z.object({
     description: z.string(),
     photoUrl: z.string().nullable(),
     videoUrl: z.string(),
+    instagramUrl: z.string().nullable(),
     isActive: z.boolean(),
     sortOrder: z.number().int(),
     createdAt: z.string().datetime(),
@@ -79,4 +94,5 @@ export const publicGuidePickSchema = z.object({
     description: z.string(),
     photoUrl: z.string().nullable(),
     videoUrl: z.string(),
+    instagramUrl: z.string().nullable(),
 });

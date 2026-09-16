@@ -73,6 +73,58 @@ describe('guidePickCreateRequestSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('accepts a valid http(s) Instagram URL', () => {
+    const parsed = guidePickCreateRequestSchema.parse({
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'Wifi kuat dan buka sampai tengah malam.',
+      videoMediaId: id(2),
+      instagramUrl: 'https://instagram.com/p/abc123',
+    });
+    expect(parsed.instagramUrl).toBe('https://instagram.com/p/abc123');
+  });
+
+  it('accepts a create request with no instagramUrl at all', () => {
+    const parsed = guidePickCreateRequestSchema.parse({
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'Wifi kuat dan buka sampai tengah malam.',
+      videoMediaId: id(2),
+    });
+    expect(parsed.instagramUrl).toBeUndefined();
+  });
+
+  it('accepts an explicit null instagramUrl', () => {
+    const parsed = guidePickCreateRequestSchema.parse({
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'Wifi kuat dan buka sampai tengah malam.',
+      videoMediaId: id(2),
+      instagramUrl: null,
+    });
+    expect(parsed.instagramUrl).toBeNull();
+  });
+
+  /**
+   * `z.string().url()` alone accepts every one of these — `new URL()` parses any scheme. This
+   * value reaches an `href` on the public home page, so the scheme allowlist is what stops a
+   * `news.manage` holder from planting executable script there
+   * (specs/guide-of-the-week-management/spec.md - "A non-http(s) Instagram URL is rejected").
+   */
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'not-a-url'])(
+    'rejects the non-http(s) instagramUrl %s',
+    (instagramUrl) => {
+      const result = guidePickCreateRequestSchema.safeParse({
+        city: 'Surabaya',
+        place: 'Seven Cafe',
+        description: 'Wifi kuat dan buka sampai tengah malam.',
+        videoMediaId: id(2),
+        instagramUrl,
+      });
+      expect(result.success).toBe(false);
+    },
+  );
 });
 
 describe('guidePickUpdateRequestSchema', () => {
@@ -84,6 +136,16 @@ describe('guidePickUpdateRequestSchema', () => {
   it('does not accept sortOrder — order changes only via the reorder endpoint', () => {
     const result = guidePickUpdateRequestSchema.safeParse({ sortOrder: 2 });
     expect(result.success).toBe(false);
+  });
+
+  it('rejects a non-http(s) scheme on update, the same as on create', () => {
+    const result = guidePickUpdateRequestSchema.safeParse({ instagramUrl: 'javascript:alert(1)' });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts an explicit null instagramUrl to clear it', () => {
+    const parsed = guidePickUpdateRequestSchema.parse({ instagramUrl: null });
+    expect(parsed.instagramUrl).toBeNull();
   });
 });
 

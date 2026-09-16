@@ -86,28 +86,57 @@ export function GuideOfWeek({ guides }: { guides: PublicGuidePick[] }) {
           >
             {group.picks.map((guide, index) => {
               const key = `${guide.city}-${guide.place}-${index}`;
+              const video = (
+                <video
+                  ref={(el) => {
+                    if (el) videoRefs.current.set(key, el);
+                    else videoRefs.current.delete(key);
+                  }}
+                  src={guide.videoUrl}
+                  preload="none"
+                  muted
+                  loop
+                  playsInline
+                  // No native `controls` when the card is an Instagram link: clicking anywhere
+                  // on the card must navigate, not toggle play/pause, so the video stays a
+                  // passive autoplay preview here — the same one `IntersectionObserver` above
+                  // already drives for every card — with no click affordance of its own.
+                  controls={!guide.instagramUrl}
+                  className="aspect-[9/16] w-full border border-rule object-cover"
+                  onPlay={guide.instagramUrl ? undefined : (e) => handlePlay(e.currentTarget)}
+                >
+                  <track kind="captions" />
+                </video>
+              );
+              const place = (
+                <div className="mt-2 font-serif text-[clamp(14px,1.6vw,17px)] font-bold leading-[1.15] tracking-[-0.01em]">
+                  {guide.place}
+                </div>
+              );
+              const description = (
+                <p className="mt-1 text-[12px] leading-[1.5]">{guide.description}</p>
+              );
+
               return (
                 <div key={key} className="border-b border-r border-rule p-[clamp(10px,1.5vw,16px)]">
-                  <video
-                    ref={(el) => {
-                      if (el) videoRefs.current.set(key, el);
-                      else videoRefs.current.delete(key);
-                    }}
-                    src={guide.videoUrl}
-                    preload="none"
-                    muted
-                    loop
-                    playsInline
-                    controls
-                    className="aspect-[9/16] w-full border border-rule object-cover"
-                    onPlay={(e) => handlePlay(e.currentTarget)}
-                  >
-                    <track kind="captions" />
-                  </video>
-                  <div className="mt-2 font-serif text-[clamp(14px,1.6vw,17px)] font-bold leading-[1.15] tracking-[-0.01em]">
-                    {guide.place}
-                  </div>
-                  <p className="mt-1 text-[12px] leading-[1.5]">{guide.description}</p>
+                  {guide.instagramUrl ? (
+                    <a
+                      href={guide.instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block no-underline"
+                    >
+                      {video}
+                      {place}
+                      {description}
+                    </a>
+                  ) : (
+                    <>
+                      {video}
+                      {place}
+                      {description}
+                    </>
+                  )}
                 </div>
               );
             })}

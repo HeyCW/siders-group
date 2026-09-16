@@ -76,6 +76,7 @@ class GuidePickController extends Controller
             'description' => $pick->description,
             'photoUrl' => $pick->photoMedia ? $this->mediaService->publicUrl($pick->photoMedia) : null,
             'videoUrl' => $this->mediaService->publicUrl($pick->videoMedia),
+            'instagramUrl' => $pick->instagram_url,
             'sortOrder' => $pick->sort_order,
             'isActive' => $pick->is_active,
             'createdAt' => $pick->created_at->toIso8601String(),

@@ -27,6 +27,7 @@ function row(overrides: Partial<GuidePickRow> & Pick<GuidePickRow, 'id'>): Guide
     photoStoragePath: '2026/08/photo.webp',
     videoMediaId: VIDEO_MEDIA_ID,
     videoStoragePath: '2026/08/video.mp4',
+    instagramUrl: null,
     sortOrder: 0,
     isActive: true,
     createdAt: new Date('2026-01-01T00:00:00Z'),

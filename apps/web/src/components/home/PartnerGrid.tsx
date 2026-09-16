@@ -41,7 +41,13 @@ function PartnerTile({
   hidden?: boolean;
   className: string;
 }) {
-  const logo = <img src={partner.logoUrl} alt={partner.name} className="h-full w-full object-contain" />;
+  // `w-full` forced every logo into the same bounding box regardless of its own aspect ratio —
+  // a wide wordmark shrank to a sliver of that box's height while a square mark filled it, so
+  // logos read as wildly different sizes next to each other. Normalizing on height alone (auto
+  // width, capped by the tile's own width) matches how logo strips are conventionally done and
+  // keeps every mark visually the same size; `object-contain` only kicks in for the rare logo
+  // wide enough to hit `max-w-full`.
+  const logo = <img src={partner.logoUrl} alt={partner.name} className="h-full w-auto max-w-full object-contain" />;
 
   if (!partner.websiteUrl) {
     return (

@@ -14,7 +14,7 @@ class GuidePick extends Model
     use HasMillisecondTimestamps;
     use HasUuidPrimaryKey;
 
-    protected $fillable = ['city', 'place', 'description', 'photo_media_id', 'video_media_id', 'sort_order', 'is_active'];
+    protected $fillable = ['city', 'place', 'description', 'photo_media_id', 'video_media_id', 'instagram_url', 'sort_order', 'is_active'];
 
     protected function casts(): array
     {

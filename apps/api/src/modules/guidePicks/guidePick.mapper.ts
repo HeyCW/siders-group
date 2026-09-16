@@ -13,6 +13,7 @@ export function toGuidePickResponse(env: { MEDIA_PUBLIC_BASE_URL: string }, row:
     description: row.description,
     photoUrl: row.photoStoragePath === null ? null : publicUrlFor(env, row.photoStoragePath),
     videoUrl: publicUrlFor(env, row.videoStoragePath),
+    instagramUrl: row.instagramUrl,
     isActive: row.isActive,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
@@ -31,5 +32,6 @@ export function toPublicGuidePick(env: { MEDIA_PUBLIC_BASE_URL: string }, row: G
     description: row.description,
     photoUrl: row.photoStoragePath === null ? null : publicUrlFor(env, row.photoStoragePath),
     videoUrl: publicUrlFor(env, row.videoStoragePath),
+    instagramUrl: row.instagramUrl,
   };
 }

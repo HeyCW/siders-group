@@ -3,7 +3,7 @@ import { z } from 'zod';
  * A guide pick requires a video at creation; its photo is optional
  * (specs/guide-of-the-week-management/spec.md - "A guide pick's photo is optional", "A guide pick
  * requires a self-hosted video"). `isActive` defaults to active, matching the stored column
- * default.
+ * default. `instagramUrl` is optional, mirroring `partnerCreateRequestSchema.websiteUrl`.
  */
 export declare const guidePickCreateRequestSchema: z.ZodObject<{
     city: z.ZodString;
@@ -11,6 +11,7 @@ export declare const guidePickCreateRequestSchema: z.ZodObject<{
     description: z.ZodString;
     photoMediaId: z.ZodOptional<z.ZodString>;
     videoMediaId: z.ZodString;
+    instagramUrl: z.ZodOptional<z.ZodNullable<z.ZodEffects<z.ZodString, string, string>>>;
     isActive: z.ZodOptional<z.ZodBoolean>;
 }, "strict", z.ZodTypeAny, {
     description: string;
@@ -19,6 +20,7 @@ export declare const guidePickCreateRequestSchema: z.ZodObject<{
     videoMediaId: string;
     isActive?: boolean | undefined;
     photoMediaId?: string | undefined;
+    instagramUrl?: string | null | undefined;
 }, {
     description: string;
     city: string;
@@ -26,6 +28,7 @@ export declare const guidePickCreateRequestSchema: z.ZodObject<{
     videoMediaId: string;
     isActive?: boolean | undefined;
     photoMediaId?: string | undefined;
+    instagramUrl?: string | null | undefined;
 }>;
 export type GuidePickCreateRequest = z.infer<typeof guidePickCreateRequestSchema>;
 /**
@@ -35,6 +38,9 @@ export type GuidePickCreateRequest = z.infer<typeof guidePickCreateRequestSchema
  * `videoMediaId` may be updated to a new video but, like `photoMediaId`, has no way to be cleared
  * to empty — there is no nullable variant of either field
  * (specs/guide-of-the-week-management/spec.md - "A guide pick cannot be left without its video").
+ * `instagramUrl` is `.nullable()` on top of `.optional()`, the same shape as
+ * `partnerUpdateRequestSchema.websiteUrl`: absent means "leave it as it is", `null` means "clear
+ * it".
  */
 export declare const guidePickUpdateRequestSchema: z.ZodObject<{
     city: z.ZodOptional<z.ZodString>;
@@ -42,6 +48,7 @@ export declare const guidePickUpdateRequestSchema: z.ZodObject<{
     description: z.ZodOptional<z.ZodString>;
     photoMediaId: z.ZodOptional<z.ZodString>;
     videoMediaId: z.ZodOptional<z.ZodString>;
+    instagramUrl: z.ZodOptional<z.ZodNullable<z.ZodEffects<z.ZodString, string, string>>>;
     isActive: z.ZodOptional<z.ZodBoolean>;
 }, "strict", z.ZodTypeAny, {
     isActive?: boolean | undefined;
@@ -50,6 +57,7 @@ export declare const guidePickUpdateRequestSchema: z.ZodObject<{
     place?: string | undefined;
     photoMediaId?: string | undefined;
     videoMediaId?: string | undefined;
+    instagramUrl?: string | null | undefined;
 }, {
     isActive?: boolean | undefined;
     description?: string | undefined;
@@ -57,6 +65,7 @@ export declare const guidePickUpdateRequestSchema: z.ZodObject<{
     place?: string | undefined;
     photoMediaId?: string | undefined;
     videoMediaId?: string | undefined;
+    instagramUrl?: string | null | undefined;
 }>;
 export type GuidePickUpdateRequest = z.infer<typeof guidePickUpdateRequestSchema>;
 /**
@@ -86,6 +95,7 @@ export declare const guidePickResponseSchema: z.ZodObject<{
     description: z.ZodString;
     photoUrl: z.ZodNullable<z.ZodString>;
     videoUrl: z.ZodString;
+    instagramUrl: z.ZodNullable<z.ZodString>;
     isActive: z.ZodBoolean;
     sortOrder: z.ZodNumber;
     createdAt: z.ZodString;
@@ -99,6 +109,7 @@ export declare const guidePickResponseSchema: z.ZodObject<{
     description: string;
     city: string;
     place: string;
+    instagramUrl: string | null;
     photoUrl: string | null;
     videoUrl: string;
 }, {
@@ -110,6 +121,7 @@ export declare const guidePickResponseSchema: z.ZodObject<{
     description: string;
     city: string;
     place: string;
+    instagramUrl: string | null;
     photoUrl: string | null;
     videoUrl: string;
 }>;
@@ -129,16 +141,19 @@ export declare const publicGuidePickSchema: z.ZodObject<{
     description: z.ZodString;
     photoUrl: z.ZodNullable<z.ZodString>;
     videoUrl: z.ZodString;
+    instagramUrl: z.ZodNullable<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     description: string;
     city: string;
     place: string;
+    instagramUrl: string | null;
     photoUrl: string | null;
     videoUrl: string;
 }, {
     description: string;
     city: string;
     place: string;
+    instagramUrl: string | null;
     photoUrl: string | null;
     videoUrl: string;
 }>;

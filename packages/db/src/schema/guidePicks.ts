@@ -13,7 +13,9 @@ import { media } from './media.js';
  * ordering table — a guide pick has no independent existence outside this section, so there is no
  * pool to select from (design.md - "Guide picks are directly-owned entities, not a curated
  * selection"). No maximum-count constraint anywhere in this table, deliberately — the list is
- * bounded only by how many rows exist (design.md - "No maximum pick count").
+ * bounded only by how many rows exist (design.md - "No maximum pick count"). `instagramUrl` is
+ * optional, plain `text` like `partners.websiteUrl` — no foreign key, no derived storage path, just
+ * an admin-supplied outbound link (openspec/changes/add-guide-pick-instagram-link).
  */
 export const guidePicks = mysqlTable('guide_picks', {
   id: char('id', { length: 36 }).primaryKey().$defaultFn(newId),
@@ -24,6 +26,7 @@ export const guidePicks = mysqlTable('guide_picks', {
   videoMediaId: char('video_media_id', { length: 36 })
     .notNull()
     .references(() => media.id, { onDelete: 'restrict' }),
+  instagramUrl: text('instagram_url'),
   sortOrder: int('sort_order').notNull(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: datetime('created_at', { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),

@@ -24,6 +24,7 @@ class GuidePickService
             'description' => $data['description'],
             'photo_media_id' => $data['photoMediaId'] ?? null,
             'video_media_id' => $data['videoMediaId'],
+            'instagram_url' => $data['instagramUrl'] ?? null,
             'sort_order' => $sortOrder,
             'is_active' => $data['isActive'] ?? true,
         ]);
@@ -41,6 +42,7 @@ class GuidePickService
             'description' => $data['description'] ?? null,
             'photo_media_id' => $data['photoMediaId'] ?? null,
             'video_media_id' => $data['videoMediaId'] ?? null,
+            'instagram_url' => $data['instagramUrl'] ?? null,
             'is_active' => $data['isActive'] ?? null,
         ], fn ($v) => $v !== null));
 

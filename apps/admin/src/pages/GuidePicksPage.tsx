@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { GuidePickResponse } from '@siders/contracts';
+import { isHttpUrl, type GuidePickResponse } from '@siders/contracts';
 import { ApiError } from '../lib/api.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { guidePicksApi } from '../lib/guidePicksApi.js';
@@ -10,6 +10,15 @@ const TEXT_INPUT =
   'w-full rounded-md border border-[var(--rule)] bg-transparent px-3 py-2 text-sm placeholder:text-[var(--muted)]/60 focus:border-[var(--signal)] focus:outline-none focus:ring-2 focus:ring-[var(--signal)]/20';
 const FILE_LABEL =
   'inline-block cursor-pointer rounded-md border border-[var(--rule)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)]/30';
+
+/**
+ * The same predicate the server enforces, imported rather than re-derived: `isHttpUrl` is what
+ * `guidePickCreateRequestSchema.instagramUrl` refines on, mirroring `PartnersPage.tsx`'s
+ * `isValidWebsiteUrl` (packages/contracts/src/guidePick.ts).
+ */
+const isValidInstagramUrl = isHttpUrl;
+
+const INSTAGRAM_URL_HINT = 'Enter a valid http(s) URL.';
 
 function IconGrip({ className }: { className?: string }) {
   return (
@@ -44,6 +53,7 @@ export function GuidePicksPage() {
   const [city, setCity] = useState('');
   const [place, setPlace] = useState('');
   const [description, setDescription] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
 
   const [videoMediaId, setVideoMediaId] = useState<string | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
@@ -55,6 +65,7 @@ export function GuidePicksPage() {
   const [editCity, setEditCity] = useState('');
   const [editPlace, setEditPlace] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editInstagramUrl, setEditInstagramUrl] = useState('');
 
   const [editVideoMediaId, setEditVideoMediaId] = useState<string | null>(null);
   const [editVideoPreviewUrl, setEditVideoPreviewUrl] = useState<string | null>(null);
@@ -79,18 +90,24 @@ export function GuidePicksPage() {
 
   useEffect(load, []);
 
+  const instagramUrlIsInvalid = instagramUrl.trim().length > 0 && !isValidInstagramUrl(instagramUrl.trim());
   const canCreate =
     city.trim().length > 0 &&
     place.trim().length > 0 &&
     description.trim().length > 0 &&
     videoMediaId !== null &&
+    !instagramUrlIsInvalid &&
     !createState.loading &&
     !uploadingVideo;
 
+  // The edit form validates the same field by the same rule as the create form above.
+  const editInstagramUrlIsInvalid =
+    editInstagramUrl.trim().length > 0 && !isValidInstagramUrl(editInstagramUrl.trim());
   const canSaveEdit =
     editCity.trim().length > 0 &&
     editPlace.trim().length > 0 &&
     editDescription.trim().length > 0 &&
+    !editInstagramUrlIsInvalid &&
     !updateState.loading &&
     !editUploadingVideo;
 
@@ -123,11 +140,13 @@ export function GuidePicksPage() {
         place: place.trim(),
         description: description.trim(),
         videoMediaId,
+        instagramUrl: instagramUrl.trim() || null,
       });
       setGuidePicks((prev) => [...prev, created]);
       setCity('');
       setPlace('');
       setDescription('');
+      setInstagramUrl('');
       setVideoPreviewUrl(null);
       setVideoMediaId(null);
       setVideoInputKey((k) => k + 1);
@@ -141,6 +160,7 @@ export function GuidePicksPage() {
     setEditCity(pick.city);
     setEditPlace(pick.place);
     setEditDescription(pick.description);
+    setEditInstagramUrl(pick.instagramUrl ?? '');
     setEditVideoMediaId(null);
     setEditVideoPreviewUrl(pick.videoUrl);
     setEditVideoUploadError(null);
@@ -151,6 +171,7 @@ export function GuidePicksPage() {
     setEditCity('');
     setEditPlace('');
     setEditDescription('');
+    setEditInstagramUrl('');
     setEditVideoMediaId(null);
     setEditVideoPreviewUrl(null);
     setEditVideoUploadError(null);
@@ -180,6 +201,7 @@ export function GuidePicksPage() {
         city: editCity.trim(),
         place: editPlace.trim(),
         description: editDescription.trim(),
+        instagramUrl: editInstagramUrl.trim() || null,
         ...(editVideoMediaId ? { videoMediaId: editVideoMediaId } : {}),
       });
       setGuidePicks((prev) => prev.map((p) => (p.id === editingId ? updated : p)));
@@ -297,6 +319,22 @@ export function GuidePicksPage() {
           </div>
 
           <div>
+            <label htmlFor="guide-pick-instagram-url" className={FIELD_LABEL}>
+              Instagram URL (optional)
+            </label>
+            <input
+              id="guide-pick-instagram-url"
+              value={instagramUrl}
+              onChange={(e) => setInstagramUrl(e.target.value)}
+              placeholder="https://instagram.com/p/..."
+              className={TEXT_INPUT}
+            />
+            {instagramUrlIsInvalid && (
+              <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{INSTAGRAM_URL_HINT}</p>
+            )}
+          </div>
+
+          <div>
             <label className={FIELD_LABEL}>Video (required, MP4)</label>
             <div className="flex items-center gap-3">
               <label className={FILE_LABEL}>
@@ -386,6 +424,20 @@ export function GuidePicksPage() {
                       rows={2}
                       className={TEXT_INPUT}
                     />
+                  </div>
+                  <div>
+                    <label htmlFor={`edit-guide-pick-instagram-url-${pick.id}`} className={FIELD_LABEL}>
+                      Instagram URL (optional)
+                    </label>
+                    <input
+                      id={`edit-guide-pick-instagram-url-${pick.id}`}
+                      value={editInstagramUrl}
+                      onChange={(e) => setEditInstagramUrl(e.target.value)}
+                      className={TEXT_INPUT}
+                    />
+                    {editInstagramUrlIsInvalid && (
+                      <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{INSTAGRAM_URL_HINT}</p>
+                    )}
                   </div>
                   <div>
                     <label className={FIELD_LABEL}>Replace video (optional, MP4)</label>

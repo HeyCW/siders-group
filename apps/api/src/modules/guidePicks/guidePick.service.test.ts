@@ -19,6 +19,7 @@ function row(overrides: Partial<GuidePickRow> & Pick<GuidePickRow, 'id'>): Guide
     photoStoragePath: '2026/08/photo.webp',
     videoMediaId: '11111111-1111-1111-1111-000000000002',
     videoStoragePath: '2026/08/video.mp4',
+    instagramUrl: null,
     sortOrder: 0,
     isActive: true,
     createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -60,6 +61,7 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
         description: input.description,
         photoMediaId: input.photoMediaId ?? null,
         videoMediaId: input.videoMediaId,
+        instagramUrl: input.instagramUrl ?? null,
         isActive: input.isActive ?? true,
       });
       stored.push(created);
@@ -86,6 +88,10 @@ function createFakeGuidePickRepository(initial: GuidePickRow[] = []) {
         description: input.description ?? existing.description,
         photoMediaId: input.photoMediaId ?? existing.photoMediaId,
         videoMediaId: input.videoMediaId ?? existing.videoMediaId,
+        // `instagramUrl` distinguishes omitted (leave as-is) from explicit `null` (clear) — a
+        // plain `??` would treat both the same, mirroring the real repository's `stripUndefined`
+        // behavior over a plain object.
+        instagramUrl: 'instagramUrl' in input ? (input.instagramUrl ?? null) : existing.instagramUrl,
         isActive: input.isActive ?? existing.isActive,
         updatedAt: new Date(),
       };
@@ -172,6 +178,35 @@ describe('GuidePickService.create', () => {
 
     expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
   });
+
+  it('creates a guide pick with an Instagram URL', async () => {
+    const { repository } = createFakeGuidePickRepository();
+    const service = createGuidePickService(repository, revalidateEnv, logger);
+
+    const created = await service.create({
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'desc',
+      videoMediaId: VIDEO_ID,
+      instagramUrl: 'https://instagram.com/p/abc123',
+    });
+
+    expect(created.instagramUrl).toBe('https://instagram.com/p/abc123');
+  });
+
+  it('creates a guide pick with no Instagram URL', async () => {
+    const { repository } = createFakeGuidePickRepository();
+    const service = createGuidePickService(repository, revalidateEnv, logger);
+
+    const created = await service.create({
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'desc',
+      videoMediaId: VIDEO_ID,
+    });
+
+    expect(created.instagramUrl).toBeNull();
+  });
 });
 
 describe('GuidePickService.update', () => {
@@ -210,6 +245,28 @@ describe('GuidePickService.update', () => {
     await service.update('a', { isActive: false });
 
     expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the Instagram URL when explicitly updated to null', async () => {
+    const { repository } = createFakeGuidePickRepository([
+      row({ id: 'a', instagramUrl: 'https://instagram.com/p/abc123' }),
+    ]);
+    const service = createGuidePickService(repository, revalidateEnv, logger);
+
+    const updated = await service.update('a', { instagramUrl: null });
+
+    expect(updated.instagramUrl).toBeNull();
+  });
+
+  it('leaves the Instagram URL unchanged when the field is omitted from the update', async () => {
+    const { repository } = createFakeGuidePickRepository([
+      row({ id: 'a', instagramUrl: 'https://instagram.com/p/abc123' }),
+    ]);
+    const service = createGuidePickService(repository, revalidateEnv, logger);
+
+    const updated = await service.update('a', { city: 'New city' });
+
+    expect(updated.instagramUrl).toBe('https://instagram.com/p/abc123');
   });
 });
 

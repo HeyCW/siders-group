@@ -7,6 +7,7 @@ function pick(overrides: Partial<PublicGuidePick> & Pick<PublicGuidePick, 'place
     description: 'desc',
     photoUrl: 'https://cdn.example.com/photo.webp',
     videoUrl: 'https://cdn.example.com/video.mp4',
+    instagramUrl: null,
     ...overrides,
   };
 }

@@ -22,6 +22,9 @@ export interface GuidePickRow {
    *  its video's poster, so both references are resolved in the same read
    *  (openspec/changes/self-hosted-guideline-videos/design.md). */
   videoStoragePath: string;
+  /** Plain nullable column, not derived from a join — mirrors `PartnerRow.websiteUrl`
+   *  (partner.repository.ts). */
+  instagramUrl: string | null;
   sortOrder: number;
   isActive: boolean;
   createdAt: Date;
@@ -34,6 +37,7 @@ export interface CreateGuidePickInput {
   description: string;
   photoMediaId?: string | undefined;
   videoMediaId: string;
+  instagramUrl?: string | null | undefined;
   isActive?: boolean | undefined;
 }
 
@@ -43,6 +47,7 @@ export interface UpdateGuidePickInput {
   description?: string | undefined;
   photoMediaId?: string | undefined;
   videoMediaId?: string | undefined;
+  instagramUrl?: string | null | undefined;
   isActive?: boolean | undefined;
 }
 
@@ -114,6 +119,7 @@ const SELECT_COLUMNS = {
   photoStoragePath: media.storagePath,
   videoMediaId: guidePicks.videoMediaId,
   videoStoragePath: videoMedia.storagePath,
+  instagramUrl: guidePicks.instagramUrl,
   sortOrder: guidePicks.sortOrder,
   isActive: guidePicks.isActive,
   createdAt: guidePicks.createdAt,
@@ -199,6 +205,7 @@ export function createGuidePickRepository(db: Database): GuidePickRepository {
             description: input.description,
             photoMediaId: input.photoMediaId ?? null,
             videoMediaId: input.videoMediaId,
+            instagramUrl: input.instagramUrl ?? null,
             isActive: input.isActive ?? true,
             sortOrder: maxRow.nextSortOrder,
           });

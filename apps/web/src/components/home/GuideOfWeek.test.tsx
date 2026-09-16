@@ -11,6 +11,7 @@ function pick(overrides: Partial<PublicGuidePick> & Pick<PublicGuidePick, 'place
     description: 'Wifi kuat dan buka sampai tengah malam.',
     photoUrl: 'https://cdn.example.com/seven-cafe.webp',
     videoUrl: 'https://cdn.example.com/seven-cafe.mp4',
+    instagramUrl: null,
     ...overrides,
   };
 }
@@ -63,6 +64,35 @@ describe('GuideOfWeek', () => {
     expect(video.getAttribute('poster')).toBeNull();
     expect(video.getAttribute('src')).toBe('https://cdn.example.com/seven-cafe.mp4');
     expect(video.getAttribute('preload')).toBe('none');
+  });
+
+  /** specs/guide-of-the-week-management/spec.md - "A guide pick's Instagram link takes over its
+   *  public card": the video still autoplays as a muted preview (same as any other card), but the
+   *  card is a link and the video carries no native `controls` — a click must navigate, not toggle
+   *  play/pause. */
+  it('renders a pick with an Instagram URL as a link wrapping its still-present preview video', () => {
+    const guides = [pick({ place: 'Seven Cafe', instagramUrl: 'https://instagram.com/p/abc123' })];
+    const { container } = render(<GuideOfWeek guides={guides} />);
+
+    const link = screen.getByRole('link', { name: /Seven Cafe/ });
+    expect(link.getAttribute('href')).toBe('https://instagram.com/p/abc123');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+
+    const video = link.querySelector('video') as HTMLVideoElement;
+    expect(video).toBeTruthy();
+    expect(video.hasAttribute('controls')).toBe(false);
+    expect(container.querySelectorAll('video')).toHaveLength(1);
+  });
+
+  it('renders a pick without an Instagram URL exactly as before: an inline video with controls, no link', () => {
+    const guides = [pick({ place: 'Seven Cafe', instagramUrl: null })];
+    const { container } = render(<GuideOfWeek guides={guides} />);
+
+    const video = container.querySelector('video') as HTMLVideoElement;
+    expect(video).toBeTruthy();
+    expect(video.hasAttribute('controls')).toBe(true);
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   /** specs/web-public-site/spec.md - "A single pick renders without a dangling divider". Asserted

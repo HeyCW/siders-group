@@ -26,6 +26,7 @@ function guidePick(overrides: Partial<GuidePickResponse> & Pick<GuidePickRespons
     description: 'Wifi kuat dan buka sampai tengah malam.',
     photoUrl: null,
     videoUrl: 'https://cdn.example.com/seven-cafe.mp4',
+    instagramUrl: null,
     isActive: true,
     sortOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -95,6 +96,48 @@ describe('GuidePicksPage — new guide pick form', () => {
       place: 'Playground, Blok M',
       description: 'Panggung kecil tiap Jumat.',
       videoMediaId: 'media-2-video',
+      instagramUrl: null,
+    });
+  });
+
+  it('shows validation feedback for an invalid Instagram URL', async () => {
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText('Instagram URL (optional)'), { target: { value: 'not-a-url' } });
+
+    expect(screen.getByText('Enter a valid http(s) URL.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Add guide pick' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('creates a guide pick with an Instagram URL', async () => {
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Jakarta' } });
+    fireEvent.change(screen.getByLabelText('Place'), { target: { value: 'Playground, Blok M' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Panggung kecil tiap Jumat.' } });
+    fireEvent.change(screen.getByLabelText('Instagram URL (optional)'), {
+      target: { value: 'https://instagram.com/p/abc123' },
+    });
+
+    vi.mocked(mediaApi.upload).mockResolvedValueOnce({ id: 'media-2-video', url: 'https://cdn.example.com/x.mp4' } as never);
+    const videoFile = new File(['x'], 'video.mp4', { type: 'video/mp4' });
+    await act(async () => {
+      fireEvent.change(createFormVideoPicker(), { target: { files: [videoFile] } });
+    });
+
+    vi.mocked(guidePicksApi.create).mockResolvedValue(
+      guidePick({ id: 'new-1', city: 'Jakarta', instagramUrl: 'https://instagram.com/p/abc123' }),
+    );
+    await act(async () => {
+      screen.getByRole('button', { name: 'Add guide pick' }).click();
+    });
+
+    expect(guidePicksApi.create).toHaveBeenCalledWith({
+      city: 'Jakarta',
+      place: 'Playground, Blok M',
+      description: 'Panggung kecil tiap Jumat.',
+      videoMediaId: 'media-2-video',
+      instagramUrl: 'https://instagram.com/p/abc123',
     });
   });
 });
@@ -117,6 +160,52 @@ describe('GuidePicksPage — no pick-count limit', () => {
 
     const addButton = screen.getByRole('button', { name: 'Add guide pick' }) as HTMLButtonElement;
     await waitFor(() => expect(addButton.disabled).toBe(false));
+  });
+});
+
+describe('GuidePicksPage — edit form', () => {
+  it('blocks saving an edit whose Instagram URL is invalid, with field-level feedback', async () => {
+    await renderPage([guidePick({ id: 'a' })]);
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Edit' }).click();
+    });
+
+    const urlInput = screen
+      .getAllByLabelText('Instagram URL (optional)')
+      .find((el) => el.id === 'edit-guide-pick-instagram-url-a') as HTMLInputElement;
+    fireEvent.change(urlInput, { target: { value: 'javascript:alert(1)' } });
+
+    expect(screen.getByText('Enter a valid http(s) URL.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(guidePicksApi.update).not.toHaveBeenCalled();
+  });
+
+  it('allows saving an edit with the Instagram URL cleared, sending null', async () => {
+    const existing = guidePick({ id: 'a', instagramUrl: 'https://instagram.com/p/abc123' });
+    await renderPage([existing]);
+    vi.mocked(guidePicksApi.update).mockResolvedValue({ ...existing, instagramUrl: null });
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Edit' }).click();
+    });
+    const urlInput = screen
+      .getAllByLabelText('Instagram URL (optional)')
+      .find((el) => el.id === 'edit-guide-pick-instagram-url-a') as HTMLInputElement;
+    fireEvent.change(urlInput, { target: { value: '' } });
+
+    const saveButton = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(false);
+    await act(async () => {
+      saveButton.click();
+    });
+
+    expect(guidePicksApi.update).toHaveBeenCalledWith('a', {
+      city: 'Surabaya',
+      place: 'Seven Cafe',
+      description: 'Wifi kuat dan buka sampai tengah malam.',
+      instagramUrl: null,
+    });
   });
 });
 

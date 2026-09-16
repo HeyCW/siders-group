@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\GuidePick;
 
+use App\Rules\HttpUrl;
 use App\Rules\MatchesMediaKind;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -22,6 +23,7 @@ class UpdateGuidePickRequest extends FormRequest
             'description' => ['sometimes', 'string'],
             'photoMediaId' => ['sometimes', 'string', 'exists:media,id', new MatchesMediaKind('image')],
             'videoMediaId' => ['sometimes', 'string', 'exists:media,id', new MatchesMediaKind('video')],
+            'instagramUrl' => ['sometimes', 'nullable', 'string', new HttpUrl()],
             'isActive' => ['sometimes', 'boolean'],
         ];
     }
