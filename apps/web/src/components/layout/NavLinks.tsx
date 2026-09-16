@@ -1,9 +1,18 @@
 import { Link, useLocation } from 'react-router-dom';
 import { NAV_ITEMS } from '../../lib/content';
+import { SUB_BRAND_PAGES } from '../../lib/subBrandPages';
+
+/** The anak usaha pages sit at the top level but have no nav item of their own, so without this
+ *  the whole nav goes dark the moment a reader follows one from the home page. They belong to
+ *  Home: that is the only entry point to them. */
+const SUB_BRAND_PATHS = new Set(SUB_BRAND_PAGES.map((page) => `/${page.slug}`));
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(`${href}/`);
+  // A prerendered route is served from a directory, so Apache redirects to the trailing-slash
+  // form and that is the pathname the router reports.
+  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  if (href === '/') return path === '/' || SUB_BRAND_PATHS.has(path);
+  return path === href || path.startsWith(`${href}/`);
 }
 
 /** `stacked` is a distinct internal layout, not a class appended by the caller — Tailwind's

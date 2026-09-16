@@ -1,13 +1,24 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const container = document.getElementById('root')!;
+
+const tree = (
   <React.StrictMode>
     <BrowserRouter basename="/siders">
       <App />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 );
+
+// The anak usaha routes ship with their markup already in the HTML (`scripts/prerender.mjs`), so
+// those adopt it instead of throwing it away and repainting. Every other route is served the empty
+// `index.html` shell, where `hydrateRoot` has nothing to adopt and only `createRoot` is valid.
+if (container.firstChild) {
+  hydrateRoot(container, tree);
+} else {
+  createRoot(container).render(tree);
+}

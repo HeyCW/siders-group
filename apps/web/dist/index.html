@@ -32,14 +32,84 @@
     />
     <meta name="twitter:image" content="https://sidersmedia.com/siders/siders-icon.png" />
 
+    <!-- Entity graph for the Siders brand. Static (not React-injected) for the same reason as the
+         Open Graph tags above: this file is what crawlers read before any JS runs.
+
+         The point of the @graph is identity consolidation — one Organization node that the WebSite
+         points at as its publisher, with `sameAs` listing every off-site profile Siders controls.
+         That is what tells Google the IG/TikTok accounts and this domain are one brand, and that
+         the domain is the canonical hub.
+
+         The three anak usaha appear here only as `subOrganization` @id references. Each node is
+         described in full on its own prerendered page (src/lib/seo.ts, scripts/prerender.mjs),
+         under the same @id, so the two documents describe one entity rather than competing
+         descriptions of it — and the detail sits on the page actually trying to rank for it.
+
+         Social URLs are kept in sync with apps/api-laravel/database/seeders/AnakUsahaSeeder.php
+         (the single source of truth for each brand's real links); tracking params are stripped
+         because `sameAs` must be the canonical profile URL. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "Siders",
-        "url": "https://sidersmedia.com/siders/",
-        "logo": "https://sidersmedia.com/siders/siders-icon.png",
-        "description": "Siders is a hyperlocal media and community platform connecting stories, brands, and people across Surabaya and Jakarta."
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://sidersmedia.com/siders/#organization",
+            "name": "Siders",
+            "alternateName": "Siders Group",
+            "legalName": "PT. Siders Karya Nusantara",
+            "url": "https://sidersmedia.com/siders/",
+            "logo": {
+              "@type": "ImageObject",
+              "@id": "https://sidersmedia.com/siders/#logo",
+              "url": "https://sidersmedia.com/siders/siders-icon.png",
+              "contentUrl": "https://sidersmedia.com/siders/siders-icon.png",
+              "caption": "Siders"
+            },
+            "image": { "@id": "https://sidersmedia.com/siders/#logo" },
+            "slogan": "Everyone has a voice. Everyone has a story. Everyone is Siders.",
+            "description": "Siders is a hyperlocal media and community platform connecting stories, brands, and people across Surabaya and Jakarta.",
+            "email": "karyasiders@gmail.com",
+            "areaServed": [
+              { "@type": "City", "name": "Surabaya" },
+              { "@type": "City", "name": "Jakarta" }
+            ],
+            "address": {
+              "@type": "PostalAddress",
+              "addressCountry": "ID"
+            },
+            "contactPoint": [
+              {
+                "@type": "ContactPoint",
+                "contactType": "customer support",
+                "email": "karyasiders@gmail.com",
+                "telephone": "+6281217371521",
+                "availableLanguage": ["id", "en"]
+              }
+            ],
+            "sameAs": [
+              "https://www.instagram.com/sidersvox",
+              "https://www.instagram.com/surabayasiders",
+              "https://www.instagram.com/jakarta_siders",
+              "https://www.tiktok.com/@surabaya.siders",
+              "https://www.tiktok.com/@jakartasiders"
+            ],
+            "subOrganization": [
+              { "@id": "https://sidersmedia.com/siders/#siders-vox" },
+              { "@id": "https://sidersmedia.com/siders/#surabaya-siders" },
+              { "@id": "https://sidersmedia.com/siders/#jakarta-siders" }
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://sidersmedia.com/siders/#website",
+            "url": "https://sidersmedia.com/siders/",
+            "name": "Siders",
+            "description": "Siders is a hyperlocal media and community platform connecting stories, brands, and people across Surabaya and Jakarta.",
+            "inLanguage": "id-ID",
+            "publisher": { "@id": "https://sidersmedia.com/siders/#organization" }
+          }
+        ]
       }
     </script>
 
@@ -53,8 +123,8 @@
       href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;700;900&family=Libre+Franklin:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/siders/assets/index--fncz-kW.js"></script>
-    <link rel="stylesheet" crossorigin href="/siders/assets/index-DAFD_QXW.css">
+    <script type="module" crossorigin src="/siders/assets/index-Mu6OmFCu.js"></script>
+    <link rel="stylesheet" crossorigin href="/siders/assets/index-B9h9tWDu.css">
   </head>
   <body>
     <div id="root"></div>

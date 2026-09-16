@@ -25,8 +25,8 @@ class ArticleService
             $article = Article::create([
                 'title' => $data['title'],
                 'slug' => $slug,
-                'body_json' => $data['bodyJson'],
-                'body_html' => $this->sanitize($data['bodyHtml']),
+                'body_json' => $data['bodyJson'] ?? [],
+                'body_html' => $this->sanitize($data['bodyHtml'] ?? ''),
                 'excerpt' => $data['excerpt'] ?? null,
                 'status' => 'draft',
                 'author_id' => $authorId,

@@ -18,8 +18,8 @@ class StoreArticleRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:500'],
             'slug' => ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
-            'bodyJson' => ['required', 'array'],
-            'bodyHtml' => ['required', 'string'],
+            'bodyJson' => ['nullable', 'array'],
+            'bodyHtml' => ['nullable', 'string'],
             'excerpt' => ['nullable', 'string'],
             'featuredMediaId' => ['nullable', 'string', 'exists:media,id'],
             'anakUsahaId' => ['nullable', 'string', 'exists:anak_usaha,id'],

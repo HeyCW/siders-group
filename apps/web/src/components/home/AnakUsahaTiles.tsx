@@ -1,9 +1,14 @@
+import { Link } from 'react-router-dom';
 import type { PresentedAnakUsaha } from '../../lib/anakUsaha';
+import { findSubBrandPageByName } from '../../lib/subBrandPages';
 import { Reveal } from '../ui/Reveal';
 import { RuleDraw } from '../ui/RuleDraw';
 
-/** Each tile's own links go straight to that sub-brand's real social profiles — there is still
- *  no per-sub-brand page on this site (`proposal.md` — Non-Goals). Colors are gone: every tile
+/** Each tile's own links go straight to that sub-brand's real social profiles. The brand name on
+ *  top of them now links inward instead, to that brand's own page where the full description and
+ *  its `parentOrganization` schema live — the internal link is what lets those pages be found and
+ *  credited at all. A brand in the database with no page here stays plain text. Colors are gone:
+ *  every tile
  *  shares one neutral background and the uploaded logo carries the identity instead
  *  (design.md - "Colors are being removed entirely"). The logo is a remote URL from the media
  *  module, rendered via a plain `<img>`, matching the existing precedent in `PartnerGrid.tsx`. */
@@ -39,9 +44,7 @@ export function AnakUsahaTiles({ brands }: { brands: PresentedAnakUsaha[] }) {
               )}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="font-serif text-[clamp(17px,1.8vw,20px)] font-bold leading-[1.15] tracking-[-0.02em]">
-                {brand.name}
-              </div>
+              <BrandName name={brand.name} />
               {brand.description && (
                 <p className="mt-1.5 text-[15px] leading-[1.5] text-muted">{brand.description}</p>
               )}
@@ -65,5 +68,21 @@ export function AnakUsahaTiles({ brands }: { brands: PresentedAnakUsaha[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function BrandName({ name }: { name: string }) {
+  const className =
+    'font-serif text-[clamp(17px,1.8vw,20px)] font-bold leading-[1.15] tracking-[-0.02em]';
+  const page = findSubBrandPageByName(name);
+
+  if (!page) return <div className={className}>{name}</div>;
+  return (
+    <Link
+      to={`/${page.slug}`}
+      className={`${className} underline decoration-rule-strong underline-offset-4 hover:decoration-ink`}
+    >
+      {name}
+    </Link>
   );
 }

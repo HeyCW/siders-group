@@ -10,6 +10,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SITE_URL = 'https://sidersmedia.com/siders';
 const PAGE_SIZE = 100;
 
+// Mirrors the slugs in src/lib/subBrandPages.ts. Duplicated rather than imported because this
+// script runs before the build, with no TypeScript loader available; scripts/prerender.mjs reads
+// the real list from the SSR bundle and fails the build if a slug here has no page to match.
+const SUB_BRAND_SLUGS = ['surabaya-siders', 'jakarta-siders', 'siders-vox'];
+
 function loadApiUrl() {
   if (process.env.VITE_API_URL) return process.env.VITE_API_URL;
   const envPath = resolve(__dirname, '../.env.local');
@@ -23,7 +28,9 @@ function loadApiUrl() {
 async function fetchAllArticles(apiUrl) {
   const articles = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
-    const res = await fetch(`${apiUrl}/api/articles?limit=${PAGE_SIZE}&offset=${offset}&order=newest`);
+    const res = await fetch(
+      `${apiUrl}/api/articles?limit=${PAGE_SIZE}&offset=${offset}&order=newest`,
+    );
     if (!res.ok) throw new Error(`GET /articles failed with ${res.status}`);
     const { data } = await res.json();
     articles.push(...data);
@@ -45,6 +52,9 @@ async function main() {
     urlEntry(`${SITE_URL}/news`, today, 'daily', '0.9'),
     urlEntry(`${SITE_URL}/team`, today, 'monthly', '0.5'),
     urlEntry(`${SITE_URL}/contact`, today, 'monthly', '0.5'),
+    // Trailing slash on purpose: these are prerendered to `dist/<slug>/index.html`, so the
+    // slashless form only 301s to this one (see scripts/prerender.mjs).
+    ...SUB_BRAND_SLUGS.map((slug) => urlEntry(`${SITE_URL}/${slug}/`, today, 'monthly', '0.7')),
   ];
 
   // Degrades to static-only routes when the API can't be reached, the same way the home page's
@@ -55,7 +65,12 @@ async function main() {
     const apiUrl = loadApiUrl();
     const articles = await fetchAllArticles(apiUrl);
     articleEntries = articles.map((article) =>
-      urlEntry(`${SITE_URL}/news/${article.slug}`, article.publishedAt.slice(0, 10), 'weekly', '0.8'),
+      urlEntry(
+        `${SITE_URL}/news/${article.slug}`,
+        article.publishedAt.slice(0, 10),
+        'weekly',
+        '0.8',
+      ),
     );
   } catch (err) {
     console.warn(`[sitemap] Skipping article URLs — ${err.message}`);

@@ -1,4 +1,7 @@
+import type { CSSProperties, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { SUB_BRANDS } from '../../lib/content';
+import { findSubBrandPageByName } from '../../lib/subBrandPages';
 
 const GROUPS = ['Media Platform', 'News & Community'] as const;
 
@@ -14,11 +17,14 @@ export function ConnectedPlatforms() {
         if (group.length === 0) return null;
         return (
           <div key={kind}>
-            <div className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">{kind}</div>
+            <div className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
+              {kind}
+            </div>
             <div className="flex flex-wrap items-center gap-[clamp(16px,2.5vw,28px)] pt-3.5">
               {group.map((brand) => (
-                <span
+                <BrandTile
                   key={brand.name}
+                  name={brand.name}
                   className={`flex h-[124px] w-[160px] items-center justify-center p-1.5 ${
                     brand.tile === 'transparent' ? '' : 'border border-rule'
                   }`}
@@ -40,12 +46,44 @@ export function ConnectedPlatforms() {
                       {brand.name}
                     </span>
                   )}
-                </span>
+                </BrandTile>
               ))}
             </div>
           </div>
         );
       })}
     </div>
+  );
+}
+
+function BrandTile({
+  name,
+  className,
+  style,
+  children,
+}: {
+  name: string;
+  className: string;
+  style: CSSProperties;
+  children: ReactNode;
+}) {
+  const page = findSubBrandPageByName(name);
+
+  if (!page) {
+    return (
+      <span className={className} style={style}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link
+      to={`/${page.slug}`}
+      aria-label={name}
+      className={`${className} transition-opacity duration-hover ease-hover hover:opacity-70`}
+      style={style}
+    >
+      {children}
+    </Link>
   );
 }
