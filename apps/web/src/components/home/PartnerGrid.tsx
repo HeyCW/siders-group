@@ -119,11 +119,10 @@ export function PartnerGrid({ partners }: { partners: PublicPartner[] }) {
 
       {/* The logo row sits in the band between this section's rule and the next section's
           (`AnakUsahaTiles`, `pt-[clamp(20px,3vw,40px)]`). The tiles' own `py-2` is the only space
-          above it, so without a top pad here the row hugs the heading rule. Padded a step past the
-          next section's own top pad rather than matching it exactly: `object-contain` leaves each
-          logo its own slack inside the fixed-height tile, so a tile-box match still reads
-          top-heavy — the row needs the extra air above to sit centred by eye. */}
-      <Reveal delayMs={90} className="pt-[clamp(32px,4.5vw,64px)]">
+          above it, so without a matching top pad the row hugs the heading rule and reads
+          off-centre in the band. Mirroring the next section's top pad puts equal air on both
+          sides. */}
+      <Reveal delayMs={90} className="pt-[clamp(20px,3vw,40px)]">
         <div data-testid="partner-static-grid" className="hidden overflow-hidden motion-reduce:block">
           <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] border-l border-t border-rule">
             {partners.map((partner, index) => (
