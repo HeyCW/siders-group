@@ -19,7 +19,6 @@ class UpdateArticleRequest extends FormRequest
             'title' => ['sometimes', 'string', 'max:500'],
             'slug' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'bodyJson' => ['sometimes', 'array'],
-            'bodyHtml' => ['sometimes', 'string'],
             'excerpt' => ['sometimes', 'nullable', 'string'],
             'featuredMediaId' => ['sometimes', 'nullable', 'string', 'exists:media,id'],
             'anakUsahaId' => ['sometimes', 'nullable', 'string', 'exists:anak_usaha,id'],

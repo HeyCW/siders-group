@@ -19,8 +19,13 @@ class AutosaveArticleRequest extends FormRequest
         return [
             'title' => ['sometimes', 'string', 'max:500'],
             'bodyJson' => ['sometimes', 'array'],
-            'bodyHtml' => ['sometimes', 'string'],
             'excerpt' => ['sometimes', 'nullable', 'string'],
+            'featuredMediaId' => ['sometimes', 'nullable', 'string', 'exists:media,id'],
+            'anakUsahaId' => ['sometimes', 'nullable', 'string', 'exists:anak_usaha,id'],
+            'seoTitle' => ['sometimes', 'nullable', 'string'],
+            'seoDescription' => ['sometimes', 'nullable', 'string'],
+            'categoryIds' => ['sometimes', 'array'],
+            'categoryIds.*' => ['string', 'exists:categories,id'],
         ];
     }
 }

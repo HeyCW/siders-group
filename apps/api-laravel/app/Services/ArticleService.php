@@ -8,10 +8,10 @@ use App\Exceptions\InvalidArticleTransitionException;
 use App\Exceptions\SlugConflictException;
 use App\Models\Article;
 use App\Services\Contracts\DeployNotifierInterface;
+use App\Support\ArticleBodyRenderer;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Mews\Purifier\Facades\Purifier;
 
 class ArticleService
 {
@@ -20,13 +20,14 @@ class ArticleService
     public function create(array $data, string $authorId): Article
     {
         $slug = $this->resolveSlug($data['slug'] ?? null, $data['title']);
+        $bodyJson = $data['bodyJson'] ?? [];
 
-        return DB::transaction(function () use ($data, $authorId, $slug) {
+        return DB::transaction(function () use ($data, $authorId, $slug, $bodyJson) {
             $article = Article::create([
                 'title' => $data['title'],
                 'slug' => $slug,
-                'body_json' => $data['bodyJson'] ?? [],
-                'body_html' => $this->sanitize($data['bodyHtml'] ?? ''),
+                'body_json' => $bodyJson,
+                'body_html' => ArticleBodyRenderer::render($bodyJson),
                 'excerpt' => $data['excerpt'] ?? null,
                 'status' => 'draft',
                 'author_id' => $authorId,
@@ -61,12 +62,12 @@ class ArticleService
                 $attributes['slug'] = $this->resolveSlug($data['slug'], null, $article->id);
             }
 
+            // `body_html` is always derived from `body_json` here, never taken from the request —
+            // it is the only thing the public site renders, so it can never be allowed to drift
+            // from what the editor actually saved.
             if (array_key_exists('bodyJson', $data)) {
                 $attributes['body_json'] = $data['bodyJson'];
-            }
-
-            if (array_key_exists('bodyHtml', $data)) {
-                $attributes['body_html'] = $this->sanitize($data['bodyHtml']);
+                $attributes['body_html'] = ArticleBodyRenderer::render($data['bodyJson']);
             }
 
             foreach (['excerpt', 'featuredMediaId', 'anakUsahaId', 'seoTitle', 'seoDescription'] as $field) {
@@ -95,12 +96,33 @@ class ArticleService
      */
     public function autosave(Article $article, array $data): Article
     {
-        $article->update(array_filter([
-            'title' => $data['title'] ?? null,
-            'body_json' => $data['bodyJson'] ?? null,
-            'body_html' => isset($data['bodyHtml']) ? $this->sanitize($data['bodyHtml']) : null,
-            'excerpt' => $data['excerpt'] ?? null,
-        ], fn ($v) => $v !== null));
+        $attributes = [];
+
+        if (array_key_exists('title', $data)) {
+            $attributes['title'] = $data['title'];
+        }
+
+        // `body_html` is always re-derived alongside `body_json` — never taken from the request —
+        // so autosave keeps the public-facing HTML in sync with every edit, not just full saves.
+        if (array_key_exists('bodyJson', $data)) {
+            $attributes['body_json'] = $data['bodyJson'];
+            $attributes['body_html'] = ArticleBodyRenderer::render($data['bodyJson']);
+        }
+
+        // `array_key_exists`, not `?? null` — a nullable field (featuredMediaId, anakUsahaId)
+        // that's explicitly sent as `null` means "clear this", which is different from the field
+        // being absent from the request entirely.
+        foreach (['excerpt', 'featuredMediaId', 'anakUsahaId', 'seoTitle', 'seoDescription'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $attributes[Str::snake($field)] = $data[$field];
+            }
+        }
+
+        $article->update($attributes);
+
+        if (array_key_exists('categoryIds', $data)) {
+            $article->categories()->sync(array_unique($data['categoryIds']));
+        }
 
         return $article->fresh();
     }
@@ -161,11 +183,6 @@ class ArticleService
         return $article;
     }
 
-    private function sanitize(string $html): string
-    {
-        return Purifier::clean($html);
-    }
-
     private function resolveSlug(?string $requestedSlug, ?string $title, ?string $ignoreId = null): string
     {
         $slug = $requestedSlug ?: Str::slug($title);
@@ -175,7 +192,7 @@ class ArticleService
             ->exists();
 
         if ($exists) {
-            throw new SlugConflictException();
+            throw new SlugConflictException;
         }
 
         return $slug;
