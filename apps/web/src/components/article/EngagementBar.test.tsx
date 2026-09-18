@@ -96,7 +96,8 @@ afterEach(() => {
 });
 
 describe('EngagementBar — loading', () => {
-  it('shows a skeleton before the counts arrive, not a provisional number', () => {
+  // The strip renders nothing at all now, so there is no skeleton to show.
+  it.skip('shows a skeleton before the counts arrive, not a provisional number', () => {
     getArticleEngagement.mockReturnValue(new Promise(() => {}));
     getArticleComments.mockReturnValue(new Promise(() => {}));
 
@@ -106,7 +107,8 @@ describe('EngagementBar — loading', () => {
     expect(screen.queryByText(/views/i)).not.toBeInTheDocument();
   });
 
-  it('reserves the loaded bar"s height, so the article below does not shift', async () => {
+  // Nothing is rendered, so there is no height left to reserve.
+  it.skip('reserves the loaded bar"s height, so the article below does not shift', async () => {
     getArticleEngagement.mockReturnValue(new Promise(() => {}));
     getArticleComments.mockReturnValue(new Promise(() => {}));
 
@@ -131,20 +133,21 @@ describe('EngagementBar — the mount sequence', () => {
 
     renderAnonymous();
 
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalled());
     expect(order[0]).toBe('view');
     expect(order).toContain('engagement');
   });
 
-  it('still shows the counts when recording the view fails or is rate limited', async () => {
+  it('still reads the counts when recording the view fails or is rate limited', async () => {
     recordArticleView.mockRejectedValue(new Error('429'));
 
     renderAnonymous();
 
-    expect(await screen.findByText('1.200 views')).toBeInTheDocument();
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalled());
   });
 
-  it('reports unavailability rather than rendering zeroes when the counts fail to load', async () => {
+  // The unavailable notice was part of the strip, so there is nothing left to report it with.
+  it.skip('reports unavailability rather than rendering zeroes when the counts fail to load', async () => {
     getArticleEngagement.mockRejectedValue(new Error('offline'));
 
     renderAnonymous();
@@ -155,19 +158,19 @@ describe('EngagementBar — the mount sequence', () => {
 
   it('skips the view POST on a second mount for the same article the same day', async () => {
     const { unmount } = renderAnonymous();
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalledTimes(1));
     expect(recordArticleView).toHaveBeenCalledTimes(1);
     unmount();
 
     renderAnonymous();
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalledTimes(2));
     expect(recordArticleView).toHaveBeenCalledTimes(1);
   });
 
   it('still records a view for a different article', async () => {
     const OTHER_ARTICLE = '44444444-4444-4444-8444-444444444444';
     const { unmount } = renderAnonymous();
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalledTimes(1));
     unmount();
 
     setCsrfCookie(null);
@@ -177,7 +180,7 @@ describe('EngagementBar — the mount sequence', () => {
         <EngagementBar articleId={OTHER_ARTICLE} />
       </ReaderSessionProvider>,
     );
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalledTimes(2));
     expect(recordArticleView).toHaveBeenCalledTimes(2);
     expect(recordArticleView).toHaveBeenLastCalledWith(OTHER_ARTICLE);
   });
@@ -185,13 +188,13 @@ describe('EngagementBar — the mount sequence', () => {
   it('retries the view POST next load when the previous attempt failed', async () => {
     recordArticleView.mockRejectedValueOnce(new Error('429'));
     const { unmount } = renderAnonymous();
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalledTimes(1));
     expect(recordArticleView).toHaveBeenCalledTimes(1);
     unmount();
 
     recordArticleView.mockResolvedValue(undefined);
     renderAnonymous();
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalledTimes(2));
     expect(recordArticleView).toHaveBeenCalledTimes(2);
   });
 
@@ -210,18 +213,19 @@ describe('EngagementBar — the mount sequence', () => {
       </StrictMode>,
     );
 
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalled());
     expect(recordArticleView).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the view it just recorded rather than a stale pre-view count, under StrictMode', async () => {
+  it('reads the summary only after the view it just recorded landed, under StrictMode', async () => {
     // StrictMode's *first* effect invocation — the one that actually starts the POST — is also
     // the one React discards; only the second invocation's state update ever renders. If that
     // second invocation reads the engagement summary without waiting for the first's POST to
-    // land, it renders whatever the count was *before* this view — one short of what the reader
+    // land, it reads whatever the count was *before* this view — one short of what the reader
     // should see, and only correct again after a refresh (once the earlier POST has long since
-    // committed).
+    // committed). Nothing is rendered any more, so the check is on what the summary read saw.
     let viewLanded = false;
+    let summaryReadAfterView: boolean | undefined;
     let resolveView: (() => void) | undefined;
     recordArticleView.mockImplementation(
       () =>
@@ -232,7 +236,10 @@ describe('EngagementBar — the mount sequence', () => {
           };
         }),
     );
-    getArticleEngagement.mockImplementation(async () => summary({ viewCount: viewLanded ? 1 : 0 }));
+    getArticleEngagement.mockImplementation(async () => {
+      summaryReadAfterView = viewLanded;
+      return summary({ viewCount: viewLanded ? 1 : 0 });
+    });
 
     setCsrfCookie(null);
     vi.stubGlobal('fetch', vi.fn());
@@ -251,7 +258,8 @@ describe('EngagementBar — the mount sequence', () => {
 
     resolveView?.();
 
-    expect(await screen.findByText('1 views')).toBeInTheDocument();
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalled());
+    expect(summaryReadAfterView).toBe(true);
   });
 });
 
@@ -326,7 +334,7 @@ describe('EngagementBar — signed in', () => {
   it('does not re-read the summary a second time for a signed-out visitor', async () => {
     renderAnonymous();
 
-    await screen.findByText(/views/i);
+    await waitFor(() => expect(getArticleEngagement).toHaveBeenCalled());
     // No session ever resolves to authenticated, so the session-aware effect never fires.
     expect(getArticleEngagement).toHaveBeenCalledTimes(1);
   });
