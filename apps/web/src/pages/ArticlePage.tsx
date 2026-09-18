@@ -99,7 +99,7 @@ export function ArticlePage() {
             {article.title}
           </h1>
           <div className="mb-[18px] mt-3.5 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-            Oleh {article.authorName} · {readMinutes} menit baca
+            {readMinutes} menit baca
           </div>
 
           <MediaSlot
