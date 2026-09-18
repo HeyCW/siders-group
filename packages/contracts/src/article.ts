@@ -113,6 +113,14 @@ export const articlePublicListQuerySchema = z.object({
   publishedBefore: z.coerce.date().optional(),
   excludeIds: commaSeparatedList(z.string().uuid()),
   order: z.enum(['newest', 'oldest']).default('newest'),
+  // Free-text search over title, excerpt and keywords. Preprocessed rather than validated
+  // straight, so `?q=` and `?q=%20` collapse to "no search" instead of being rejected as too
+  // short — a reader clearing the search box should not produce a 400.
+  q: z.preprocess((value) => {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, z.string().max(100).optional()),
 });
 export type ArticlePublicListQuery = z.infer<typeof articlePublicListQuerySchema>;
 

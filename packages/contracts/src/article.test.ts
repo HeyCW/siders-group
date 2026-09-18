@@ -87,6 +87,18 @@ describe('articlePublicListQuerySchema', () => {
 
   it('still rejects a zero or negative limit as malformed', () => {
     expect(articlePublicListQuerySchema.safeParse({ limit: '0' }).success).toBe(false);
+  });
+
+  it('trims a search term and treats a blank one as no search at all', () => {
+    expect(articlePublicListQuerySchema.parse({ q: '  kuliner  ' }).q).toBe('kuliner');
+    // A reader clearing the box must not become a 400.
+    expect(articlePublicListQuerySchema.parse({ q: '' }).q).toBeUndefined();
+    expect(articlePublicListQuerySchema.parse({ q: '   ' }).q).toBeUndefined();
+    expect(articlePublicListQuerySchema.parse({}).q).toBeUndefined();
+  });
+
+  it('rejects a search term longer than the column search can reasonably use', () => {
+    expect(articlePublicListQuerySchema.safeParse({ q: 'a'.repeat(101) }).success).toBe(false);
     expect(articlePublicListQuerySchema.safeParse({ limit: '-5' }).success).toBe(false);
   });
 

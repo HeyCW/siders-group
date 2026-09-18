@@ -175,18 +175,43 @@ describe('NewsExplorer', () => {
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
   });
 
-  it('search narrows the currently loaded set without calling the API again', async () => {
+  it('sends the search term to the API rather than filtering the loaded page', async () => {
     const match = makeArticle({ title: 'Kerja remote di Surabaya' });
-    const other = makeArticle({ title: 'Rute sepeda aman' });
-    await renderExplorer({}, [match, other]);
+    await renderExplorer({}, [makeArticle({ title: 'Rute sepeda aman' })]);
+    getArticlesMock.mockResolvedValueOnce([match]);
 
-    fireEvent.change(screen.getByPlaceholderText('Search this page…'), {
+    fireEvent.change(screen.getByPlaceholderText('Cari artikel…'), {
       target: { value: 'remote' },
     });
 
-    expect(screen.getByText('Kerja remote di Surabaya')).toBeInTheDocument();
+    // The term reaches the API, so a match that was never on this page can still come back.
+    await waitFor(() =>
+      expect(getArticlesMock).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'remote' })),
+    );
+    expect(await screen.findByText('Kerja remote di Surabaya')).toBeInTheDocument();
     expect(screen.queryByText('Rute sepeda aman')).not.toBeInTheDocument();
-    expect(getArticlesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('debounces typing into one request, and drops a term the reader clears again', async () => {
+    await renderExplorer();
+    const box = screen.getByPlaceholderText('Cari artikel…');
+
+    getArticlesMock.mockResolvedValue([]);
+    fireEvent.change(box, { target: { value: 'k' } });
+    fireEvent.change(box, { target: { value: 'ku' } });
+    fireEvent.change(box, { target: { value: 'kul' } });
+
+    await waitFor(() =>
+      expect(getArticlesMock).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'kul' })),
+    );
+    // One mount fetch plus one settled search, not one per keystroke.
+    expect(getArticlesMock).toHaveBeenCalledTimes(2);
+
+    fireEvent.change(box, { target: { value: '   ' } });
+    // Whitespace is not a search: the term drops out rather than being sent as-is.
+    await waitFor(() =>
+      expect(getArticlesMock).toHaveBeenLastCalledWith(expect.objectContaining({ q: undefined })),
+    );
   });
 
   it('"Hapus semua" clears category, anak usaha, and date filters at once', async () => {

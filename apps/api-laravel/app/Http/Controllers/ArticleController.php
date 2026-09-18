@@ -101,11 +101,36 @@ class ArticleController extends Controller
             ->publiclyVisible()
             ->when($request->query('categorySlug'), fn ($q, $slug) => $q->whereHas('categories', fn ($c) => $c->where('slug', $slug)))
             ->when($request->query('anakUsahaSlug'), fn ($q, $slug) => $q->whereHas('anakUsaha', fn ($a) => $a->where('slug', $slug)))
+            ->when($this->searchTerm($request), fn ($q, string $term) => $q->where(
+                // Grouped, so the three OR branches cannot leak out and widen the
+                // `publiclyVisible()` condition into "visible OR title matches".
+                fn ($w) => $w->where('title', 'like', $term)
+                    ->orWhere('excerpt', 'like', $term)
+                    ->orWhere('keywords', 'like', $term)
+            ))
             ->orderByDesc('published_at')
             ->limit($limit)
             ->get();
 
         return response()->json(['data' => $articles->map(fn (Article $a) => ArticlePresenter::public($a))]);
+    }
+
+    /**
+     * The `q` param as a LIKE pattern, or null when there is nothing to search for. `%` and `_`
+     * are escaped so a reader typing them searches for those characters rather than turning the
+     * query into a wildcard; the length cap matches `articlePublicListQuerySchema`.
+     */
+    private function searchTerm(Request $request): ?string
+    {
+        $raw = $request->query('q');
+
+        if (! is_string($raw)) {
+            return null;
+        }
+
+        $trimmed = mb_substr(trim($raw), 0, 100);
+
+        return $trimmed === '' ? null : '%'.addcslashes($trimmed, '%_\\').'%';
     }
 
     public function publicShow(string $slug): JsonResponse

@@ -12,6 +12,9 @@ import {
 import { ArticleCard } from './ArticleCard';
 import { FilterOption, FilterTrigger } from './FilterTrigger';
 
+/** Long enough that a typed word is one request, short enough to still feel like typing. */
+const SEARCH_DEBOUNCE_MS = 300;
+
 type PopoverKey = 'anak' | 'kat' | 'tgl' | null;
 
 interface ActiveFilters {
@@ -77,15 +80,27 @@ export function NewsExplorer({
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState('');
+  // The search now runs on the server, so the box's value reaches the fetch only after the
+  // reader pauses — otherwise every keystroke would be its own request. Everything derived from
+  // the result (the count, the empty state, the featured slot) reads this debounced value rather
+  // than `query`, so what is on screen always describes the articles actually loaded.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [openPopover, setOpenPopover] = useState<PopoverKey>(null);
   // Date is the one filter with a two-step commit (pick "Custom range", then fill in and
   // apply a range), so its popover needs a draft selection distinct from the committed,
   // URL-sourced `activeDateOption` prop — otherwise the custom-range inputs could only appear
   // after a full round trip through the URL and back (design.md - "Date range").
-  const [draftDateOption, setDraftDateOption] = useState<NewsDateOption | undefined>(activeDateOption);
+  const [draftDateOption, setDraftDateOption] = useState<NewsDateOption | undefined>(
+    activeDateOption,
+  );
   const [dateFromDraft, setDateFromDraft] = useState(activeDateFrom ?? '');
   const [dateToDraft, setDateToDraft] = useState(activeDateTo ?? '');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const activeCategories = categories.filter((c) => activeCategorySlugs.includes(c.slug));
   const activeAnakUsaha = anakUsahaOptions.filter((a) => activeAnakUsahaSlugs.includes(a.slug));
@@ -94,16 +109,10 @@ export function NewsExplorer({
     activeCategorySlugs.length > 0 ||
     activeAnakUsahaSlugs.length > 0 ||
     Boolean(activeDateOption) ||
-    query.trim() !== '';
+    debouncedQuery !== '';
 
-  const searchFiltered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return articles;
-    return articles.filter((a) => `${a.title} ${a.excerpt ?? ''}`.toLowerCase().includes(q));
-  }, [articles, query]);
-
-  const featured = !hasFilters && searchFiltered.length > 0 ? searchFiltered[0] : undefined;
-  const gridItems = featured ? searchFiltered.slice(1) : searchFiltered;
+  const featured = !hasFilters && articles.length > 0 ? articles[0] : undefined;
+  const gridItems = featured ? articles.slice(1) : articles;
 
   // One key string per distinct filter combination, used below to re-fetch whenever any of them
   // changes.
@@ -114,6 +123,7 @@ export function NewsExplorer({
     activeDateFrom ?? '',
     activeDateTo ?? '',
     sortOrder,
+    debouncedQuery,
   ].join('|');
 
   useEffect(() => {
@@ -133,6 +143,7 @@ export function NewsExplorer({
       limit: NEWS_PAGE_SIZE,
       offset: 0,
       order: sortOrder,
+      q: debouncedQuery || undefined,
     })
       .then((result) => {
         if (cancelled) return;
@@ -228,6 +239,7 @@ export function NewsExplorer({
         limit: NEWS_PAGE_SIZE,
         offset: articles.length,
         order: sortOrder,
+        q: debouncedQuery || undefined,
       });
       setArticles((prev) => [...prev, ...next]);
       setHasMore(next.length === NEWS_PAGE_SIZE);
@@ -243,7 +255,7 @@ export function NewsExplorer({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search this page…"
+          placeholder="Cari artikel…"
           className="w-full border-0 border-b-2 border-ink bg-transparent py-2.5 text-[clamp(16px,2vw,20px)] outline-none"
         />
       </div>
@@ -385,7 +397,8 @@ export function NewsExplorer({
             onClick={() => toggleAnakUsaha(entry.slug)}
             className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-signal focus-visible:bg-ink focus-visible:text-signal"
           >
-            Group Companies <span className="font-serif font-bold normal-case tracking-normal">{entry.name}</span> ×
+            Group Companies{' '}
+            <span className="font-serif font-bold normal-case tracking-normal">{entry.name}</span> ×
           </button>
         ))}
         {activeCategories.map((cat) => (
@@ -395,16 +408,23 @@ export function NewsExplorer({
             onClick={() => toggleCategory(cat.slug)}
             className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-signal focus-visible:bg-ink focus-visible:text-signal"
           >
-            Category <span className="font-serif font-bold normal-case tracking-normal">{cat.name}</span> ×
+            Category{' '}
+            <span className="font-serif font-bold normal-case tracking-normal">{cat.name}</span> ×
           </button>
         ))}
         {activeDateLabel && (
           <button
             type="button"
-            onClick={() => pushFilters({ dateOption: undefined, dateFrom: undefined, dateTo: undefined })}
+            onClick={() =>
+              pushFilters({ dateOption: undefined, dateFrom: undefined, dateTo: undefined })
+            }
             className="inline-flex items-center gap-2 bg-signal px-3 py-1.5 font-sans text-[11px] font-bold uppercase tracking-widest transition-colors duration-hover ease-hover hover:bg-ink hover:text-signal focus-visible:bg-ink focus-visible:text-signal"
           >
-            Date <span className="font-serif font-bold normal-case tracking-normal">{activeDateLabel}</span> ×
+            Date{' '}
+            <span className="font-serif font-bold normal-case tracking-normal">
+              {activeDateLabel}
+            </span>{' '}
+            ×
           </button>
         )}
         {hasFilters && (
@@ -417,7 +437,7 @@ export function NewsExplorer({
           </button>
         )}
         <span className="ml-auto font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
-          {searchFiltered.length} {searchFiltered.length === 1 ? 'story' : 'stories'}
+          {articles.length} {articles.length === 1 ? 'story' : 'stories'}
         </span>
       </div>
 
@@ -437,7 +457,7 @@ export function NewsExplorer({
         </div>
       )}
 
-      {!loadingInitial && searchFiltered.length === 0 && (
+      {!loadingInitial && articles.length === 0 && (
         <div className="border-b border-ink py-[clamp(32px,5vw,64px)]">
           <div className="font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
             Tidak ada hasil
@@ -445,7 +465,7 @@ export function NewsExplorer({
           <div className="my-3.5 max-w-[34ch] font-serif text-[clamp(24px,3vw,34px)] font-bold leading-[1.1] tracking-[-0.03em]">
             {hasFilters
               ? 'Filter ini belum punya cerita yang cocok dengan pencarianmu.'
-              : 'Pencarianmu tidak menemukan cerita apa pun di halaman ini.'}
+              : 'Belum ada cerita yang bisa ditampilkan.'}
           </div>
           <button
             type="button"
