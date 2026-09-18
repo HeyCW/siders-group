@@ -33,6 +33,7 @@ class ArticlePresenter
             'bodyHtml' => $article->body_html,
             'seoTitle' => $article->seo_title,
             'seoDescription' => $article->seo_description,
+            'keywords' => $article->keywords,
         ];
     }
 
@@ -57,6 +58,7 @@ class ArticlePresenter
             'anakUsaha' => self::anakUsaha($article),
             'seoTitle' => $article->seo_title,
             'seoDescription' => $article->seo_description,
+            'keywords' => $article->keywords,
             'publishedAt' => $article->published_at?->toIso8601String(),
             'createdAt' => $article->created_at->toIso8601String(),
             'updatedAt' => $article->updated_at->toIso8601String(),

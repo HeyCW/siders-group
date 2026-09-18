@@ -24,6 +24,7 @@ class AutosaveArticleRequest extends FormRequest
             'anakUsahaId' => ['sometimes', 'nullable', 'string', 'exists:anak_usaha,id'],
             'seoTitle' => ['sometimes', 'nullable', 'string'],
             'seoDescription' => ['sometimes', 'nullable', 'string'],
+            'keywords' => ['sometimes', 'nullable', 'string', 'max:500'],
             'categoryIds' => ['sometimes', 'array'],
             'categoryIds.*' => ['string', 'exists:categories,id'],
         ];

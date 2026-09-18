@@ -24,6 +24,7 @@ class StoreArticleRequest extends FormRequest
             'anakUsahaId' => ['nullable', 'string', 'exists:anak_usaha,id'],
             'seoTitle' => ['nullable', 'string'],
             'seoDescription' => ['nullable', 'string'],
+            'keywords' => ['nullable', 'string', 'max:500'],
             'categoryIds' => ['sometimes', 'array'],
             'categoryIds.*' => ['string', 'exists:categories,id'],
         ];

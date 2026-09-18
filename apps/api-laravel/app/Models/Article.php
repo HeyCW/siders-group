@@ -29,6 +29,7 @@ class Article extends Model
         'anak_usaha_id',
         'seo_title',
         'seo_description',
+        'keywords',
         'published_at',
     ];
 

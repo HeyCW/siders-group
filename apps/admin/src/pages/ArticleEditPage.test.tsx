@@ -55,6 +55,7 @@ function article(overrides: Partial<ArticleAdminResponse> & Pick<ArticleAdminRes
     anakUsaha: null,
     seoTitle: null,
     seoDescription: null,
+    keywords: null,
     publishedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -80,6 +81,7 @@ function publicDetail(a: ArticleAdminResponse): ArticlePublicDetail {
     bodyHtml: a.bodyHtml,
     seoTitle: a.seoTitle,
     seoDescription: a.seoDescription,
+    keywords: a.keywords,
   };
 }
 
@@ -142,6 +144,26 @@ describe('ArticleEditPage — autosave', () => {
     );
     vi.useRealTimers();
     await screen.findByText('Saved');
+  });
+
+  it('includes keywords in the autosave payload when the field is edited', async () => {
+    const original = article({ id: 'a', title: 'Draft Title' });
+    await renderPage(original);
+
+    vi.useFakeTimers();
+    const keywordsInput = screen.getByText('SEO keywords').parentElement!.querySelector('input') as HTMLInputElement;
+    fireEvent.change(keywordsInput, { target: { value: 'jakarta, kuliner' } });
+
+    vi.mocked(articlesApi.autosave).mockResolvedValue({ ...original, keywords: 'jakarta, kuliner' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1200);
+    });
+
+    expect(articlesApi.autosave).toHaveBeenCalledWith(
+      'a',
+      expect.objectContaining({ keywords: 'jakarta, kuliner' }),
+    );
+    vi.useRealTimers();
   });
 
   it('shows the failure message when autosave rejects', async () => {

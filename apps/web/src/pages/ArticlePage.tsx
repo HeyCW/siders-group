@@ -5,6 +5,8 @@ import { ApiError, getArticleBySlug } from '../lib/api';
 import { estimateReadMinutes } from '../lib/readingTime';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { useMetaDescription } from '../lib/useMetaDescription';
+import { useMetaKeywords } from '../lib/useMetaKeywords';
+import { splitKeywords } from '../lib/splitKeywords';
 import { Container } from '../components/layout/Container';
 import { MediaSlot } from '../components/ui/MediaSlot';
 import { EngagementBar } from '../components/article/EngagementBar';
@@ -49,6 +51,7 @@ export function ArticlePage() {
       ? (state.article.seoDescription ?? state.article.excerpt ?? state.article.title)
       : 'Siders is a hyperlocal media and community platform. Everyone has a voice, everyone has a story, everyone is Siders.',
   );
+  useMetaKeywords(state.status === 'ready' ? (state.article.keywords ?? '') : '');
 
   if (state.status === 'loading') {
     return (
@@ -67,6 +70,7 @@ export function ArticlePage() {
   const { article } = state;
   const kicker = article.categories[0]?.name ?? 'Siders';
   const readMinutes = estimateReadMinutes(article.bodyHtml);
+  const keywords = splitKeywords(article.keywords);
   const publishedDate = new Date(article.publishedAt).toLocaleDateString('id-ID', {
     day: 'numeric',
     month: 'short',
@@ -119,6 +123,24 @@ export function ArticlePage() {
         className="article-body pt-[clamp(18px,2.5vw,28px)] text-[15px] leading-[1.72] [&_p]:mb-4 [&_h2]:mb-2.5 [&_h2]:mt-6 [&_h2]:border-b [&_h2]:border-ink [&_h2]:pb-1.5 [&_h2]:font-serif [&_h2]:text-xl [&_h2]:font-black [&_h2]:uppercase [&_h2]:tracking-wide [&_h3]:mb-2.5 [&_h3]:mt-6 [&_h3]:border-b [&_h3]:border-ink [&_h3]:pb-1.5 [&_h3]:font-serif [&_h3]:text-xl [&_h3]:font-black [&_h3]:uppercase [&_h3]:tracking-wide [&_a]:underline"
         dangerouslySetInnerHTML={{ __html: article.bodyHtml }}
       />
+
+      {keywords.length > 0 && (
+        <div className="pt-[clamp(18px,2.5vw,28px)]">
+          <div className="border-b border-rule pb-2 font-sans text-[11px] font-bold uppercase tracking-widest text-muted">
+            Keywords
+          </div>
+          <div className="flex flex-wrap gap-2 pt-3">
+            {keywords.map((keyword) => (
+              <span
+                key={keyword}
+                className="rounded-full border border-rule px-3 py-1 font-sans text-[11px] font-bold uppercase tracking-widest text-muted"
+              >
+                {keyword}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* A Client Component island under Next; now just a normal component — `articleId` is the
           only thing it needs from the page. */}

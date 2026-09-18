@@ -29,6 +29,14 @@ describe('articleCreateRequestSchema', () => {
     });
     expect(parsed.categoryIds).toHaveLength(2);
   });
+
+  it('accepts keywords up to 500 chars and rejects anything longer', () => {
+    const accepted = articleCreateRequestSchema.safeParse({ title: 'T', keywords: 'jakarta, kuliner, umkm' });
+    expect(accepted.success).toBe(true);
+
+    const rejected = articleCreateRequestSchema.safeParse({ title: 'T', keywords: 'a'.repeat(501) });
+    expect(rejected.success).toBe(false);
+  });
 });
 
 describe('articleUpdateRequestSchema', () => {

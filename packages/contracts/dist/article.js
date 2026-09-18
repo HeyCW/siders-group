@@ -30,6 +30,7 @@ export const articleWriteFieldsSchema = z.object({
     anakUsahaId: z.string().uuid().nullable().optional(),
     seoTitle: z.string().max(200).optional(),
     seoDescription: z.string().max(500).optional(),
+    keywords: z.string().max(500).optional(),
 });
 export const articleCreateRequestSchema = articleWriteFieldsSchema.strict();
 export const articleUpdateRequestSchema = articleWriteFieldsSchema.partial().strict();
@@ -49,6 +50,7 @@ export const articleAutosaveRequestSchema = z
     anakUsahaId: z.string().uuid().nullable().optional(),
     seoTitle: z.string().max(200).optional(),
     seoDescription: z.string().max(500).optional(),
+    keywords: z.string().max(500).optional(),
 })
     .strict();
 /** Publish and unpublish take no body — the transition itself is the entire request. */
@@ -119,6 +121,7 @@ export const articlePublicDetailSchema = articlePublicCardSchema.extend({
     bodyHtml: z.string(),
     seoTitle: z.string().nullable(),
     seoDescription: z.string().nullable(),
+    keywords: z.string().nullable(),
 });
 /** The admin-facing shape: everything the public gets, plus authoring state and `bodyJson`. */
 export const articleAdminResponseSchema = z.object({
@@ -137,6 +140,7 @@ export const articleAdminResponseSchema = z.object({
     anakUsaha: anakUsahaResponseSchema.nullable(),
     seoTitle: z.string().nullable(),
     seoDescription: z.string().nullable(),
+    keywords: z.string().nullable(),
     publishedAt: z.string().datetime().nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),

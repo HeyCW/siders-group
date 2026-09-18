@@ -23,6 +23,7 @@ export declare const articleWriteFieldsSchema: z.ZodObject<{
     anakUsahaId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     seoTitle: z.ZodOptional<z.ZodString>;
     seoDescription: z.ZodOptional<z.ZodString>;
+    keywords: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     title: string;
     slug?: string | undefined;
@@ -33,6 +34,7 @@ export declare const articleWriteFieldsSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }, {
     title: string;
     slug?: string | undefined;
@@ -43,6 +45,7 @@ export declare const articleWriteFieldsSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }>;
 export declare const articleCreateRequestSchema: z.ZodObject<{
     title: z.ZodString;
@@ -54,6 +57,7 @@ export declare const articleCreateRequestSchema: z.ZodObject<{
     anakUsahaId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     seoTitle: z.ZodOptional<z.ZodString>;
     seoDescription: z.ZodOptional<z.ZodString>;
+    keywords: z.ZodOptional<z.ZodString>;
 }, "strict", z.ZodTypeAny, {
     title: string;
     slug?: string | undefined;
@@ -64,6 +68,7 @@ export declare const articleCreateRequestSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }, {
     title: string;
     slug?: string | undefined;
@@ -74,6 +79,7 @@ export declare const articleCreateRequestSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }>;
 export type ArticleCreateRequest = z.infer<typeof articleCreateRequestSchema>;
 export declare const articleUpdateRequestSchema: z.ZodObject<{
@@ -86,6 +92,7 @@ export declare const articleUpdateRequestSchema: z.ZodObject<{
     anakUsahaId: z.ZodOptional<z.ZodOptional<z.ZodNullable<z.ZodString>>>;
     seoTitle: z.ZodOptional<z.ZodOptional<z.ZodString>>;
     seoDescription: z.ZodOptional<z.ZodOptional<z.ZodString>>;
+    keywords: z.ZodOptional<z.ZodOptional<z.ZodString>>;
 }, "strict", z.ZodTypeAny, {
     slug?: string | undefined;
     title?: string | undefined;
@@ -96,6 +103,7 @@ export declare const articleUpdateRequestSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }, {
     slug?: string | undefined;
     title?: string | undefined;
@@ -106,6 +114,7 @@ export declare const articleUpdateRequestSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }>;
 export type ArticleUpdateRequest = z.infer<typeof articleUpdateRequestSchema>;
 /**
@@ -123,6 +132,7 @@ export declare const articleAutosaveRequestSchema: z.ZodObject<{
     anakUsahaId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     seoTitle: z.ZodOptional<z.ZodString>;
     seoDescription: z.ZodOptional<z.ZodString>;
+    keywords: z.ZodOptional<z.ZodString>;
 }, "strict", z.ZodTypeAny, {
     title?: string | undefined;
     bodyJson?: unknown;
@@ -132,6 +142,7 @@ export declare const articleAutosaveRequestSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }, {
     title?: string | undefined;
     bodyJson?: unknown;
@@ -141,6 +152,7 @@ export declare const articleAutosaveRequestSchema: z.ZodObject<{
     anakUsahaId?: string | null | undefined;
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
+    keywords?: string | undefined;
 }>;
 export type ArticleAutosaveRequest = z.infer<typeof articleAutosaveRequestSchema>;
 /** Publish and unpublish take no body — the transition itself is the entire request. */
@@ -298,6 +310,7 @@ export declare const articlePublicDetailSchema: z.ZodObject<{
     bodyHtml: z.ZodString;
     seoTitle: z.ZodNullable<z.ZodString>;
     seoDescription: z.ZodNullable<z.ZodString>;
+    keywords: z.ZodNullable<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     id: string;
     slug: string;
@@ -305,6 +318,7 @@ export declare const articlePublicDetailSchema: z.ZodObject<{
     excerpt: string | null;
     seoTitle: string | null;
     seoDescription: string | null;
+    keywords: string | null;
     publishedAt: string;
     featuredImageUrl: string | null;
     categories: {
@@ -326,6 +340,7 @@ export declare const articlePublicDetailSchema: z.ZodObject<{
     excerpt: string | null;
     seoTitle: string | null;
     seoDescription: string | null;
+    keywords: string | null;
     publishedAt: string;
     featuredImageUrl: string | null;
     categories: {
@@ -383,6 +398,7 @@ export declare const articleAdminResponseSchema: z.ZodObject<{
     }>>;
     seoTitle: z.ZodNullable<z.ZodString>;
     seoDescription: z.ZodNullable<z.ZodString>;
+    keywords: z.ZodNullable<z.ZodString>;
     publishedAt: z.ZodNullable<z.ZodString>;
     createdAt: z.ZodString;
     updatedAt: z.ZodString;
@@ -397,6 +413,7 @@ export declare const articleAdminResponseSchema: z.ZodObject<{
     featuredMediaId: string | null;
     seoTitle: string | null;
     seoDescription: string | null;
+    keywords: string | null;
     publishedAt: string | null;
     featuredImageUrl: string | null;
     categories: {
@@ -424,6 +441,7 @@ export declare const articleAdminResponseSchema: z.ZodObject<{
     featuredMediaId: string | null;
     seoTitle: string | null;
     seoDescription: string | null;
+    keywords: string | null;
     publishedAt: string | null;
     featuredImageUrl: string | null;
     categories: {

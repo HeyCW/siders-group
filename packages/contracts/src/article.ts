@@ -33,6 +33,7 @@ export const articleWriteFieldsSchema = z.object({
   anakUsahaId: z.string().uuid().nullable().optional(),
   seoTitle: z.string().max(200).optional(),
   seoDescription: z.string().max(500).optional(),
+  keywords: z.string().max(500).optional(),
 });
 
 export const articleCreateRequestSchema = articleWriteFieldsSchema.strict();
@@ -57,6 +58,7 @@ export const articleAutosaveRequestSchema = z
     anakUsahaId: z.string().uuid().nullable().optional(),
     seoTitle: z.string().max(200).optional(),
     seoDescription: z.string().max(500).optional(),
+    keywords: z.string().max(500).optional(),
   })
   .strict();
 export type ArticleAutosaveRequest = z.infer<typeof articleAutosaveRequestSchema>;
@@ -136,6 +138,7 @@ export const articlePublicDetailSchema = articlePublicCardSchema.extend({
   bodyHtml: z.string(),
   seoTitle: z.string().nullable(),
   seoDescription: z.string().nullable(),
+  keywords: z.string().nullable(),
 });
 export type ArticlePublicDetail = z.infer<typeof articlePublicDetailSchema>;
 
@@ -156,6 +159,7 @@ export const articleAdminResponseSchema = z.object({
   anakUsaha: anakUsahaResponseSchema.nullable(),
   seoTitle: z.string().nullable(),
   seoDescription: z.string().nullable(),
+  keywords: z.string().nullable(),
   publishedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

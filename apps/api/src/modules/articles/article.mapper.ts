@@ -54,6 +54,10 @@ export function toPublicDetail(env: MediaUrlEnv, article: ArticleWithRelations):
     bodyHtml: article.bodyHtml,
     seoTitle: article.seoTitle,
     seoDescription: article.seoDescription,
+    // Always null here: `keywords` is authored and stored only by the Laravel backend, which
+    // owns the `articles.keywords` column. This schema has no such column, so there is nothing
+    // to map — the field exists in the response purely to satisfy the shared contract.
+    keywords: null,
   };
 }
 
@@ -75,6 +79,7 @@ export function toAdminResponse(env: MediaUrlEnv, article: ArticleWithRelations)
     anakUsaha: article.anakUsaha,
     seoTitle: article.seoTitle,
     seoDescription: article.seoDescription,
+    keywords: null, // See `toPublicDetail` — Laravel-only field.
     publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
     createdAt: article.createdAt.toISOString(),
     updatedAt: article.updatedAt.toISOString(),
@@ -100,5 +105,6 @@ export function toPreviewResponse(env: MediaUrlEnv, article: ArticleWithRelation
     bodyHtml: article.bodyHtml,
     seoTitle: article.seoTitle,
     seoDescription: article.seoDescription,
+    keywords: null, // See `toPublicDetail` — Laravel-only field.
   };
 }

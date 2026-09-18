@@ -20,6 +20,7 @@ interface FormState {
   excerpt: string;
   seoTitle: string;
   seoDescription: string;
+  keywords: string;
   categoryIds: string[];
   featuredMediaId: string | null;
   featuredImageUrl: string | null;
@@ -33,6 +34,7 @@ function toFormState(article: ArticleAdminResponse): FormState {
     excerpt: article.excerpt ?? '',
     seoTitle: article.seoTitle ?? '',
     seoDescription: article.seoDescription ?? '',
+    keywords: article.keywords ?? '',
     categoryIds: article.categories.map((c) => c.id),
     featuredMediaId: article.featuredMediaId,
     featuredImageUrl: article.featuredImageUrl,
@@ -117,6 +119,7 @@ export function ArticleEditPage() {
         anakUsahaId: formRef.current.anakUsahaId,
         seoTitle: formRef.current.seoTitle,
         seoDescription: formRef.current.seoDescription,
+        keywords: formRef.current.keywords,
       });
       setArticle(updated);
       setSaveStatus('saved');
@@ -408,6 +411,11 @@ export function ArticleEditPage() {
                 rows={2}
                 className={FIELD_INPUT}
               />
+            </div>
+            <div>
+              <label className={FIELD_LABEL}>SEO keywords</label>
+              <input value={form.keywords} onChange={(e) => patchForm({ keywords: e.target.value })} className={FIELD_INPUT} />
+              <p className="mt-1 text-xs text-[var(--muted)]">Comma-separated, e.g. jakarta, kuliner, umkm</p>
             </div>
 
             <div className="border-t border-[var(--rule)] pt-4">

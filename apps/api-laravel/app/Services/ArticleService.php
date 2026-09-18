@@ -35,6 +35,7 @@ class ArticleService
                 'anak_usaha_id' => $data['anakUsahaId'] ?? null,
                 'seo_title' => $data['seoTitle'] ?? null,
                 'seo_description' => $data['seoDescription'] ?? null,
+                'keywords' => $this->normalizeKeywords($data['keywords'] ?? null),
             ]);
 
             if (! empty($data['categoryIds'])) {
@@ -74,6 +75,12 @@ class ArticleService
                 if (array_key_exists($field, $data)) {
                     $attributes[Str::snake($field)] = $data[$field];
                 }
+            }
+
+            // Kept out of the generic loop above so it always goes through normalizeKeywords()
+            // instead of being written to the model raw.
+            if (array_key_exists('keywords', $data)) {
+                $attributes['keywords'] = $this->normalizeKeywords($data['keywords']);
             }
 
             $article->update($attributes);
@@ -116,6 +123,12 @@ class ArticleService
             if (array_key_exists($field, $data)) {
                 $attributes[Str::snake($field)] = $data[$field];
             }
+        }
+
+        // Kept out of the generic loop above so it always goes through normalizeKeywords()
+        // instead of being written to the model raw.
+        if (array_key_exists('keywords', $data)) {
+            $attributes['keywords'] = $this->normalizeKeywords($data['keywords']);
         }
 
         $article->update($attributes);
@@ -196,5 +209,32 @@ class ArticleService
         }
 
         return $slug;
+    }
+
+    /**
+     * Centralized here rather than in each write path, so create/update/autosave can't drift on
+     * what a "keyword" is: split on commas, trim, drop blanks, dedupe case-insensitively (keeping
+     * the first occurrence's casing), then re-join with ", ". An input that normalizes to nothing
+     * becomes null rather than an empty string.
+     */
+    private function normalizeKeywords(?string $raw): ?string
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $seen = [];
+        foreach (explode(',', $raw) as $entry) {
+            $entry = trim($entry);
+            if ($entry === '') {
+                continue;
+            }
+            $key = mb_strtolower($entry);
+            if (! array_key_exists($key, $seen)) {
+                $seen[$key] = $entry;
+            }
+        }
+
+        return $seen === [] ? null : implode(', ', $seen);
     }
 }
