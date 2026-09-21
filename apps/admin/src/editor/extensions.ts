@@ -12,6 +12,7 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import CharacterCount from '@tiptap/extension-character-count';
 import { VideoNode } from './videoNode.js';
+import { InternalNote } from './internalNote.js';
 import { SlashCommand } from './slashCommand.js';
 
 /**
@@ -56,6 +57,7 @@ export function buildEditorExtensions(handlers: {
     TaskItem.configure({ nested: true }),
     CharacterCount,
     VideoNode,
+    InternalNote,
     SlashCommand.configure(handlers),
   ];
 }

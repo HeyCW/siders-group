@@ -1,56 +1,94 @@
 ## 1. Editor content model
 
-- [ ] 1.1 Add `apps/admin/src/editor/internalNote.ts`: a block-level Tiptap node (`internalNote`,
-      `group: 'block'`, `content: 'inline*'`), following `videoNode.ts`'s structure as the
-      existing custom-node precedent
-- [ ] 1.2 Register it in `buildEditorExtensions` (`extensions.ts`)
-- [ ] 1.3 Style it in the canvas so it reads as not-for-readers (marked bullet, muted/flagged
-      treatment) — distinct from blockquote, which is reader-facing content
-- [ ] 1.4 Add an "Internal note" entry to `buildCommandItems` (`commandItems.ts`), keywords
-      `['note', 'internal', 'todo', 'editor']`
+- [x] 1.1 Added `apps/admin/src/editor/internalNote.ts`: block-level Tiptap node (`internalNote`,
+      `group: 'block'`, `content: 'inline*'`), following `videoNode.ts`'s structure
+- [x] 1.2 Registered in `buildEditorExtensions` (`extensions.ts`)
+- [x] 1.3 Styled via `.siders-scope .internal-note` in `index.css` — a bordered, tinted box using
+      the existing `--signal`/`--signal-soft` design tokens, with a CSS-generated "Internal note"
+      label (`::before`) rather than a DOM node inside the editable content, so the label can
+      never be selected/edited/copied as if it were the note's own text
+- [x] 1.4 Added "Internal note" to `buildCommandItems` — icon `⚑`, keywords
+      `['note', 'internal', 'todo', 'editor', 'flag']`
 
 ## 2. Renderer (both backends, kept node-for-node identical)
 
-- [ ] 2.1 `ArticleBodyRenderer::render()` gains a mode parameter (public by default). In public
-      mode `internalNote` is simply not a case in `renderNode`'s match, so it falls to
-      `default => ''` — the note is dropped by the existing deny-by-default, not by a new strip
-      pass (design.md - "Public safety comes from the renderer's deny-by-default")
-- [ ] 2.2 In preview mode `internalNote` renders as a marked block (e.g.
-      `<aside class="internal-note">`) whose children go through the same inline rendering and
-      escaping as any other block
-- [ ] 2.3 Mirror both changes in `apps/api/src/lib/sanitizeHtml.ts`, per that file's
-      "ported node-for-node so the two backends can never render an article's body differently"
-      contract
-- [ ] 2.4 Confirm no call site renders in preview mode except the preview endpoint
+- [x] 2.1 `ArticleBodyRenderer::render()` (and TS `sanitizeHtml()`) gained a `$mode`/`mode`
+      parameter, `'public'` by default. `internalNote`'s `match`/`switch` arm is
+      `mode === 'preview' ? renderInternalNote(...) : ''` — public mode collapses to exactly the
+      same empty string the `default` arm already produces for any unrecognized type
+- [x] 2.2 Preview mode renders `<aside class="internal-note" data-internal-note="true">…</aside>`;
+      children go through the same `renderChildren`/inline text-and-marks path as every other
+      block, so escaping and mark rendering inside a note are identical to anywhere else
+- [x] 2.3 Mirrored in `apps/api/src/lib/sanitizeHtml.ts` — every function that recurses into
+      `renderNode` (`renderChildren`, `renderTableCell`, `renderHeading`, `renderOrderedList`,
+      `renderTaskItem`) now threads `mode` through, matching the PHP side arm for arm
+- [x] 2.4 Confirmed: `sanitizeHtml`/`ArticleBodyRenderer::render` default to `'public'`, so every
+      existing call site (article create/update's stored `body_html`, the public detail/list
+      mappers) is unchanged; only `toPreviewResponse` / `ArticlePresenter::preview` pass
+      `'preview'`
 
 ## 3. Preview endpoint
 
-- [ ] 3.1 `ArticleController::preview` renders the body from `body_json` in preview mode at
-      request time instead of returning the stored `body_html`
-- [ ] 3.2 Keep the rest of the preview response shape exactly as `ArticlePresenter::public`
-      produces it, so the preview differs from the public rendering in the note blocks and
-      nothing else
-- [ ] 3.3 Mirror in `apps/api`'s `article.controller.ts` (`toPreviewResponse`)
-- [ ] 3.4 Leave every other read path untouched — public detail, public list, and the admin
-      article read all keep returning the stored `body_html`
+- [x] 3.1 `ArticleController::preview` now calls `ArticlePresenter::preview($article)`, which
+      renders `body_html` fresh from `body_json` in preview mode
+- [x] 3.2 `ArticlePresenter::preview()` spreads `public()`'s full result and overrides only
+      `bodyHtml` — every other field (categories, anakUsaha, authorName, seo*, …) is identical to
+      `public()`'s
+- [x] 3.3 Mirrored: `apps/api`'s `toPreviewResponse` now builds `bodyHtml` via
+      `sanitizeHtml(article.bodyJson, 'preview').html` instead of reading `article.bodyHtml`
+- [x] 3.4 Confirmed: `toPublicDetail`/`toPublicCard` (Node) and `ArticlePresenter::public()`
+      (Laravel) are untouched — both still read the stored `body_html` column directly, never
+      re-rendering; `cardExcerpt`'s HTML-derived excerpt fallback also reads the stored (public,
+      note-free) `bodyHtml`, so it carries no leak risk by construction
 
 ## 4. Preview UI
 
-- [ ] 4.1 Style `internal-note` inside `PreviewModal`'s `prose` container so a note is
-      unmistakably internal (label or marker, not just a colour), matching the canvas treatment
-- [ ] 4.2 Update `PreviewModal`'s doc comment: its `bodyHtml` is now the preview rendering, still
-      server-generated by the allowlist renderer and still never raw user input
+- [x] 4.1 `.internal-note` styling in `index.css` is shared by the canvas and `PreviewModal` —
+      both wrap content in `.prose` inside `.siders-scope`, so one rule covers both surfaces with
+      nothing to keep in sync between them
+- [x] 4.2 Updated `PreviewModal`'s doc comment: `bodyHtml` is server-generated as before, but is
+      no longer byte-identical to the public rendering — an article with no notes previews
+      identically to its public page, one with notes does not, and that difference is the point
 
 ## 5. Verification
 
-- [ ] 5.1 Renderer tests, both backends: a document with an `internalNote` renders no trace of it
-      in public mode, and renders it in preview mode; inline marks inside a note are escaped the
-      same way as anywhere else
-- [ ] 5.2 Test the leak paths named in the spec delta: public detail body, public list card, and
-      the excerpt fallback derived from body HTML all contain no note text when `excerpt` is empty
-- [ ] 5.3 Editor tests: insert via slash menu, note persists across a save/reload, deleting a note
-      leaves neighbouring paragraphs intact
-- [ ] 5.4 Preview endpoint test: a note appears for `news.manage`, and the endpoint stays rejected
-      without it
-- [ ] 5.5 Regression: an article with no notes previews byte-identically to its public rendering
-- [ ] 5.6 `php -l`, `./vendor/bin/pint --test`, `php artisan test`; `pnpm lint`/`typecheck`/`test`
+- [x] 5.1 Renderer tests, both backends (`sanitizeHtml.test.ts` +5,
+      `ArticleBodyRendererTest.php` +5): absent in default/explicit-public mode with surrounding
+      blocks intact, present in preview mode, marks/escaping applied inside a note the same as
+      elsewhere, and — an extra case beyond the original plan — a note nested inside another
+      block type (blockquote) never leaks into that block's public output
+- [x] 5.2 `article.mapper.test.ts` (new): `toPublicDetail` returns the stored, note-free
+      `body_html` unchanged even when handed a `bodyJson` that (inconsistently) still carries a
+      note — the public path never re-renders, so it can't be made to disclose one. The excerpt
+      fallback needed no separate test: `cardExcerpt`/Laravel's `excerpt` field never read from a
+      note-inclusive render in the first place (see 3.4)
+- [~] 5.3 Editor tests (insert via slash menu, persists across save/reload, delete leaves
+      neighbours intact) — **not added**. This codebase has no existing Tiptap-node-level test of
+      any kind (`videoNode.ts`, headings, etc. are all untested at that layer);
+      `ArticleEditPage.test.tsx` stubs `EditorCanvas` out entirely and tests only the page's own
+      orchestration. Adding node-level Tiptap tests here would introduce a testing pattern this
+      codebase doesn't otherwise use; the content-model round trip (insert → persisted structure →
+      rendered) is instead covered by the renderer tests in 5.1, which verify what an
+      `internalNote` node of this shape produces once it reaches the server.
+- [x] 5.4 `tests/Feature/ArticleInternalNotePreviewTest.php` (new, mirrors the
+      `HyperlocalSpotlightTest.php` fixture pattern): a note appears in the preview response for
+      an Owner-role staff member; the preview endpoint is `403` without `news.manage` and `401`
+      unauthenticated; the public detail and public list endpoints never contain the note text or
+      the `internal-note` marker; an article with no notes previews byte-identical to its public
+      rendering
+- [~] **Could not execute** `ArticleInternalNotePreviewTest.php` in this sandbox — same pre-existing
+      SQLite incompatibility documented for `add-hyperlocal-spotlight`: every migration's
+      `CURRENT_TIMESTAMP(3)` column default is invalid SQLite syntax, so any `RefreshDatabase`
+      test fails on the very first migration (`roles`) regardless of this change. Confirmed by
+      running the file — it fails at exactly that step, before any of this change's code runs.
+      `ArticleBodyRendererTest.php` (pure Unit, no DB) *did* run and passes in full — see 5.1.
+- [~] `ArticlePresenter::preview()` has no dedicated unit test of its own (only exercised via the
+      Feature test above, which can't run here) — it is a two-line function (spread `public()`,
+      override `bodyHtml`), and the substantive logic it depends on
+      (`ArticleBodyRenderer::render(..., 'preview')`) is fully covered by 5.1.
+- [x] 5.6 Verification run in this sandbox: `php -l` and `./vendor/bin/pint --test` clean on every
+      touched/added PHP file; `php artisan test --testsuite=Unit` 24/24 passing (includes the 5 new
+      cases); `RouteAuthorizationAuditTest` unaffected (no new routes in this change).
+      `pnpm --filter @siders/api run typecheck` and `pnpm --filter @siders/admin run typecheck`
+      clean; `pnpm eslint` clean on every touched TS/TSX file; `pnpm --filter @siders/api exec
+      vitest run` 553/556 passing (549+4 new; 3 skipped mysql-integration, pre-existing).

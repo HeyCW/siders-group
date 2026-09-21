@@ -1,6 +1,7 @@
 import type { ArticleAdminResponse, ArticlePublicCard, ArticlePublicDetail, CategoryResponse } from '@siders/contracts';
 import { publicUrlFor } from '../../lib/mediaStorage.js';
 import { excerptFromHtml } from '../../lib/htmlExcerpt.js';
+import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
 import type { ArticleWithRelations, TaxonomyRef } from './article.repository.js';
 
 type MediaUrlEnv = { MEDIA_PUBLIC_BASE_URL: string };
@@ -99,7 +100,11 @@ export function toAdminResponse(
 /**
  * Preview: the same shape the public detail endpoint returns, but callable regardless of
  * status and without the visibility filter — the caller already holds `news.manage`
- * (specs/article-management/spec.md - "Article preview").
+ * (specs/article-management/spec.md - "Article preview"). `bodyHtml` is rendered fresh from
+ * `bodyJson` in preview mode here, rather than read from the stored (public) `body_html` column —
+ * this is the one read path in the system permitted to re-render, specifically so it can include
+ * internal note blocks the stored public HTML never contains
+ * (specs/article-management/spec.md - "The staff preview is the one read that re-renders").
  */
 export function toPreviewResponse(env: MediaUrlEnv, article: ArticleWithRelations): ArticlePublicDetail {
   return {
@@ -112,7 +117,7 @@ export function toPreviewResponse(env: MediaUrlEnv, article: ArticleWithRelation
     anakUsaha: article.anakUsaha,
     authorName: article.authorName,
     publishedAt: article.publishedAt ? article.publishedAt.toISOString() : new Date(0).toISOString(),
-    bodyHtml: article.bodyHtml,
+    bodyHtml: sanitizeHtml(article.bodyJson, 'preview').html,
     seoTitle: article.seoTitle,
     seoDescription: article.seoDescription,
     keywords: null, // See `toPublicDetail` — Laravel-only field.

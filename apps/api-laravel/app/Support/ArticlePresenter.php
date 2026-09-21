@@ -38,6 +38,21 @@ class ArticlePresenter
     }
 
     /**
+     * The staff preview: everything `public()` returns, except `bodyHtml` is rendered fresh from
+     * `body_json` in preview mode rather than read from the stored `body_html` column — the one
+     * read path in the system permitted to re-render, specifically so it can include internal
+     * note blocks the stored public HTML never contains
+     * (specs/article-management/spec.md - "The staff preview is the one read that re-renders").
+     */
+    public static function preview(Article $article): array
+    {
+        return [
+            ...self::public($article),
+            'bodyHtml' => ArticleBodyRenderer::render($article->body_json, 'preview'),
+        ];
+    }
+
+    /**
      * Matches articleAdminResponseSchema. `$isHyperlocalSpotlight` is resolved by the caller
      * (ArticleController), never derived from `$article` itself — the spotlight lives in its
      * own singleton table, not on the article row

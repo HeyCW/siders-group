@@ -131,6 +131,54 @@ describe('sanitizeHtml — one test per supported block type', () => {
   });
 });
 
+describe('sanitizeHtml — internal note blocks (specs/article-editor/spec.md - "Internal note block")', () => {
+  const node = doc(
+    { type: 'paragraph', content: [text('before')] },
+    { type: 'internalNote', content: [text('confirm the spelling before this runs')] },
+    { type: 'paragraph', content: [text('after')] },
+  );
+
+  it('is absent from the default (public) rendering, with the surrounding paragraphs intact', () => {
+    const { html } = sanitizeHtml(node);
+    expect(html).toBe('<p>before</p><p>after</p>');
+    expect(html).not.toContain('confirm the spelling');
+    expect(html).not.toContain('internal-note');
+    expect(html).not.toContain('<!--');
+  });
+
+  it('is absent from an explicit "public" mode too', () => {
+    const { html } = sanitizeHtml(node, 'public');
+    expect(html).toBe('<p>before</p><p>after</p>');
+  });
+
+  it('renders in "preview" mode, in its position, with the rest of the document unchanged', () => {
+    const { html } = sanitizeHtml(node, 'preview');
+    expect(html).toBe(
+      '<p>before</p><aside class="internal-note" data-internal-note="true">confirm the spelling before this runs</aside><p>after</p>',
+    );
+  });
+
+  it('escapes and applies marks to note text the same way any other text is handled', () => {
+    const marked = doc({
+      type: 'internalNote',
+      content: [text('<b>', []), text('bold', [{ type: 'bold' }])],
+    });
+    const { html } = sanitizeHtml(marked, 'preview');
+    expect(html).toBe('<aside class="internal-note" data-internal-note="true">&lt;b&gt;<strong>bold</strong></aside>');
+  });
+
+  it('never leaks note text into any other supported block type, in either mode', () => {
+    const nested = doc({
+      type: 'blockquote',
+      content: [{ type: 'internalNote', content: [text('secret')] }],
+    });
+    expect(sanitizeHtml(nested).html).toBe('<blockquote></blockquote>');
+    expect(sanitizeHtml(nested, 'preview').html).toBe(
+      '<blockquote><aside class="internal-note" data-internal-note="true">secret</aside></blockquote>',
+    );
+  });
+});
+
 describe('sanitizeHtml — disallowed markup is stripped', () => {
   it('omits an unrecognized node type entirely', () => {
     const node = doc(

@@ -11,6 +11,15 @@ export interface SanitizeResult {
   html: string;
 }
 
+/**
+ * 'public' (the default) is used for everything that gets stored or served to a reader —
+ * `internalNote` is simply not a case this mode reaches, falling to the same `default => ''`
+ * every other unrecognized node type does. 'preview' is used only by the staff preview endpoint,
+ * rendering at request time from `body_json` rather than the stored `body_html`
+ * (specs/article-management/spec.md - "The staff preview is the one read that re-renders").
+ */
+export type RenderMode = 'public' | 'preview';
+
 interface PMMark {
   type?: unknown;
   attrs?: Record<string, unknown>;
@@ -107,8 +116,10 @@ function renderCodeText(nodes: PMNode[]): string {
     .join('');
 }
 
-function renderChildren(node: PMNode): string {
-  return nodeArray(node.content).map(renderNode).join('');
+function renderChildren(node: PMNode, mode: RenderMode): string {
+  return nodeArray(node.content)
+    .map((n) => renderNode(n, mode))
+    .join('');
 }
 
 function renderImage(node: PMNode): string {
@@ -138,30 +149,42 @@ function renderVideo(node: PMNode): string {
   return `<figure class="video-embed"><a href="${escapeAttr(src)}" rel="noopener noreferrer nofollow" target="_blank">${escapeHtml(src)}</a></figure>`;
 }
 
-function renderTableCell(node: PMNode, tag: 'td' | 'th'): string {
+function renderTableCell(node: PMNode, tag: 'td' | 'th', mode: RenderMode): string {
   const colspan = sanitizePositiveInt(node.attrs?.colspan, 1000);
   const rowspan = sanitizePositiveInt(node.attrs?.rowspan, 1000);
   const colspanAttr = colspan && colspan > 1 ? ` colspan="${colspan}"` : '';
   const rowspanAttr = rowspan && rowspan > 1 ? ` rowspan="${rowspan}"` : '';
-  return `<${tag}${colspanAttr}${rowspanAttr}>${renderChildren(node)}</${tag}>`;
+  return `<${tag}${colspanAttr}${rowspanAttr}>${renderChildren(node, mode)}</${tag}>`;
 }
 
-function renderNode(node: PMNode): string {
+/**
+ * Content an editor writes for other staff — rendered only in preview mode. In public mode this
+ * is never reached by any distinct code path; it is handled by the same `default: return ''`
+ * branch below that every unrecognized node type falls to
+ * (design.md - "Public safety comes from the renderer's deny-by-default, not from a strip
+ * step"). The "Internal note" label itself is CSS-generated content (`.internal-note::before`),
+ * not emitted here, so it can never be mistaken for part of the note's own text.
+ */
+function renderInternalNote(node: PMNode, mode: RenderMode): string {
+  return `<aside class="internal-note" data-internal-note="true">${renderChildren(node, mode)}</aside>`;
+}
+
+function renderNode(node: PMNode, mode: RenderMode): string {
   switch (node.type) {
     case 'doc':
-      return renderChildren(node);
+      return renderChildren(node, mode);
     case 'text':
       return renderText(node);
     case 'paragraph':
-      return `<p>${renderChildren(node)}</p>`;
+      return `<p>${renderChildren(node, mode)}</p>`;
     case 'heading': {
       const level = sanitizePositiveInt(node.attrs?.level, 3);
       const tag = level !== null ? HEADING_TAGS[level] : undefined;
-      if (!tag) return `<p>${renderChildren(node)}</p>`;
-      return `<${tag}>${renderChildren(node)}</${tag}>`;
+      if (!tag) return `<p>${renderChildren(node, mode)}</p>`;
+      return `<${tag}>${renderChildren(node, mode)}</${tag}>`;
     }
     case 'blockquote':
-      return `<blockquote>${renderChildren(node)}</blockquote>`;
+      return `<blockquote>${renderChildren(node, mode)}</blockquote>`;
     case 'codeBlock': {
       const language = typeof node.attrs?.language === 'string' && LANGUAGE_PATTERN.test(node.attrs.language)
         ? node.attrs.language
@@ -170,35 +193,37 @@ function renderNode(node: PMNode): string {
       return `<pre><code${classAttr}>${renderCodeText(nodeArray(node.content))}</code></pre>`;
     }
     case 'bulletList':
-      return `<ul>${renderChildren(node)}</ul>`;
+      return `<ul>${renderChildren(node, mode)}</ul>`;
     case 'orderedList': {
       const start = sanitizePositiveInt(node.attrs?.start, 100000);
       const startAttr = start && start !== 1 ? ` start="${start}"` : '';
-      return `<ol${startAttr}>${renderChildren(node)}</ol>`;
+      return `<ol${startAttr}>${renderChildren(node, mode)}</ol>`;
     }
     case 'listItem':
-      return `<li>${renderChildren(node)}</li>`;
+      return `<li>${renderChildren(node, mode)}</li>`;
     case 'taskList':
-      return `<ul class="task-list">${renderChildren(node)}</ul>`;
+      return `<ul class="task-list">${renderChildren(node, mode)}</ul>`;
     case 'taskItem': {
       const checked = node.attrs?.checked === true;
       const checkedAttr = checked ? ' checked' : '';
-      return `<li class="task-item" data-checked="${checked}"><input type="checkbox" disabled${checkedAttr}>${renderChildren(node)}</li>`;
+      return `<li class="task-item" data-checked="${checked}"><input type="checkbox" disabled${checkedAttr}>${renderChildren(node, mode)}</li>`;
     }
     case 'table':
-      return `<table><tbody>${renderChildren(node)}</tbody></table>`;
+      return `<table><tbody>${renderChildren(node, mode)}</tbody></table>`;
     case 'tableRow':
-      return `<tr>${renderChildren(node)}</tr>`;
+      return `<tr>${renderChildren(node, mode)}</tr>`;
     case 'tableCell':
-      return renderTableCell(node, 'td');
+      return renderTableCell(node, 'td', mode);
     case 'tableHeader':
-      return renderTableCell(node, 'th');
+      return renderTableCell(node, 'th', mode);
     case 'image':
       return renderImage(node);
     case 'horizontalRule':
       return '<hr>';
     case 'video':
       return renderVideo(node);
+    case 'internalNote':
+      return mode === 'preview' ? renderInternalNote(node, mode) : '';
     default:
       // Unrecognized node type: omit it and its content entirely. There is no safe way to
       // infer semantics for a type this renderer was never taught, so nothing is emitted
@@ -213,7 +238,7 @@ function renderNode(node: PMNode): string {
  * malformed input — an article whose `body_json` fails to parse as a document renders as an
  * empty body rather than failing the request that reads it.
  */
-export function sanitizeHtml(bodyJson: unknown): SanitizeResult {
+export function sanitizeHtml(bodyJson: unknown, mode: RenderMode = 'public'): SanitizeResult {
   if (typeof bodyJson !== 'object' || bodyJson === null) return { html: '' };
-  return { html: renderNode(bodyJson as PMNode) };
+  return { html: renderNode(bodyJson as PMNode, mode) };
 }

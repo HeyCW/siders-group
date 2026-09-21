@@ -173,6 +173,68 @@ class ArticleBodyRendererTest extends TestCase
     }
 
     #[Test]
+    public function it_omits_an_internal_note_from_the_default_public_rendering(): void
+    {
+        $doc = $this->doc(
+            ['type' => 'paragraph', 'content' => [$this->text('before')]],
+            ['type' => 'internalNote', 'content' => [$this->text('confirm the spelling before this runs')]],
+            ['type' => 'paragraph', 'content' => [$this->text('after')]],
+        );
+        $html = ArticleBodyRenderer::render($doc);
+        $this->assertSame('<p>before</p><p>after</p>', $html);
+        $this->assertStringNotContainsString('confirm the spelling', $html);
+        $this->assertStringNotContainsString('internal-note', $html);
+    }
+
+    #[Test]
+    public function it_omits_an_internal_note_from_an_explicit_public_mode_too(): void
+    {
+        $doc = $this->doc(['type' => 'internalNote', 'content' => [$this->text('secret')]]);
+        $this->assertSame('', ArticleBodyRenderer::render($doc, 'public'));
+    }
+
+    #[Test]
+    public function it_renders_an_internal_note_in_preview_mode_with_the_rest_of_the_document_unchanged(): void
+    {
+        $doc = $this->doc(
+            ['type' => 'paragraph', 'content' => [$this->text('before')]],
+            ['type' => 'internalNote', 'content' => [$this->text('confirm the spelling before this runs')]],
+            ['type' => 'paragraph', 'content' => [$this->text('after')]],
+        );
+        $this->assertSame(
+            '<p>before</p><aside class="internal-note" data-internal-note="true">confirm the spelling before this runs</aside><p>after</p>',
+            ArticleBodyRenderer::render($doc, 'preview'),
+        );
+    }
+
+    #[Test]
+    public function it_escapes_and_marks_internal_note_text_the_same_way_as_any_other_text(): void
+    {
+        $doc = $this->doc([
+            'type' => 'internalNote',
+            'content' => [$this->text('<b>'), $this->text('bold', [['type' => 'bold']])],
+        ]);
+        $this->assertSame(
+            '<aside class="internal-note" data-internal-note="true">&lt;b&gt;<strong>bold</strong></aside>',
+            ArticleBodyRenderer::render($doc, 'preview'),
+        );
+    }
+
+    #[Test]
+    public function it_never_leaks_internal_note_text_into_a_surrounding_block_in_either_mode(): void
+    {
+        $doc = $this->doc([
+            'type' => 'blockquote',
+            'content' => [['type' => 'internalNote', 'content' => [$this->text('secret')]]],
+        ]);
+        $this->assertSame('<blockquote></blockquote>', ArticleBodyRenderer::render($doc));
+        $this->assertSame(
+            '<blockquote><aside class="internal-note" data-internal-note="true">secret</aside></blockquote>',
+            ArticleBodyRenderer::render($doc, 'preview'),
+        );
+    }
+
+    #[Test]
     public function it_omits_an_unrecognized_node_type_entirely(): void
     {
         $doc = $this->doc(
