@@ -17,17 +17,19 @@ storage, so "exactly one" is structural rather than a convention.
 ## What Changes
 
 - A new `hyperlocal-spotlight` capability: one global slot holding zero or one article. The slot
-  is stored separately from `articles`, so holding two spotlighted articles is impossible by the
-  data model rather than by validation.
+  is a single permanent row stored separately from `articles`, with a nullable `article_id`, so
+  holding two spotlighted articles is impossible by the data model rather than by validation.
+  Every spotlight write is a plain `UPDATE` of that one row — set the id to pick, set `NULL` to
+  release.
 - The article create and edit forms gain a **"Spotlight as hyperlocal story"** checkbox. Checking
   it and saving puts that article in the slot; unchecking it and saving empties the slot.
 - Checking the box on one article **releases it from whichever article held it before** — the
   previous holder is not deleted, unpublished, or otherwise altered, it simply stops being
   spotlighted. The editor shows which article currently holds the spotlight before the save, so
   taking it is never a surprise.
-- **The spotlight is never blank.** With no explicit pick — never set, unchecked, deleted, or
-  holding an article that is not publicly visible — the section falls back to the newest published
-  article, resolved at read time from the same newest-first ordering the home feed's chronological
+- **The spotlight is never blank.** Whenever `article_id` is `NULL` — never set, unchecked, or
+  nulled by the picked article's deletion — or the picked article is not publicly visible, the
+  section falls back immediately, on the very next read, to the newest published article, resolved at read time from the same newest-first ordering the home feed's chronological
   backfill already uses. The fallback is not stored, so it stays current as articles publish
   instead of freezing whichever article was newest at the moment of the uncheck.
 - Unchecking the box on the article holding the spotlight therefore hands the spotlight to the
@@ -73,5 +75,6 @@ storage, so "exactly one" is structural rather than a convention.
   `apps/web/src/components/home/HyperlocalSpotlight.tsx` (new),
   `apps/web/src/pages/HomePage.tsx`, `apps/web/src/lib/api.ts`
 - **Migration**: additive — one new `hyperlocal_spotlight` table with a single-value primary key
-  and an `ON DELETE CASCADE` article reference. No backfill, no existing table touched, no data
-  loss. Follows the applied migration path in `apps/api-laravel/database/migrations/`.
+  and a nullable `ON DELETE SET NULL` article reference, seeded with its one row holding `NULL`.
+  No backfill, no existing table touched, no data loss. Follows the applied migration path in
+  `apps/api-laravel/database/migrations/`.

@@ -1,16 +1,19 @@
 ## 1. Data model
 
 - [ ] 1.1 Add `packages/db/src/schema/hyperlocalSpotlight.ts`: table `hyperlocal_spotlight` with
-      `slot` (single-permitted-value primary key, so a second row is impossible), `article_id`
-      (`char(36)`, `references(() => articles.id, { onDelete: 'cascade' })`), `updated_by`
-      (`references(() => users.id)`), `updated_at`. Document in the file header why this is a
-      separate singleton table and not an `articles` boolean, the way `homeCuration.ts` documents
-      its primary-key choice.
+      `slot` (single-permitted-value primary key, so a second row is impossible), **nullable**
+      `article_id` (`char(36)`, `references(() => articles.id, { onDelete: 'set null' })`),
+      nullable `updated_by` (`references(() => users.id)`), `updated_at`. Document in the file
+      header (a) why this is a separate singleton table and not an `articles` boolean, and (b) why
+      the FK is `SET NULL` and not `CASCADE` as `homeCuration.ts` uses — the row is the slot, not
+      the pick, so it must outlive any article.
 - [ ] 1.2 Export it from `packages/db/src/schema/index.ts`
 - [ ] 1.3 Add the migration under `apps/api-laravel/database/migrations/` (the applied path — see
       `add-guide-pick-instagram-link/tasks.md` 1.2 on the stale drizzle migrations), following the
       existing create-table migrations' conventions
-- [ ] 1.4 Confirm no column is added to `articles`
+- [ ] 1.4 Seed the one row in that same migration (`slot = 'default'`, `article_id = NULL`), so no
+      code path ever has to create it
+- [ ] 1.5 Confirm no column is added to `articles`
 
 ## 2. Contracts
 
@@ -31,17 +34,21 @@
 ## 3. API — spotlight storage and reads
 
 - [ ] 3.1 Add `apps/api/src/modules/hyperlocalSpotlight/hyperlocalSpotlight.repository.ts`:
-      `get()` (join to article for status/publishedAt), `set(articleId, userId, tx)` and
-      `clearIfHeldBy(articleId, tx)`, all accepting the caller's transaction
+      `get()` (left join to article for status/publishedAt) and `set(articleId | null, userId, tx)`
+      — one `UPDATE` of the single row, no upsert and no delete path. Add
+      `clearIfHeldBy(articleId, tx)` as the same `UPDATE` guarded by `WHERE article_id = ?`. Both
+      accept the caller's transaction. `get()` treats a missing row exactly as a null reference
+      rather than throwing, so a database restored without the seed degrades to the fallback.
 - [ ] 3.2 Add `hyperlocalSpotlight.service.ts` + `hyperlocalSpotlight.mapper.ts` +
       `hyperlocalSpotlight.controller.ts` for the two reads. Resolution order: editor pick when
       stored *and* publicly visible, else the newest published article via the existing
       `articleRepository.listPublished({ limit: 1 })` — the same newest-first, same-visibility
       query the home feed backfills with. Decide visibility with `isPubliclyVisible` from
       `article.repository.ts` — no second visibility rule, no second definition of "newest".
-- [ ] 3.2a Never write the fallback into the slot — it is resolved per read, so a newly published
-      article takes over with no write. Both read shapes carry `isEditorPick` so admin and web can
-      tell a chosen pick from an automatic one.
+- [ ] 3.2a Never write the fallback into the slot — a null `article_id` resolves to the newest
+      article on the very next read, so a newly published article takes over with no write. Both
+      read shapes carry `isEditorPick` so admin and web can tell a chosen pick from an automatic
+      one.
 - [ ] 3.3 Add `hyperlocalSpotlight.routes.ts`: admin `GET /admin/hyperlocal-spotlight` behind
       `requirePermission('news.manage')`, public `GET /home/hyperlocal-spotlight` behind
       `requirePublic()` + `publicReadRateLimiter`, mirroring `curation.routes.ts`. No write route.
@@ -51,8 +58,8 @@
 
 - [ ] 4.1 In `article.service.ts`, handle `isHyperlocalSpotlight` on create and update inside the
       existing article transaction: `true` → `set()` (which replaces the previous pick),
-      `false` → `clearIfHeldBy(thisArticle)` (the spotlight then resolves by fallback — no
-      compensating write), omitted → no spotlight write at all
+      `false` → `clearIfHeldBy(thisArticle)`, which nulls the reference and lets the fallback take
+      over on the next read — no compensating write; omitted → no spotlight write at all
 - [ ] 4.2 On create, order the slot write after the article insert within the same transaction
 - [ ] 4.3 Include the flag in the admin article read/mapper (`article.mapper.ts`), resolved from
       the slot, not from an article column
@@ -73,8 +80,10 @@
 - [ ] 5.5 Status behavior: a draft/scheduled pick is held while the public read shows the fallback,
       the pick takes over at its scheduled time, unpublishing returns the public spotlight to the
       fallback without releasing the pick
-- [ ] 5.6 Article hard-delete releases the pick and the spotlight continues on the newest article;
-      concurrent spotlight saves both succeed
+- [ ] 5.6 Article hard-delete nulls the reference (the slot row survives — assert it still exists)
+      and the spotlight continues on the newest article; concurrent spotlight saves both succeed
+- [ ] 5.6a Set → release → set again touches the same row throughout, and a read with the row
+      missing entirely resolves to the fallback instead of erroring
 - [ ] 5.7 Curated-list independence both ways, including both holding the same article
 
 ## 6. Admin UI

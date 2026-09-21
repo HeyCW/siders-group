@@ -2,18 +2,25 @@
 
 ### Requirement: The spotlight holds at most one editor pick
 The system SHALL maintain exactly one hyperlocal spotlight slot, applying to the public home page
-only. The slot SHALL hold either no editor pick or exactly one. It SHALL be structurally
-impossible for the slot to hold two articles at once, rather than prevented by validation alone.
-The slot SHALL NOT store an order, a position, a layout role, or any locality value.
+only. The slot SHALL be a single persistent record whose article reference is either empty or
+exactly one article. It SHALL be structurally impossible for the slot to reference two articles at
+once, rather than prevented by validation alone. The slot SHALL NOT store an order, a position, a
+layout role, or any locality value.
 
 #### Scenario: Two articles cannot occupy the slot
 - **WHEN** the spotlight storage is inspected after any sequence of writes
-- **THEN** it holds at most one article, and no write path exists by which a second could be added
-  alongside the first
+- **THEN** it references at most one article, and no write path exists by which a second could be
+  added alongside the first
 
-#### Scenario: An unset slot is a valid state
+#### Scenario: The slot record persists across releases
+- **WHEN** the editor pick is set, released, and set again
+- **THEN** the same single slot record is updated each time, and no slot record is created or
+  destroyed by any of those writes
+
+#### Scenario: An empty reference is a valid state
 - **WHEN** no article has ever been spotlighted, or the editor pick has been released
-- **THEN** reads succeed and resolve the spotlight by the fallback rule, and no error is raised
+- **THEN** the slot's article reference is empty, reads succeed and resolve the spotlight by the
+  fallback rule, and no error is raised
 
 #### Scenario: No locality is stored
 - **WHEN** the spotlight is read
@@ -37,7 +44,13 @@ public article read, with no second definition of either.
 
 #### Scenario: The fallback is not persisted
 - **WHEN** the spotlight storage is inspected while the spotlight is resolving by fallback
-- **THEN** the slot holds no article, so a fallback pick is never mistaken for an editor pick
+- **THEN** the slot's article reference is empty, so a fallback pick is never mistaken for an
+  editor pick
+
+#### Scenario: An empty reference falls back on the very next read
+- **WHEN** the editor pick is released
+- **THEN** the next read already resolves to the newest published article, with no intervening
+  write, job, or cache invalidation
 
 #### Scenario: An editor pick outranks the newest article
 - **WHEN** the slot holds a publicly visible editor pick and a different article is the most
@@ -113,8 +126,8 @@ state, curated-list membership, and content SHALL be unchanged.
   neither request is rejected because of the other
 
 ### Requirement: Releasing the spotlight hands it to the newest article
-Saving the editor pick with the flag unset SHALL remove the editor pick, after which the spotlight
-SHALL resolve to the most recently published publicly visible article. Releasing the pick SHALL
+Saving the editor pick with the flag unset SHALL empty the slot's article reference, after which
+the spotlight SHALL resolve to the most recently published publicly visible article. Releasing the pick SHALL
 NOT leave the section blank while any publicly visible article exists, and SHALL NOT write the
 fallback article into the slot. Saving an article that is not the editor pick with the flag unset
 SHALL leave the slot unchanged and SHALL NOT be treated as an error.
@@ -298,13 +311,14 @@ appears in the other.
 - **THEN** both reads return it, and neither suppresses it because of the other
 
 ### Requirement: Deleting the editor pick hands the spotlight to the newest article
-When the editor pick is hard-deleted, the slot SHALL be left holding no pick rather than a
-reference to a deleted article, and the spotlight SHALL resolve by the fallback rule afterwards.
-The deletion SHALL NOT be blocked by the article being spotlighted.
+When the editor pick is hard-deleted, the slot record SHALL survive with an empty article
+reference rather than being destroyed or left referencing a deleted article, and the spotlight
+SHALL resolve by the fallback rule afterwards. The deletion SHALL NOT be blocked by the article
+being spotlighted.
 
-#### Scenario: Deletion releases the pick
+#### Scenario: Deletion empties the reference without destroying the slot
 - **WHEN** the editor pick is hard-deleted
-- **THEN** the deletion succeeds and no editor pick is stored afterwards
+- **THEN** the deletion succeeds, the slot record still exists, and its article reference is empty
 
 #### Scenario: The spotlight continues on the newest article
 - **WHEN** the spotlight is read after the editor pick was deleted

@@ -45,8 +45,8 @@ previous holder — and a single missed path (an import, a backfill, a future bu
 breaks the invariant with no error.
 
 Instead, `hyperlocal_spotlight` is its own table with a `slot` primary key whose only permitted
-value is the constant `'default'`, alongside `article_id`, `updated_at`, and `updated_by`. A second
-row is rejected by the primary key. The checkbox in the editor reads and writes *that* slot; the
+value is the constant `'default'`, alongside a **nullable** `article_id`, `updated_at`, and
+`updated_by`. A second row is rejected by the primary key. The checkbox in the editor reads and writes *that* slot; the
 article row itself is unchanged. This is the same reasoning that made `article_id` the primary key
 of `home_curation` so a duplicate pick is "structurally impossible instead of merely validated."
 
@@ -60,11 +60,26 @@ layer knows it writes a different table.
 standalone `PUT /admin/hyperlocal-spotlight` as the primary write (a second write surface for one
 decision, and not what the editor asked for).
 
+### Exactly one row, forever; `article_id NULL` means "newest article"
+
+The row is created once by the migration and never inserted or deleted again. Every spotlight
+write is a plain `UPDATE` of that single row: set `article_id` to an article id to pick, set it to
+`NULL` to release. There is no upsert, no insert-or-update branch, no delete path — "is there a row
+yet?" is never a question any code has to answer, and the invariant "at most one spotlight" holds
+by the table's shape rather than by any write being careful.
+
+`NULL` is the release state and resolves to the fallback on the very next read, with nothing else
+to clean up.
+
+(If the row is somehow absent — a database restored without the seed — reads treat that exactly as
+`NULL` rather than erroring, so a missing seed degrades to the fallback instead of breaking the
+home page.)
+
 ### An unset slot means "newest article", resolved at read time
 
-The spotlight has two layers: an optional explicit pick (the slot row) and an automatic fallback
-(the newest publicly visible article). A read resolves the explicit pick when there is one and it
-is publicly visible; otherwise it resolves the fallback. The section is blank only when the site
+The spotlight has two layers: an optional explicit pick (`article_id` on the slot row) and an
+automatic fallback (the newest publicly visible article). A read resolves the explicit pick when `article_id` is
+non-null and that article is publicly visible; otherwise it resolves the fallback. The section is blank only when the site
 has no publicly visible article at all.
 
 The fallback is **computed on read, never written into the slot**. Writing "the newest article at
@@ -92,8 +107,8 @@ touched in any other way — not unpublished, not removed from `home_curation`, 
 this silently demotes another article, the editor shows the current holder next to the checkbox
 before the save, so taking the spotlight is a visible choice rather than a discovery.
 
-Unchecking the box on the article that currently holds the slot removes the explicit pick, and the
-spotlight falls back to the newest published article. Unchecking on an article that does not hold
+Unchecking the box on the article that currently holds the slot sets `article_id` to `NULL`, and
+the spotlight falls back to the newest published article on the next read. Unchecking on an article that does not hold
 it is a no-op, not an error — otherwise every ordinary save of every other article would fail.
 
 ### One transaction with the article save
@@ -119,13 +134,15 @@ limit/backfill arithmetic answer two questions at once, and would force every fe
 care about a section it may not render. The cost is one extra request from the home page, paid in
 parallel with the guide-pick and partner reads it already issues.
 
-### Article deletion clears the pick
+### Article deletion nulls the pick — `SET NULL`, not `CASCADE`
 
-`article_id` references `articles.id` with `ON DELETE CASCADE`, for the same reason `home_curation`
-uses it: articles are hard-deleted in this system, so without a cascade the slot would point at
-nothing. An unset slot is a valid state that resolves to the fallback, so the cascade needs no
-compensating write — deleting the spotlighted article hands the spotlight to the newest published
-article on the next read.
+`article_id` references `articles.id` with `ON DELETE SET NULL`. This is where the singleton row
+and `home_curation` deliberately part ways: `home_curation` is a join table whose rows *are* the
+picks, so `ON DELETE CASCADE` correctly removes one. Here the row is the slot itself and must
+outlive any article, so a cascade would be wrong — it would delete the slot row, reintroducing the
+"does the row exist?" question this design just removed. `SET NULL` leaves the row in place holding
+`NULL`, which is already the release state, so hard-deleting the spotlighted article hands the
+spotlight to the newest published article on the next read with no compensating write.
 
 ### Independence from the curated feed is deliberate
 
