@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Editor, Range } from '@tiptap/core';
-import type { AnakUsahaResponse, ArticleAdminResponse, ArticlePublicDetail, CategoryResponse } from '@siders/contracts';
+import type {
+  AnakUsahaResponse,
+  ArticleAdminResponse,
+  ArticlePublicDetail,
+  CategoryResponse,
+  HyperlocalSpotlightResponse,
+} from '@siders/contracts';
 import { articlesApi } from '../lib/articlesApi.js';
+import { hyperlocalSpotlightApi } from '../lib/hyperlocalSpotlightApi.js';
 import { anakUsahaApi, categoriesApi } from '../lib/taxonomyApi.js';
 import { mediaApi } from '../lib/mediaApi.js';
 import { ApiError } from '../lib/api.js';
@@ -83,6 +90,25 @@ export function ArticleEditPage() {
   const [scheduleAt, setScheduleAt] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // What the hyperlocal spotlight currently shows, independent of whether *this* article holds
+  // it — used only to name what checking the box below would displace
+  // (specs/hyperlocal-spotlight/spec.md - "The editor reports what the spotlight currently
+  // shows"). `article.isHyperlocalSpotlight` is this article's own state; this is everyone
+  // else's.
+  const [spotlight, setSpotlight] = useState<HyperlocalSpotlightResponse | null>(null);
+  const [spotlightSaving, setSpotlightSaving] = useState(false);
+  const [spotlightError, setSpotlightError] = useState<string | null>(null);
+
+  function refreshSpotlight() {
+    hyperlocalSpotlightApi
+      .get()
+      .then(setSpotlight)
+      .catch(() => {
+        /* the checkbox still works from `article.isHyperlocalSpotlight` alone; only the
+           "currently shown" caption is lost */
+      });
+  }
+
   useEffect(() => {
     if (!id) return;
     articlesApi
@@ -99,7 +125,30 @@ export function ArticleEditPage() {
         setAnakUsahaOptions(a);
       })
       .catch((err: unknown) => setTaxonomyError(errorMessage(err, 'Could not load categories')));
+    refreshSpotlight();
   }, [id]);
+
+  /**
+   * An explicit, immediate save — never routed through `patchForm`/the debounced autosave, the
+   * same way `commitSlug` below saves the slug outside autosave. A spotlight move is an
+   * editorial decision, not a byproduct of typing
+   * (specs/hyperlocal-spotlight/spec.md - "Autosave never changes the spotlight"; design.md -
+   * "Autosave cannot touch the spotlight").
+   */
+  async function handleSpotlightToggle(checked: boolean) {
+    if (!id) return;
+    setSpotlightSaving(true);
+    setSpotlightError(null);
+    try {
+      const updated = await articlesApi.update(id, { isHyperlocalSpotlight: checked });
+      setArticle(updated);
+      refreshSpotlight();
+    } catch (err) {
+      setSpotlightError(errorMessage(err, 'Could not update the spotlight'));
+    } finally {
+      setSpotlightSaving(false);
+    }
+  }
 
   const debouncedSave = useDebouncedCallback(async () => {
     if (!id || !formRef.current) return;
@@ -416,6 +465,29 @@ export function ArticleEditPage() {
               <label className={FIELD_LABEL}>SEO keywords</label>
               <input value={form.keywords} onChange={(e) => patchForm({ keywords: e.target.value })} className={FIELD_INPUT} />
               <p className="mt-1 text-xs text-[var(--muted)]">Comma-separated, e.g. jakarta, kuliner, umkm</p>
+            </div>
+
+            <div className="border-t border-[var(--rule)] pt-4">
+              <label className={FIELD_LABEL}>Hyperlocal spotlight</label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={article.isHyperlocalSpotlight}
+                  disabled={spotlightSaving}
+                  onChange={(e) => void handleSpotlightToggle(e.target.checked)}
+                />
+                Spotlight as hyperlocal story
+              </label>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {article.isHyperlocalSpotlight
+                  ? 'This article is the spotlight. Unchecking returns it to the newest published article.'
+                  : spotlight?.editorPick
+                    ? `Currently: "${spotlight.editorPick.article.title}" (editor pick) — checking this takes it.`
+                    : spotlight?.resolved
+                      ? `Currently: "${spotlight.resolved.title}" — automatic, newest article.`
+                      : 'Currently: none.'}
+              </p>
+              {spotlightError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{spotlightError}</p>}
             </div>
 
             <div className="border-t border-[var(--rule)] pt-4">

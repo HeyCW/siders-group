@@ -24,6 +24,15 @@ export declare const articleWriteFieldsSchema: z.ZodObject<{
     seoTitle: z.ZodOptional<z.ZodString>;
     seoDescription: z.ZodOptional<z.ZodString>;
     keywords: z.ZodOptional<z.ZodString>;
+    /**
+     * Settable on create and update only — never on autosave, which has its own separate,
+     * narrower schema below that has no field of this name at all
+     * (specs/hyperlocal-spotlight/spec.md - "Autosave never changes the spotlight"). `true` makes
+     * this article the hyperlocal spotlight's editor pick, releasing whichever article held it
+     * before; `false` releases it if this article currently holds it and is a no-op otherwise;
+     * omitted leaves the spotlight untouched.
+     */
+    isHyperlocalSpotlight: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
     title: string;
     slug?: string | undefined;
@@ -35,6 +44,7 @@ export declare const articleWriteFieldsSchema: z.ZodObject<{
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
     keywords?: string | undefined;
+    isHyperlocalSpotlight?: boolean | undefined;
 }, {
     title: string;
     slug?: string | undefined;
@@ -46,6 +56,7 @@ export declare const articleWriteFieldsSchema: z.ZodObject<{
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
     keywords?: string | undefined;
+    isHyperlocalSpotlight?: boolean | undefined;
 }>;
 export declare const articleCreateRequestSchema: z.ZodObject<{
     title: z.ZodString;
@@ -58,6 +69,15 @@ export declare const articleCreateRequestSchema: z.ZodObject<{
     seoTitle: z.ZodOptional<z.ZodString>;
     seoDescription: z.ZodOptional<z.ZodString>;
     keywords: z.ZodOptional<z.ZodString>;
+    /**
+     * Settable on create and update only — never on autosave, which has its own separate,
+     * narrower schema below that has no field of this name at all
+     * (specs/hyperlocal-spotlight/spec.md - "Autosave never changes the spotlight"). `true` makes
+     * this article the hyperlocal spotlight's editor pick, releasing whichever article held it
+     * before; `false` releases it if this article currently holds it and is a no-op otherwise;
+     * omitted leaves the spotlight untouched.
+     */
+    isHyperlocalSpotlight: z.ZodOptional<z.ZodBoolean>;
 }, "strict", z.ZodTypeAny, {
     title: string;
     slug?: string | undefined;
@@ -69,6 +89,7 @@ export declare const articleCreateRequestSchema: z.ZodObject<{
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
     keywords?: string | undefined;
+    isHyperlocalSpotlight?: boolean | undefined;
 }, {
     title: string;
     slug?: string | undefined;
@@ -80,6 +101,7 @@ export declare const articleCreateRequestSchema: z.ZodObject<{
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
     keywords?: string | undefined;
+    isHyperlocalSpotlight?: boolean | undefined;
 }>;
 export type ArticleCreateRequest = z.infer<typeof articleCreateRequestSchema>;
 export declare const articleUpdateRequestSchema: z.ZodObject<{
@@ -93,6 +115,7 @@ export declare const articleUpdateRequestSchema: z.ZodObject<{
     seoTitle: z.ZodOptional<z.ZodOptional<z.ZodString>>;
     seoDescription: z.ZodOptional<z.ZodOptional<z.ZodString>>;
     keywords: z.ZodOptional<z.ZodOptional<z.ZodString>>;
+    isHyperlocalSpotlight: z.ZodOptional<z.ZodOptional<z.ZodBoolean>>;
 }, "strict", z.ZodTypeAny, {
     slug?: string | undefined;
     title?: string | undefined;
@@ -104,6 +127,7 @@ export declare const articleUpdateRequestSchema: z.ZodObject<{
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
     keywords?: string | undefined;
+    isHyperlocalSpotlight?: boolean | undefined;
 }, {
     slug?: string | undefined;
     title?: string | undefined;
@@ -115,6 +139,7 @@ export declare const articleUpdateRequestSchema: z.ZodObject<{
     seoTitle?: string | undefined;
     seoDescription?: string | undefined;
     keywords?: string | undefined;
+    isHyperlocalSpotlight?: boolean | undefined;
 }>;
 export type ArticleUpdateRequest = z.infer<typeof articleUpdateRequestSchema>;
 /**
@@ -405,6 +430,13 @@ export declare const articleAdminResponseSchema: z.ZodObject<{
     publishedAt: z.ZodNullable<z.ZodString>;
     createdAt: z.ZodString;
     updatedAt: z.ZodString;
+    /**
+     * Whether this article is currently the hyperlocal spotlight's stored editor pick. `false`
+     * both when no article holds it and when a *different* article does — it reflects only this
+     * article's own state, never the automatic newest-article fallback
+     * (specs/hyperlocal-spotlight/spec.md - "The flag reflects only an editor pick").
+     */
+    isHyperlocalSpotlight: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
     status: "draft" | "scheduled" | "published";
     id: string;
@@ -417,6 +449,7 @@ export declare const articleAdminResponseSchema: z.ZodObject<{
     seoTitle: string | null;
     seoDescription: string | null;
     keywords: string | null;
+    isHyperlocalSpotlight: boolean;
     publishedAt: string | null;
     featuredImageUrl: string | null;
     categories: {
@@ -445,6 +478,7 @@ export declare const articleAdminResponseSchema: z.ZodObject<{
     seoTitle: string | null;
     seoDescription: string | null;
     keywords: string | null;
+    isHyperlocalSpotlight: boolean;
     publishedAt: string | null;
     featuredImageUrl: string | null;
     categories: {

@@ -13,6 +13,8 @@ import type { ArticleStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { stripUndefined } from '../../lib/stripUndefined.js';
 import { isForeignKeyViolation, isUniqueViolationOn, violatedConstraint } from '../../lib/dbErrors.js';
+import { createHyperlocalSpotlightRepository } from '../hyperlocalSpotlight/hyperlocalSpotlight.repository.js';
+import type { OrderingExecutor } from '../../lib/replaceOrdering.js';
 
 export interface ArticleRow {
   id: string;
@@ -57,6 +59,10 @@ export interface CreateArticleInput {
   seoTitle: string | null;
   seoDescription: string | null;
   categoryIds: string[];
+  /** `true` sets this article as the hyperlocal spotlight's editor pick, `false` is a no-op (a
+   *  just-created article can never already hold it), `undefined` touches nothing
+   *  (specs/hyperlocal-spotlight/spec.md - "Spotlight set at creation"). */
+  isHyperlocalSpotlight?: boolean | undefined;
 }
 
 export interface UpdateArticleInput {
@@ -70,6 +76,12 @@ export interface UpdateArticleInput {
   seoTitle?: string | null | undefined;
   seoDescription?: string | null | undefined;
   categoryIds?: string[] | undefined;
+  /** `true` makes this article the hyperlocal spotlight's editor pick, releasing whichever
+   *  article held it before; `false` releases it only if this article currently holds it;
+   *  `undefined` leaves the spotlight untouched
+   *  (specs/hyperlocal-spotlight/spec.md - "Spotlighting one article releases the previous
+   *  pick", "Releasing the spotlight hands it to the newest article"). */
+  isHyperlocalSpotlight?: boolean | undefined;
 }
 
 export interface PublicListFilter {
@@ -256,6 +268,27 @@ async function attachRelations(db: Database, rows: ArticleRow[]): Promise<Articl
 }
 
 export function createArticleRepository(db: Database): ArticleRepository {
+  // Composed internally rather than injected, so every existing call site
+  // (`article.routes.ts`, `curation.routes.ts`, `server.ts`'s scheduler) keeps working
+  // unchanged — the atomicity this exists for is an implementation detail of `create`/`update`
+  // below, not something their callers need to know about.
+  const spotlightRepository = createHyperlocalSpotlightRepository(db);
+
+  async function writeSpotlight(
+    tx: OrderingExecutor,
+    articleId: string,
+    isHyperlocalSpotlight: boolean | undefined,
+  ): Promise<void> {
+    if (isHyperlocalSpotlight === true) {
+      await spotlightRepository.set(tx, articleId);
+    } else if (isHyperlocalSpotlight === false) {
+      await spotlightRepository.clearIfHeldBy(tx, articleId);
+    }
+    // undefined: the spotlight is untouched — no write at all
+    // (specs/hyperlocal-spotlight/spec.md - "Saving an article without the flag changes
+    // nothing").
+  }
+
   async function findRowById(id: string): Promise<ArticleRow | null> {
     const [row] = await db.select().from(articles).where(eq(articles.id, id)).limit(1);
     return row ?? null;
@@ -280,6 +313,11 @@ export function createArticleRepository(db: Database): ArticleRepository {
             seoDescription: input.seoDescription,
           });
           await replaceTaxonomy(tx, newRowId, { categoryIds: input.categoryIds });
+          // After the insert, within the same transaction — the article has to exist for the
+          // spotlight's foreign key before it can be pointed at
+          // (specs/hyperlocal-spotlight/spec.md - "The spotlight write is atomic with the
+          // article save").
+          await writeSpotlight(tx, newRowId, input.isHyperlocalSpotlight);
           return newRowId;
         });
         const row = await findRowById(id);
@@ -297,7 +335,10 @@ export function createArticleRepository(db: Database): ArticleRepository {
     async update(id, input) {
       try {
         await db.transaction(async (tx) => {
-          const { categoryIds, ...fields } = input;
+          // `isHyperlocalSpotlight` is pulled out here same as `categoryIds` — `articles` has no
+          // such column, it is written to `hyperlocal_spotlight` below within this same
+          // transaction, never through this `.set()` call.
+          const { categoryIds, isHyperlocalSpotlight, ...fields } = input;
           const definedFields = stripUndefined(fields);
           // Bumped even when `definedFields` is empty but the taxonomy assignment changed — a
           // category-only edit is still an edit, and the admin list orders by `updatedAt`
@@ -306,6 +347,7 @@ export function createArticleRepository(db: Database): ArticleRepository {
             await tx.update(articles).set({ ...definedFields, updatedAt: new Date() }).where(eq(articles.id, id));
           }
           await replaceTaxonomy(tx, id, { categoryIds });
+          await writeSpotlight(tx, id, isHyperlocalSpotlight);
         });
       } catch (err) {
         const translated = translateArticleWriteError(err);

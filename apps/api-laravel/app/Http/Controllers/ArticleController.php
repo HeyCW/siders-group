@@ -10,6 +10,7 @@ use App\Http\Requests\Article\StoreArticleRequest;
 use App\Http\Requests\Article\UpdateArticleRequest;
 use App\Models\Article;
 use App\Services\ArticleService;
+use App\Services\HyperlocalSpotlightService;
 use App\Support\ArticlePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,10 @@ use Illuminate\Support\Carbon;
 
 class ArticleController extends Controller
 {
-    public function __construct(private readonly ArticleService $articleService) {}
+    public function __construct(
+        private readonly ArticleService $articleService,
+        private readonly HyperlocalSpotlightService $spotlightService,
+    ) {}
 
     // --- Admin ---
 
@@ -28,36 +32,41 @@ class ArticleController extends Controller
             ->orderByDesc('created_at')
             ->paginate((int) $request->query('perPage', 20));
 
+        // One lookup for the whole page, not one per article.
+        $spotlightId = $this->spotlightService->getPickArticleId();
+
         return response()->json([
-            'data' => collect($articles->items())->map(fn (Article $a) => ArticlePresenter::admin($a)),
+            'data' => collect($articles->items())->map(
+                fn (Article $a) => ArticlePresenter::admin($a, $a->id === $spotlightId)
+            ),
             'meta' => ['total' => $articles->total(), 'page' => $articles->currentPage(), 'limit' => $articles->perPage()],
         ]);
     }
 
     public function adminShow(string $id): JsonResponse
     {
-        return response()->json(['data' => ArticlePresenter::admin(Article::findOrFail($id))]);
+        return response()->json(['data' => $this->presentAdmin(Article::findOrFail($id))]);
     }
 
     public function store(StoreArticleRequest $request): JsonResponse
     {
         $article = $this->articleService->create($request->validated(), $request->user('staff')->id);
 
-        return response()->json(['data' => ArticlePresenter::admin($article)], 201);
+        return response()->json(['data' => $this->presentAdmin($article)], 201);
     }
 
     public function update(UpdateArticleRequest $request, string $id): JsonResponse
     {
         $article = $this->articleService->update(Article::findOrFail($id), $request->validated());
 
-        return response()->json(['data' => ArticlePresenter::admin($article)]);
+        return response()->json(['data' => $this->presentAdmin($article)]);
     }
 
     public function autosave(AutosaveArticleRequest $request, string $id): JsonResponse
     {
         $article = $this->articleService->autosave(Article::findOrFail($id), $request->validated());
 
-        return response()->json(['data' => ArticlePresenter::admin($article)]);
+        return response()->json(['data' => $this->presentAdmin($article)]);
     }
 
     public function destroy(string $id): JsonResponse
@@ -69,19 +78,26 @@ class ArticleController extends Controller
 
     public function publish(string $id): JsonResponse
     {
-        return response()->json(['data' => ArticlePresenter::admin($this->articleService->publish(Article::findOrFail($id)))]);
+        return response()->json(['data' => $this->presentAdmin($this->articleService->publish(Article::findOrFail($id)))]);
     }
 
     public function unpublish(string $id): JsonResponse
     {
-        return response()->json(['data' => ArticlePresenter::admin($this->articleService->unpublish(Article::findOrFail($id)))]);
+        return response()->json(['data' => $this->presentAdmin($this->articleService->unpublish(Article::findOrFail($id)))]);
     }
 
     public function schedule(ScheduleArticleRequest $request, string $id): JsonResponse
     {
         $article = $this->articleService->schedule(Article::findOrFail($id), Carbon::parse($request->input('publishAt')));
 
-        return response()->json(['data' => ArticlePresenter::admin($article)]);
+        return response()->json(['data' => $this->presentAdmin($article)]);
+    }
+
+    /** `isHyperlocalSpotlight` is resolved fresh on every call — cheap (a single-row lookup) and
+     *  correct even right after a write that just moved it. */
+    private function presentAdmin(Article $article): array
+    {
+        return ArticlePresenter::admin($article, $article->id === $this->spotlightService->getPickArticleId());
     }
 
     /** Renders the same public shape a reader would see, regardless of the article's current

@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const revalidateArticlePathsMock = vi.fn().mockResolvedValue(undefined);
+const revalidateHomePathMock = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../lib/revalidate.js', () => ({
   revalidateArticlePaths: (...args: unknown[]) => revalidateArticlePathsMock(...args),
+  revalidateHomePath: (...args: unknown[]) => revalidateHomePathMock(...args),
 }));
 
 import { createArticleService } from './article.service.js';
@@ -38,6 +40,9 @@ function baseRow(overrides: Partial<ArticleWithRelations> = {}): ArticleWithRela
 function createFakeArticleRepository() {
   const rows = new Map<string, ArticleWithRelations>();
   const slugs = new Set<string>();
+  /** Mirrors `hyperlocal_spotlight`'s single nullable slot — a fake standing in for both the
+   *  repository's internal spotlight writes and, indirectly, `HyperlocalSpotlightRepository`. */
+  let spotlightArticleId: string | null = null;
 
   const repository: ArticleRepository = {
     async create(input: CreateArticleInput) {
@@ -55,6 +60,8 @@ function createFakeArticleRepository() {
       });
       rows.set(row.id, row);
       slugs.add(row.slug);
+      if (input.isHyperlocalSpotlight === true) spotlightArticleId = row.id;
+      else if (input.isHyperlocalSpotlight === false && spotlightArticleId === row.id) spotlightArticleId = null;
       return row;
     },
     async update(id: string, input: UpdateArticleInput) {
@@ -75,6 +82,8 @@ function createFakeArticleRepository() {
         updatedAt: new Date(),
       };
       rows.set(id, updated);
+      if (input.isHyperlocalSpotlight === true) spotlightArticleId = id;
+      else if (input.isHyperlocalSpotlight === false && spotlightArticleId === id) spotlightArticleId = null;
       return updated;
     },
     async updateStatus(id: string, status, publishedAt) {
@@ -122,7 +131,7 @@ function createFakeArticleRepository() {
     },
   };
 
-  return { repository, rows };
+  return { repository, rows, getSpotlightArticleId: () => spotlightArticleId };
 }
 
 const revalidateEnv = { DEPLOY_TRIGGER_URL: 'https://ci.example.com/dispatch', DEPLOY_TRIGGER_TOKEN: 'x'.repeat(16) };
@@ -131,6 +140,7 @@ const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never;
 describe('ArticleService', () => {
   beforeEach(() => {
     revalidateArticlePathsMock.mockClear();
+    revalidateHomePathMock.mockClear();
   });
 
   describe('slug generation', () => {
@@ -396,6 +406,107 @@ describe('ArticleService', () => {
       await service.update(created.id, { title: 'New Title' });
 
       expect(revalidateArticlePathsMock).toHaveBeenCalledWith(revalidateEnv, logger, 'stable');
+    });
+  });
+
+  describe('hyperlocal spotlight', () => {
+    it('sets the spotlight at creation when the flag is true', async () => {
+      const { repository, getSpotlightArticleId } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await service.create({ title: 'T', isHyperlocalSpotlight: true }, 'author-1');
+      expect(getSpotlightArticleId()).toBe(created.id);
+    });
+
+    it('leaves the spotlight untouched when the flag is omitted at creation', async () => {
+      const { repository, getSpotlightArticleId } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      await service.create({ title: 'Holder', isHyperlocalSpotlight: true }, 'author-1');
+      await service.create({ title: 'Other' }, 'author-1');
+      expect(getSpotlightArticleId()).not.toBeNull();
+    });
+
+    it('setting the spotlight on one article releases whichever article held it before', async () => {
+      const { repository, getSpotlightArticleId } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const a = await service.create({ title: 'A', isHyperlocalSpotlight: true }, 'author-1');
+      const b = await service.create({ title: 'B' }, 'author-1');
+      expect(getSpotlightArticleId()).toBe(a.id);
+
+      await service.update(b.id, { isHyperlocalSpotlight: true });
+
+      expect(getSpotlightArticleId()).toBe(b.id);
+    });
+
+    it('unsetting the flag on the current holder releases it', async () => {
+      const { repository, getSpotlightArticleId } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const a = await service.create({ title: 'A', isHyperlocalSpotlight: true }, 'author-1');
+
+      await service.update(a.id, { isHyperlocalSpotlight: false });
+
+      expect(getSpotlightArticleId()).toBeNull();
+    });
+
+    it('unsetting the flag on an article that is not the holder is a no-op', async () => {
+      const { repository, getSpotlightArticleId } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const a = await service.create({ title: 'A', isHyperlocalSpotlight: true }, 'author-1');
+      const b = await service.create({ title: 'B' }, 'author-1');
+
+      await service.update(b.id, { isHyperlocalSpotlight: false });
+
+      expect(getSpotlightArticleId()).toBe(a.id);
+    });
+
+    it('saving without the flag at all leaves the spotlight exactly as it was', async () => {
+      const { repository, getSpotlightArticleId } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const a = await service.create({ title: 'A', isHyperlocalSpotlight: true }, 'author-1');
+
+      await service.update(a.id, { title: 'A renamed' });
+
+      expect(getSpotlightArticleId()).toBe(a.id);
+    });
+
+    it('revalidates the homepage when the flag is set on create', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      await service.create({ title: 'T', isHyperlocalSpotlight: true }, 'author-1');
+      expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not revalidate the homepage when the flag is omitted', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      await service.create({ title: 'T' }, 'author-1');
+      expect(revalidateHomePathMock).not.toHaveBeenCalled();
+    });
+
+    it('revalidates the homepage when a draft article (otherwise invisible) is spotlighted', async () => {
+      const { repository } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const created = await service.create({ title: 'Draft T' }, 'author-1');
+      revalidateHomePathMock.mockClear();
+
+      await service.update(created.id, { isHyperlocalSpotlight: true });
+
+      expect(revalidateHomePathMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('autosave never touches the spotlight even when asked to', async () => {
+      const { repository, getSpotlightArticleId } = createFakeArticleRepository();
+      const service = createArticleService(repository, revalidateEnv, logger);
+      const a = await service.create({ title: 'A' }, 'author-1');
+      const b = await service.create({ title: 'B', isHyperlocalSpotlight: true }, 'author-1');
+      revalidateHomePathMock.mockClear();
+
+      // `ArticleAutosaveRequest` has no such field at the contract boundary, but this proves the
+      // service itself never reads it from an autosave call either — the same double-guarding
+      // `toRepositoryFields`'s doc comment describes for `slug`.
+      await service.autosave(a.id, { title: 'A edited', isHyperlocalSpotlight: true });
+
+      expect(getSpotlightArticleId()).toBe(b.id);
+      expect(revalidateHomePathMock).not.toHaveBeenCalled();
     });
   });
 });

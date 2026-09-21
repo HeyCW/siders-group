@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { ArticleAdminResponse, ArticlePublicDetail, CategoryResponse } from '@siders/contracts';
+import type {
+  ArticleAdminResponse,
+  ArticlePublicDetail,
+  CategoryResponse,
+  HyperlocalSpotlightResponse,
+} from '@siders/contracts';
 import { ArticleEditPage } from './ArticleEditPage.js';
 import { articlesApi } from '../lib/articlesApi.js';
+import { hyperlocalSpotlightApi } from '../lib/hyperlocalSpotlightApi.js';
 import { anakUsahaApi, categoriesApi } from '../lib/taxonomyApi.js';
 import { ApiError } from '../lib/api.js';
 
@@ -20,6 +26,9 @@ vi.mock('../lib/articlesApi.js', () => ({
     schedule: vi.fn(),
     preview: vi.fn(),
   },
+}));
+vi.mock('../lib/hyperlocalSpotlightApi.js', () => ({
+  hyperlocalSpotlightApi: { get: vi.fn() },
 }));
 vi.mock('../lib/taxonomyApi.js', () => ({
   categoriesApi: { list: vi.fn() },
@@ -59,6 +68,7 @@ function article(overrides: Partial<ArticleAdminResponse> & Pick<ArticleAdminRes
     publishedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
+    isHyperlocalSpotlight: false,
     ...overrides,
   };
 }
@@ -96,10 +106,15 @@ function renderAt(id: string) {
   );
 }
 
-async function renderPage(a: ArticleAdminResponse, categoryList: CategoryResponse[] = []) {
+async function renderPage(
+  a: ArticleAdminResponse,
+  categoryList: CategoryResponse[] = [],
+  spotlight: HyperlocalSpotlightResponse = { editorPick: null, resolved: null, resolvedIsEditorPick: false },
+) {
   vi.mocked(articlesApi.get).mockResolvedValue(a);
   vi.mocked(categoriesApi.list).mockResolvedValue(categoryList);
   vi.mocked(anakUsahaApi.list).mockResolvedValue([]);
+  vi.mocked(hyperlocalSpotlightApi.get).mockResolvedValue(spotlight);
   renderAt(a.id);
   await waitFor(() => expect(articlesApi.get).toHaveBeenCalledWith(a.id));
   await screen.findByDisplayValue(a.title);
@@ -336,5 +351,86 @@ describe('ArticleEditPage — categories', () => {
 
     expect(articlesApi.autosave).toHaveBeenCalledWith('a', expect.objectContaining({ categoryIds: ['cat-1'] }));
     vi.useRealTimers();
+  });
+});
+
+describe('ArticleEditPage — hyperlocal spotlight', () => {
+  it('shows the checkbox unset and names another article as the current editor pick', async () => {
+    const original = article({ id: 'a', isHyperlocalSpotlight: false });
+    await renderPage(original, [], {
+      editorPick: { article: { id: 'b', title: 'Other Story', slug: 'other-story' }, status: 'published', isPubliclyVisible: true },
+      resolved: { id: 'b', title: 'Other Story', slug: 'other-story' },
+      resolvedIsEditorPick: true,
+    });
+
+    const checkbox = screen.getByRole('checkbox', { name: /spotlight as hyperlocal story/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    expect(screen.getByText(/other story/i)).toBeTruthy();
+    expect(screen.getByText(/editor pick/i)).toBeTruthy();
+  });
+
+  it('names the automatic newest-article fallback when no editor pick is stored', async () => {
+    const original = article({ id: 'a', isHyperlocalSpotlight: false });
+    await renderPage(original, [], {
+      editorPick: null,
+      resolved: { id: 'c', title: 'Newest Story', slug: 'newest-story' },
+      resolvedIsEditorPick: false,
+    });
+
+    expect(screen.getByText(/newest story/i)).toBeTruthy();
+    expect(screen.getByText(/automatic, newest article/i)).toBeTruthy();
+  });
+
+  it('shows the checkbox checked and a release notice when this article holds the spotlight', async () => {
+    const original = article({ id: 'a', isHyperlocalSpotlight: true });
+    await renderPage(original, [], {
+      editorPick: { article: { id: 'a', title: original.title, slug: original.slug }, status: 'draft', isPubliclyVisible: false },
+      resolved: null,
+      resolvedIsEditorPick: false,
+    });
+
+    const checkbox = screen.getByRole('checkbox', { name: /spotlight as hyperlocal story/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    expect(screen.getByText(/returns it to the newest published article/i)).toBeTruthy();
+  });
+
+  it('checking the box saves immediately via an explicit update, not autosave', async () => {
+    const original = article({ id: 'a', isHyperlocalSpotlight: false });
+    await renderPage(original);
+    vi.mocked(articlesApi.update).mockResolvedValue({ ...original, isHyperlocalSpotlight: true });
+    vi.mocked(hyperlocalSpotlightApi.get).mockResolvedValue({
+      editorPick: { article: { id: 'a', title: original.title, slug: original.slug }, status: 'draft', isPubliclyVisible: false },
+      resolved: null,
+      resolvedIsEditorPick: false,
+    });
+
+    const checkbox = screen.getByRole('checkbox', { name: /spotlight as hyperlocal story/i });
+    await act(async () => {
+      checkbox.click();
+    });
+
+    expect(articlesApi.update).toHaveBeenCalledWith('a', { isHyperlocalSpotlight: true });
+    expect(articlesApi.autosave).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect((screen.getByRole('checkbox', { name: /spotlight as hyperlocal story/i }) as HTMLInputElement).checked).toBe(
+        true,
+      ),
+    );
+  });
+
+  it('a rejected spotlight save surfaces an error and leaves the checkbox showing the prior state', async () => {
+    const original = article({ id: 'a', isHyperlocalSpotlight: false });
+    await renderPage(original);
+    vi.mocked(articlesApi.update).mockRejectedValue(new ApiError('Could not save', 500));
+
+    const checkbox = screen.getByRole('checkbox', { name: /spotlight as hyperlocal story/i });
+    await act(async () => {
+      checkbox.click();
+    });
+
+    expect(await screen.findByText('Could not save')).toBeTruthy();
+    expect((screen.getByRole('checkbox', { name: /spotlight as hyperlocal story/i }) as HTMLInputElement).checked).toBe(
+      false,
+    );
   });
 });

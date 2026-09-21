@@ -10,6 +10,7 @@ export * from './anak-usaha.js';
 export * from './media.js';
 export * from './article.js';
 export * from './curation.js';
+export * from './hyperlocalSpotlight.js';
 export * from './dashboard.js';
 export * from './partner.js';
 export * from './guidePick.js';

@@ -6,6 +6,7 @@ import type {
   ContactMessageSubmitResponse,
   PublicAnakUsaha,
   PublicGuidePick,
+  PublicHyperlocalSpotlight,
   PublicPartner,
 } from '@siders/contracts';
 import { API_URL } from './env';
@@ -110,6 +111,15 @@ export function getArticleBySlug(slug: string, init?: RequestInit): Promise<Arti
 export function getHomeFeed(limit?: number, init?: RequestInit): Promise<ArticlePublicCard[]> {
   const qs = buildQuery({ limit });
   return apiFetch<ArticlePublicCard[]>(`/home${qs}`, init);
+}
+
+/**
+ * The resolved hyperlocal spotlight — an editor pick when one is publicly visible, otherwise the
+ * newest published article (specs/hyperlocal-spotlight/spec.md - "Public spotlight read"). Never
+ * a 404 for the ordinary empty case; `article` is simply `null`.
+ */
+export function getHyperlocalSpotlight(init?: RequestInit): Promise<PublicHyperlocalSpotlight> {
+  return apiFetch<PublicHyperlocalSpotlight>('/home/hyperlocal-spotlight', init);
 }
 
 export function getCategories(init?: RequestInit): Promise<CategoryResponse[]> {

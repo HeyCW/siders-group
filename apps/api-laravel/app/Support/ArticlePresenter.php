@@ -37,8 +37,13 @@ class ArticlePresenter
         ];
     }
 
-    /** Matches articleAdminResponseSchema. */
-    public static function admin(Article $article): array
+    /**
+     * Matches articleAdminResponseSchema. `$isHyperlocalSpotlight` is resolved by the caller
+     * (ArticleController), never derived from `$article` itself — the spotlight lives in its
+     * own singleton table, not on the article row
+     * (specs/hyperlocal-spotlight/spec.md - "Spotlight flag is not stored on the article row").
+     */
+    public static function admin(Article $article, bool $isHyperlocalSpotlight = false): array
     {
         $article->loadMissing(['categories', 'anakUsaha', 'author', 'featuredMedia']);
 
@@ -62,6 +67,7 @@ class ArticlePresenter
             'publishedAt' => $article->published_at?->toIso8601String(),
             'createdAt' => $article->created_at->toIso8601String(),
             'updatedAt' => $article->updated_at->toIso8601String(),
+            'isHyperlocalSpotlight' => $isHyperlocalSpotlight,
         ];
     }
 

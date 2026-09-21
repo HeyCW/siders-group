@@ -27,6 +27,10 @@ class UpdateArticleRequest extends FormRequest
             'keywords' => ['sometimes', 'nullable', 'string', 'max:500'],
             'categoryIds' => ['sometimes', 'array'],
             'categoryIds.*' => ['string', 'exists:categories,id'],
+            // Absent from AutosaveArticleRequest entirely — autosave can never move the
+            // spotlight even if a caller tries (specs/hyperlocal-spotlight/spec.md - "Autosave
+            // never changes the spotlight").
+            'isHyperlocalSpotlight' => ['sometimes', 'boolean'],
         ];
     }
 }

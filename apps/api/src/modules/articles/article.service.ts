@@ -2,7 +2,7 @@ import type { ArticleStatus } from '@siders/contracts';
 import { AppError } from '../../middleware/errorHandler.js';
 import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
 import { slugifyRequired } from '../../lib/slugify.js';
-import { revalidateArticlePaths, type RevalidateEnv } from '../../lib/revalidate.js';
+import { revalidateArticlePaths, revalidateHomePath, type RevalidateEnv } from '../../lib/revalidate.js';
 import type { Logger } from '../../lib/logger.js';
 import type {
   ArticleRepository,
@@ -22,6 +22,7 @@ export interface ArticleCreateInput {
   anakUsahaId?: string | null | undefined;
   seoTitle?: string | undefined;
   seoDescription?: string | undefined;
+  isHyperlocalSpotlight?: boolean | undefined;
 }
 
 /**
@@ -40,6 +41,10 @@ export interface ArticleEditInput {
   anakUsahaId?: string | null | undefined;
   seoTitle?: string | undefined;
   seoDescription?: string | undefined;
+  /** Absent on every autosave request — `ArticleAutosaveRequest` declares no field of this name
+   *  at all, so this is only ever present when `input` came from a real update
+   *  (specs/hyperlocal-spotlight/spec.md - "Autosave never changes the spotlight"). */
+  isHyperlocalSpotlight?: boolean | undefined;
 }
 
 const EMPTY_DOCUMENT = { type: 'doc', content: [] };
@@ -83,6 +88,16 @@ export function createArticleService(
     return candidate;
   }
 
+  /**
+   * Deliberately excludes `slug` and `isHyperlocalSpotlight` from its return type, and never
+   * reads either field from `input` — both are shared with `autosave` below via the same
+   * `ArticleEditInput` type, and this is what keeps autosave from being able to move them,
+   * independent of (and in addition to) the narrower `articleAutosaveRequestSchema` that already
+   * strips both before either ever reaches this service
+   * (specs/article-management/spec.md - "Autosave never alters the slug";
+   * specs/hyperlocal-spotlight/spec.md - "Autosave never changes the spotlight"). `update`
+   * handles both explicitly, itself, below — never through this helper.
+   */
   function toRepositoryFields(input: ArticleEditInput): Pick<
     UpdateArticleInput,
     'title' | 'bodyJson' | 'bodyHtml' | 'excerpt' | 'featuredMediaId' | 'anakUsahaId' | 'seoTitle' | 'seoDescription'
@@ -117,8 +132,17 @@ export function createArticleService(
         seoTitle: input.seoTitle ?? null,
         seoDescription: input.seoDescription ?? null,
         categoryIds: input.categoryIds ?? [],
+        isHyperlocalSpotlight: input.isHyperlocalSpotlight,
       };
-      return repository.create(created);
+      const article = await repository.create(created);
+      // Every write that touches the spotlight affects the homepage, whether or not the flag's
+      // value actually changed anything observable — same "revalidate on every write" discipline
+      // `curation.service.ts`'s `replace` already applies (specs/hyperlocal-spotlight/spec.md -
+      // scenarios under "The public home page renders the resolved spotlight").
+      if (input.isHyperlocalSpotlight !== undefined) {
+        await revalidateHomePath(revalidateEnv, logger);
+      }
+      return article;
     },
 
     async update(id, input) {
@@ -137,6 +161,9 @@ export function createArticleService(
         ...toRepositoryFields(input),
         ...(slug !== undefined && { slug }),
         ...(input.categoryIds !== undefined && { categoryIds: input.categoryIds }),
+        // Read directly off `input` here, in `update` only — never inside `toRepositoryFields`,
+        // which `autosave` below also calls (see that function's doc comment).
+        ...(input.isHyperlocalSpotlight !== undefined && { isHyperlocalSpotlight: input.isHyperlocalSpotlight }),
       });
 
       // Gated on whether the article was *already* publicly visible before this edit — a draft
@@ -146,12 +173,20 @@ export function createArticleService(
       // as a `published` one, and skipping it here left its cached pages stale
       // (specs/article-management/spec.md - "Public pages are revalidated when an article
       // changes"; specs/public-news-api/spec.md - "One canonical public visibility rule").
-      if (isPubliclyVisible(existing, new Date())) {
+      const wasPubliclyVisible = isPubliclyVisible(existing, new Date());
+      if (wasPubliclyVisible) {
         // The old slug too when the slug moved: its cached detail page would otherwise keep
         // serving stale content (or a 404) forever, since nothing revalidates it again. Passed
         // in one call so the shared `/news` and `/` paths are only requested once.
         const movedFrom = updated.slug === existing.slug ? [] : [existing.slug];
         await revalidateArticlePaths(revalidateEnv, logger, updated.slug, ...movedFrom);
+      }
+      // A spotlight change affects the homepage regardless of whether *this* article's own page
+      // needed revalidating — an invisible article can still take or release the spotlight
+      // (specs/hyperlocal-spotlight/spec.md - "Draft article can be spotlighted"). Skipped when
+      // the call above already fired one for the same request.
+      if (input.isHyperlocalSpotlight !== undefined && !wasPubliclyVisible) {
+        await revalidateHomePath(revalidateEnv, logger);
       }
       return updated;
     },

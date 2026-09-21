@@ -9,6 +9,7 @@ use App\Http\Controllers\CurationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EngagementController;
 use App\Http\Controllers\GuidePickController;
+use App\Http\Controllers\HyperlocalSpotlightController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\ModerationController;
 use App\Http\Controllers\PartnerController;
@@ -106,6 +107,12 @@ Route::middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pend
     Route::get('/admin/curation', [CurationController::class, 'adminIndex']);
     Route::put('/admin/curation', [CurationController::class, 'replace']);
 });
+
+// --- Hyperlocal spotlight (news.manage — set only via ArticleController's store/update, no
+// write route here) ---
+Route::get('/home/hyperlocal-spotlight', [HyperlocalSpotlightController::class, 'publicShow'])->middleware('public');
+Route::get('/admin/hyperlocal-spotlight', [HyperlocalSpotlightController::class, 'adminShow'])
+    ->middleware(['auth:staff', 'staff.active', 'staff.password_change_not_pending', 'permission:news.manage']);
 
 // --- Partners (settings.manage — treated as site config, not editorial content) ---
 Route::get('/partners', [PartnerController::class, 'publicIndex'])->middleware('public');
