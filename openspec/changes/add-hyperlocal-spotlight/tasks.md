@@ -141,3 +141,50 @@
       this sandbox (pre-existing, unrelated to this change's code).
 - [ ] 8.2 Manual walk-through in a running app — not done in this session (no live MySQL instance
       available here); left for the next environment that has one.
+
+## 9. Laravel port (apps/api-laravel)
+
+The user clarified mid-implementation that this capability belongs in `apps/api-laravel`
+(Laravel), which turns out to be a complete parallel implementation of the same API surface —
+every other capability (articles, curation, guide picks, partners, …) already exists there too,
+mirroring `apps/api`'s Node implementation route-for-route and service-for-service. The frontend's
+`apiFetch` clients (`${API_URL}/api${path}`) match Laravel's auto-`/api`-prefixed routing
+convention.
+
+- [x] 9.1 `hyperlocal_spotlight` table (migration already written for 1.3 is Laravel-native; no
+      change needed)
+- [x] 9.2 `App\Models\HyperlocalSpotlight` — singleton row model, `CREATED_AT = null`
+- [x] 9.3 `App\Services\HyperlocalSpotlightService` — `getPickArticleId()`, `setPick()`,
+      `clearIfHeldBy()`, `resolveAdmin()`, `resolvePublic()`. `firstOrCreate` on every access
+      rather than a bare read, so a database restored without the seed row self-heals instead of
+      throwing.
+- [x] 9.4 `App\Http\Controllers\HyperlocalSpotlightController` — `adminShow`/`publicShow`, no
+      write action
+- [x] 9.5 Routes added to `routes/api.php`: public `GET /home/hyperlocal-spotlight`
+      (`public` middleware), admin `GET /admin/hyperlocal-spotlight` (`permission:news.manage`) —
+      confirmed by `RouteAuthorizationAuditTest` (still passes with both routes registered)
+- [x] 9.6 `isHyperlocalSpotlight` added to `StoreArticleRequest`/`UpdateArticleRequest` rules;
+      `AutosaveArticleRequest` untouched
+- [x] 9.7 `ArticleService::create`/`update` write the pick inside the existing `DB::transaction`;
+      `autosave()` untouched and structurally never receives the key (not in its FormRequest's
+      `rules()`, so Laravel's `validated()` drops it even if a caller sends it)
+- [x] 9.8 `ArticlePresenter::admin()` takes `isHyperlocalSpotlight` as a second parameter, resolved
+      per-call by `ArticleController` (added as a constructor dependency), not stored on `Article`
+- [x] 9.9 `tests/Feature/HyperlocalSpotlightTest.php` — 12 tests covering admin-auth, public
+      fallback, set-at-creation, move-releases-previous-holder-untouched, unset-releases,
+      unset-on-non-holder-is-noop, saving-without-flag-is-untouched, autosave-cannot-move-it,
+      admin-read distinguishes invisible-pick-vs-resolved, delete-hands-to-newest,
+      curated-list-independence
+- [~] 9.10 **Could not execute the new tests in this sandbox.** `php artisan test` (SQLite, the
+      only driver available here — no MySQL/docker reachable) fails on the very first migration
+      (`roles`) with a SQL syntax error: every migration's `DB::raw('CURRENT_TIMESTAMP(3)')`
+      column default is invalid SQLite syntax (SQLite's `CURRENT_TIMESTAMP` takes no precision
+      argument). Confirmed pre-existing and unrelated to this change by running an unrelated
+      one-line sanity test (`Role::create(...)`) with zero of this change's code involved — it
+      fails identically. This is why `tests/Feature`/`tests/Unit` have no existing DB-touching
+      test today: none could pass here. `.github/workflows/ci.yml` runs no PHP/Laravel step at
+      all (`pnpm lint`/`typecheck`/`test`/`build` only) — this gap has never been exercised in CI
+      either. Verified instead via `php -l` (clean), Laravel Pint (clean), and
+      `RouteAuthorizationAuditTest` passing with the two new routes registered. The test file
+      itself is ordinary `RefreshDatabase` PHPUnit and should pass unmodified against a real
+      MySQL test database.

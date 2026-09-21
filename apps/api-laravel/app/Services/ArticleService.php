@@ -15,14 +15,17 @@ use Illuminate\Support\Str;
 
 class ArticleService
 {
-    public function __construct(private readonly DeployNotifierInterface $deployNotifier) {}
+    public function __construct(
+        private readonly DeployNotifierInterface $deployNotifier,
+        private readonly HyperlocalSpotlightService $spotlightService,
+    ) {}
 
     public function create(array $data, string $authorId): Article
     {
         $slug = $this->resolveSlug($data['slug'] ?? null, $data['title']);
         $bodyJson = $data['bodyJson'] ?? [];
 
-        return DB::transaction(function () use ($data, $authorId, $slug, $bodyJson) {
+        $article = DB::transaction(function () use ($data, $authorId, $slug, $bodyJson) {
             $article = Article::create([
                 'title' => $data['title'],
                 'slug' => $slug,
@@ -42,8 +45,30 @@ class ArticleService
                 $article->categories()->sync(array_unique($data['categoryIds']));
             }
 
+            // After the insert, inside the same transaction — the article has to exist for the
+            // spotlight's foreign key before it can be pointed at
+            // (specs/hyperlocal-spotlight/spec.md - "The spotlight write is atomic with the
+            // article save"). `array_key_exists`, not `isset`/`??`, since `false` is a
+            // meaningful value here (a no-op release), not "absent".
+            if (array_key_exists('isHyperlocalSpotlight', $data)) {
+                if ($data['isHyperlocalSpotlight']) {
+                    $this->spotlightService->setPick($article->id);
+                } else {
+                    $this->spotlightService->clearIfHeldBy($article->id);
+                }
+            }
+
             return $article;
         });
+
+        // Every write that touches the spotlight affects the homepage, whether or not the
+        // flag's value actually changed anything observable — same "trigger on every write"
+        // discipline HomeCurationService::replace() already applies.
+        if (array_key_exists('isHyperlocalSpotlight', $data)) {
+            $this->deployNotifier->triggerRebuild();
+        }
+
+        return $article;
     }
 
     public function update(Article $article, array $data): Article
@@ -89,7 +114,25 @@ class ArticleService
                 $article->categories()->sync(array_unique($data['categoryIds']));
             }
 
-            if ($wasVisible || $article->isCurrentlyVisible()) {
+            // `array_key_exists`, not `isset`/`??` — `false` (release) is meaningful, not
+            // absent. Reads directly off `$data` here, in `update()` only, the same discipline
+            // this method already applies to `slug`: nothing else in this class shares this
+            // read, so autosave() — which never receives this key at all, per
+            // AutosaveArticleRequest's rules() — can't move the spotlight even indirectly.
+            $spotlightChanged = array_key_exists('isHyperlocalSpotlight', $data);
+            if ($spotlightChanged) {
+                if ($data['isHyperlocalSpotlight']) {
+                    $this->spotlightService->setPick($article->id);
+                } else {
+                    $this->spotlightService->clearIfHeldBy($article->id);
+                }
+            }
+
+            // A spotlight change affects the homepage regardless of whether this article's own
+            // visibility changed — an invisible article can still take or release the spotlight
+            // (specs/hyperlocal-spotlight/spec.md - "Draft article can be spotlighted"). Fires
+            // once, not twice, when both conditions are true for the same write.
+            if ($wasVisible || $article->isCurrentlyVisible() || $spotlightChanged) {
                 $this->deployNotifier->triggerRebuild();
             }
 
