@@ -1,39 +1,10 @@
 ## ADDED Requirements
 
-### Requirement: Permission-gated spotlight endpoints
-Every admin endpoint that reads or writes the hyperlocal spotlight SHALL declare the
-`news.manage` permission. Authorization SHALL be evaluated against the caller's permissions and
-SHALL NOT branch on the name of any role. No new permission catalog entry SHALL be introduced by
-this capability.
-
-#### Scenario: Staff member without news.manage is rejected
-- **WHEN** an authenticated staff member whose role does not include `news.manage` attempts to
-  read or replace the spotlight
-- **THEN** the system rejects the request as forbidden and the spotlight is unchanged
-
-#### Scenario: Staff member with news.manage is allowed
-- **WHEN** an authenticated staff member whose role includes `news.manage` replaces the spotlight
-- **THEN** the request is allowed and the new pick is persisted
-
-#### Scenario: Anonymous caller cannot reach the admin surface
-- **WHEN** a client with no session requests the admin spotlight endpoints
-- **THEN** the system rejects the request as unauthenticated
-
-#### Scenario: No new permission is required to spotlight an article
-- **WHEN** the permission catalog is inspected after this capability is deployed
-- **THEN** it contains no spotlight-specific entry, and the ability to spotlight is carried
-  entirely by `news.manage`
-
 ### Requirement: The spotlight holds at most one article
 The system SHALL maintain exactly one hyperlocal spotlight slot, applying to the public home page
 only. The slot SHALL hold either no article or exactly one article. It SHALL be structurally
 impossible for the slot to hold two articles at once, rather than prevented by validation alone.
 The slot SHALL NOT store an order, a position, a layout role, or any locality value.
-
-#### Scenario: Setting a pick replaces the previous one
-- **WHEN** an article is spotlighted while a different article already occupies the slot
-- **THEN** the slot afterwards holds only the newly submitted article, and the previous article is
-  no longer spotlighted
 
 #### Scenario: Two articles cannot occupy the slot
 - **WHEN** the spotlight storage is inspected after any sequence of writes
@@ -41,55 +12,105 @@ The slot SHALL NOT store an order, a position, a layout role, or any locality va
   alongside the first
 
 #### Scenario: An empty slot is a valid state
-- **WHEN** no article has ever been spotlighted, or the slot has been cleared
+- **WHEN** no article has ever been spotlighted, or the spotlight has been released
 - **THEN** reads succeed and report an empty slot, and no error is raised
 
 #### Scenario: No locality is stored
 - **WHEN** the spotlight is read
 - **THEN** it carries the article and nothing else describing a city, region, or geographic area
 
-### Requirement: The spotlight is replaced as a whole slot
-The write endpoint SHALL accept either a single article identifier or an explicit empty value, and
-SHALL replace the whole slot with it. The replacement SHALL be atomic: either the new pick is
-stored or the previous pick remains entirely intact. The system SHALL NOT expose an endpoint that
-appends to, removes from, or otherwise mutates part of the slot. Submitting the article already
-spotlighted SHALL succeed and leave the pick unchanged.
+### Requirement: The spotlight is set from the article editor
+An article SHALL carry a spotlight flag in its admin write and read shapes, settable when the
+article is created and when it is edited. Saving an article with the flag set SHALL place that
+article in the spotlight slot. The system SHALL NOT expose a separate endpoint that writes the
+spotlight, and SHALL NOT require the editor to visit a second screen to make the pick.
 
-#### Scenario: Clearing the slot
-- **WHEN** a staff member submits an explicit empty value
-- **THEN** the slot becomes empty and the request succeeds
+#### Scenario: Spotlight set at creation
+- **WHEN** a staff member creates an article with the spotlight flag set
+- **THEN** the article is created and occupies the spotlight slot
 
-#### Scenario: Re-submitting the current pick is accepted
-- **WHEN** a staff member spotlights the article that is already spotlighted
-- **THEN** the request succeeds and the slot still holds exactly that article
+#### Scenario: Spotlight set on an existing article
+- **WHEN** a staff member edits an existing article, sets the spotlight flag, and saves
+- **THEN** that article occupies the spotlight slot
 
-#### Scenario: A rejected write leaves the slot untouched
-- **WHEN** a submitted write fails validation
-- **THEN** the previously spotlighted article remains spotlighted, and an empty slot remains empty
+#### Scenario: The flag is reported back
+- **WHEN** a staff member reads an article through the admin API
+- **THEN** the response reports whether that article currently holds the spotlight
 
-#### Scenario: No partial write surface exists
-- **WHEN** the admin spotlight surface is inspected
-- **THEN** it offers one read and one whole-slot replacement, and no endpoint that mutates the
-  slot's contents in place
+#### Scenario: No separate write surface exists
+- **WHEN** the admin surface is inspected
+- **THEN** the spotlight is writable only through the article create and update endpoints, and no
+  endpoint exists that sets the spotlight without saving an article
 
-#### Scenario: Concurrent replacements do not fail
-- **WHEN** two staff members spotlight different articles at the same time
-- **THEN** both requests succeed, the slot afterwards holds exactly one of the two submitted
-  articles, and neither request is rejected because of the other
+#### Scenario: Saving an article without the flag changes nothing
+- **WHEN** a staff member saves an article that does not hold the spotlight, with the flag unset
+- **THEN** the save succeeds and the spotlight slot is unchanged, whatever it holds
 
-### Requirement: Spotlight validation
-The system SHALL reject a write naming an article that does not exist. The system SHALL reject a
-write whose article identifier is not a well-formed identifier. A rejected write SHALL leave the
-slot unchanged.
+### Requirement: Spotlighting one article releases the previous holder
+Setting the spotlight flag on an article SHALL remove the spotlight from whichever article held it
+before. The previously spotlighted article SHALL NOT be otherwise altered: its status, publication
+state, curated-list membership, and content SHALL be unchanged.
 
-#### Scenario: Unknown article rejected
-- **WHEN** a staff member submits an identifier that matches no article
-- **THEN** the system rejects the request and the slot is unchanged
+#### Scenario: The previous holder loses the spotlight
+- **WHEN** a staff member spotlights an article while a different article holds the spotlight
+- **THEN** the slot afterwards holds only the newly saved article, and the previous article no
+  longer holds the spotlight
 
-#### Scenario: Malformed identifier rejected
-- **WHEN** a staff member submits a value that is neither a well-formed article identifier nor the
-  explicit empty value
-- **THEN** the system rejects the request and the slot is unchanged
+#### Scenario: The previous holder is otherwise untouched
+- **WHEN** an article loses the spotlight because another article took it
+- **THEN** its status, `published_at`, content, categories, tags, and curated-list position are
+  exactly as they were
+
+#### Scenario: Re-saving the current holder keeps the spotlight
+- **WHEN** a staff member saves the article that already holds the spotlight, with the flag still
+  set
+- **THEN** the save succeeds and that article still holds the spotlight
+
+#### Scenario: Concurrent spotlight saves do not fail
+- **WHEN** two staff members save two different articles with the spotlight flag set at the same
+  time
+- **THEN** both saves succeed, the slot afterwards holds exactly one of the two articles, and
+  neither request is rejected because of the other
+
+### Requirement: Clearing the spotlight
+Saving the spotlighted article with the flag unset SHALL empty the spotlight slot. Saving an
+article that does not hold the spotlight with the flag unset SHALL leave the slot unchanged and
+SHALL NOT be treated as an error.
+
+#### Scenario: Unchecking on the holder empties the slot
+- **WHEN** a staff member unsets the spotlight flag on the article that holds the spotlight and
+  saves
+- **THEN** the slot becomes empty and the save succeeds
+
+#### Scenario: Unchecking on a non-holder is a no-op
+- **WHEN** a staff member saves any article that does not hold the spotlight, with the flag unset
+- **THEN** the save succeeds and the spotlighted article is still spotlighted
+
+### Requirement: The spotlight write is atomic with the article save
+The spotlight change and the article write SHALL succeed or fail together as one transaction. A
+rejected article save SHALL leave the spotlight exactly as it was, and a failed spotlight write
+SHALL leave the article exactly as it was.
+
+#### Scenario: A rejected article save does not move the spotlight
+- **WHEN** a staff member saves an article with the spotlight flag set and the save is rejected as
+  invalid
+- **THEN** no article is created or modified, and the spotlight slot is unchanged
+
+#### Scenario: A failed spotlight write does not half-save the article
+- **WHEN** the spotlight portion of a save fails
+- **THEN** the article's own changes are not persisted either, and the request reports a failure
+
+### Requirement: Autosave never changes the spotlight
+The autosave path SHALL NOT accept or apply the spotlight flag. A spotlight change SHALL require
+an explicit save.
+
+#### Scenario: Autosave payload carries no spotlight flag
+- **WHEN** the autosave request shape is inspected
+- **THEN** it contains no spotlight field, so an autosave structurally cannot move the spotlight
+
+#### Scenario: Autosave leaves the spotlight alone
+- **WHEN** a staff member edits the body of the spotlighted article and autosave fires repeatedly
+- **THEN** the spotlight slot still holds that article, unchanged, and no spotlight write occurs
 
 ### Requirement: An article in any status may be spotlighted
 The system SHALL permit an article in any status to be spotlighted, including a draft and an
@@ -99,8 +120,8 @@ spotlight without further editorial action. Public visibility SHALL be decided b
 that governs every other public article read.
 
 #### Scenario: Draft article can be spotlighted
-- **WHEN** a staff member spotlights an article in `draft` status
-- **THEN** the write succeeds and the pick is stored
+- **WHEN** a staff member saves an article in `draft` status with the spotlight flag set
+- **THEN** the save succeeds and the slot holds that article
 
 #### Scenario: Spotlighted draft is absent from public output
 - **WHEN** the slot holds an article in `draft` status
@@ -111,19 +132,39 @@ that governs every other public article read.
 - **WHEN** the slot holds an article scheduled for a future time, and that time passes
 - **THEN** the article appears in the public spotlight, with no further spotlight write
 
-#### Scenario: Unpublishing empties the public spotlight without clearing the pick
+#### Scenario: Unpublishing empties the public spotlight without releasing the slot
 - **WHEN** the spotlighted article is unpublished
-- **THEN** the public spotlight read reports an empty spotlight, and the admin read still reports
-  that article as the stored pick
+- **THEN** the public spotlight read reports an empty spotlight, and the article still holds the
+  slot, with its editor checkbox still set
 
-### Requirement: Admin reads report the pick and its visibility
-The admin read endpoint SHALL return the stored pick whether or not its article is publicly
-visible, and SHALL report enough information to determine whether it is currently live. When the
-slot is empty, the endpoint SHALL report an empty slot as an ordinary success.
+### Requirement: The editor reports the current holder before taking the spotlight
+The article editor SHALL show whether the article being edited holds the spotlight, and, when it
+does not, SHALL identify the article that currently does before the save. An editor SHALL NOT be
+able to take the spotlight from another article without that article being named.
 
-#### Scenario: Invisible pick is returned to staff
+#### Scenario: Current holder is named
+- **WHEN** a staff member opens the editor for an article that does not hold the spotlight, while
+  another article does
+- **THEN** the spotlight control names the article that currently holds it
+
+#### Scenario: Holding article is shown as holding
+- **WHEN** a staff member opens the editor for the article that holds the spotlight
+- **THEN** the spotlight control shows it as set
+
+#### Scenario: Empty slot is shown as empty
+- **WHEN** a staff member opens the editor while no article holds the spotlight
+- **THEN** the spotlight control shows that the spotlight is empty, and names no article
+
+### Requirement: Admin read of the current spotlight
+The system SHALL expose one admin read that reports the article currently holding the spotlight,
+including when that article is not publicly visible, along with enough information to determine
+whether it is currently live. When the slot is empty, the read SHALL report an empty slot as an
+ordinary success. This read SHALL declare the `news.manage` permission and SHALL introduce no new
+permission catalog entry.
+
+#### Scenario: Invisible holder is returned to staff
 - **WHEN** a staff member reads the spotlight and it holds a draft or future-scheduled article
-- **THEN** the pick is returned rather than omitted
+- **THEN** that article is returned rather than omitted
 
 #### Scenario: Live status is reported
 - **WHEN** a staff member reads the spotlight
@@ -131,7 +172,16 @@ slot is empty, the endpoint SHALL report an empty slot as an ordinary success.
 
 #### Scenario: Empty slot reads as success
 - **WHEN** a staff member reads an empty spotlight
-- **THEN** the request succeeds and reports no pick, rather than failing as not-found
+- **THEN** the request succeeds and reports no article, rather than failing as not-found
+
+#### Scenario: Anonymous caller cannot reach the admin read
+- **WHEN** a client with no session requests the admin spotlight read
+- **THEN** the system rejects the request as unauthenticated
+
+#### Scenario: No new permission is required
+- **WHEN** the permission catalog is inspected after this capability is deployed
+- **THEN** it contains no spotlight-specific entry, and the ability to spotlight is carried
+  entirely by `news.manage`
 
 ### Requirement: Public spotlight read
 The system SHALL expose one public, rate-limited endpoint that serves the spotlighted article in
@@ -162,7 +212,7 @@ appears in the other.
 - **THEN** the spotlighted article is unchanged, whether or not it appears in the submitted list
 
 #### Scenario: Spotlighting does not alter the curated list
-- **WHEN** a staff member spotlights an article
+- **WHEN** a staff member saves an article with the spotlight flag set
 - **THEN** the curated homepage list is unchanged
 
 #### Scenario: The same article may appear in both
@@ -182,8 +232,9 @@ spotlighted.
 - **WHEN** the spotlight is read after its article was deleted
 - **THEN** both the admin and public reads report an empty spotlight and succeed
 
-#### Scenario: A concurrent deletion does not deadlock a write
-- **WHEN** a staff member replaces the spotlight at the same time as any article is hard-deleted
+#### Scenario: A concurrent deletion does not deadlock a save
+- **WHEN** a staff member saves an article with the spotlight flag set at the same time as any
+  article is hard-deleted
 - **THEN** each request completes with a normal success or a normal validation failure, and
   neither fails with an internal error caused by the other
 
