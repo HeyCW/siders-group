@@ -3,22 +3,33 @@
 # Technology Stack
 
 Frontend — React, TypeScript, Vite, Tailwind CSS, shadcn/ui
-Backend — Node.js, Express, MySQL
+Backend — PHP, Laravel, MySQL (apps/api-laravel). apps/api (Node.js/Express) is a legacy parallel
+implementation of the same API — do not add new features there; port them to apps/api-laravel
+instead.
 
 # Coding Standards
 
-- TypeScript strict mode; never `any` unless unavoidable
+- PHP: `declare(strict_types=1)` everywhere; typed properties, params and returns
+- TypeScript (frontend): strict mode; never `any` unless unavoidable
 - Composition over inheritance; small focused functions; no duplicated logic
 - Self-documenting code
 
 # API
 
 - REST conventions; consistent JSON envelope
-- Handle errors gracefully via typed `AppError` subclasses, formatted once in `errorHandler`
+- Controller → Service → Model; controllers parse/delegate/respond, services hold the logic
+- Validation lives in Form Requests, never inline in controllers
+- Handle errors gracefully via typed `DomainException` subclasses (`getStatus()`/`getErrorCode()`),
+  rendered once in `bootstrap/app.php`'s `withExceptions`
+- Every route declares its own authorization — `public`, `auth:staff`, `auth:reader`, or
+  `permission:*`. Silence is a denial, not a grant; `RouteAuthorizationAuditTest` fails the build
+  on an undeclared route.
 
 # Database
 
-- UUID PKs, migrations, transactions where appropriate
+- UUID PKs (`HasUuidPrimaryKey`), migrations, transactions where appropriate
+- Eloquent models; scopes for shared read predicates (e.g. `scopePubliclyVisible`) — never
+  re-derive one inline
 
 # Frontend
 
@@ -31,7 +42,9 @@ future-extensible
 
 # Testing
 
-Before completion: build, lint, tests, no TS errors.
+- Backend (apps/api-laravel): `php -l`, `./vendor/bin/pint --test`, `php artisan test`
+- Frontend/apps/api (Node): build, lint, tests, no TS errors
+Before completion, run whichever of the above apply to the files touched.
 
 # Pull Requests
 
