@@ -8,13 +8,20 @@ import {
   articleUpdateRequestSchema,
 } from '@siders/contracts';
 import type { ArticleService } from './article.service.js';
-import type { ArticleRepository } from './article.repository.js';
+import type { ArticleRepository, ArticleWithRelations } from './article.repository.js';
 import { toAdminResponse, toPreviewResponse, toPublicCard, toPublicDetail } from './article.mapper.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { requireParam, requireUuidParam } from '../../lib/requireParam.js';
 import type { Env } from '../../config/env.js';
 
 type MediaUrlEnv = Pick<Env, 'MEDIA_PUBLIC_BASE_URL'>;
+
+/** The one thing the controller needs from the spotlight module — read-only, and deliberately
+ *  this narrow rather than a full `HyperlocalSpotlightRepository` import, so this module's only
+ *  coupling to the spotlight module is "what article id currently holds it". */
+export interface SpotlightLookup {
+  getArticleId(): Promise<string | null>;
+}
 
 function requireCaller(req: Request): { subjectId: string } {
   const subjectId = req.auth?.subjectId;
@@ -23,14 +30,25 @@ function requireCaller(req: Request): { subjectId: string } {
 }
 
 /** Parse, delegate, respond. Admin (permission-gated) article endpoints. */
-export function createArticleController(service: ArticleService, env: MediaUrlEnv) {
+export function createArticleController(service: ArticleService, env: MediaUrlEnv, spotlight: SpotlightLookup) {
+  /**
+   * `isHyperlocalSpotlight` is never carried on `ArticleWithRelations` (the spotlight lives in
+   * its own table, not the article row — specs/hyperlocal-spotlight/spec.md - "Spotlight flag is
+   * not stored on the article row"), so every admin response resolves it here by comparing the
+   * article's own id against whichever id currently holds the spotlight.
+   */
+  async function respond(article: ArticleWithRelations) {
+    const spotlightId = await spotlight.getArticleId();
+    return toAdminResponse(env, article, article.id === spotlightId);
+  }
+
   return {
     async create(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const body = articleCreateRequestSchema.parse(req.body);
         const caller = requireCaller(req);
         const article = await service.create(body, caller.subjectId);
-        res.status(201).json({ success: true, data: toAdminResponse(env, article) });
+        res.status(201).json({ success: true, data: await respond(article) });
       } catch (err) {
         next(err);
       }
@@ -40,7 +58,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
       try {
         const id = requireUuidParam(req, 'id');
         const article = await service.get(id);
-        res.json({ success: true, data: toAdminResponse(env, article) });
+        res.json({ success: true, data: await respond(article) });
       } catch (err) {
         next(err);
       }
@@ -50,7 +68,13 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
       try {
         const status = req.query.status !== undefined ? articleStatusSchema.parse(req.query.status) : undefined;
         const articles = await service.list(status);
-        res.json({ success: true, data: articles.map((article) => toAdminResponse(env, article)) });
+        // One lookup for the whole list, not one per article — `getArticleId` is a single-row
+        // read with nothing to gain from repeating it per item.
+        const spotlightId = await spotlight.getArticleId();
+        res.json({
+          success: true,
+          data: articles.map((article) => toAdminResponse(env, article, article.id === spotlightId)),
+        });
       } catch (err) {
         next(err);
       }
@@ -61,7 +85,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
         const id = requireUuidParam(req, 'id');
         const body = articleUpdateRequestSchema.parse(req.body);
         const article = await service.update(id, body);
-        res.json({ success: true, data: toAdminResponse(env, article) });
+        res.json({ success: true, data: await respond(article) });
       } catch (err) {
         next(err);
       }
@@ -72,7 +96,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
         const id = requireUuidParam(req, 'id');
         const body = articleAutosaveRequestSchema.parse(req.body);
         const article = await service.autosave(id, body);
-        res.json({ success: true, data: toAdminResponse(env, article) });
+        res.json({ success: true, data: await respond(article) });
       } catch (err) {
         next(err);
       }
@@ -92,7 +116,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
       try {
         const id = requireUuidParam(req, 'id');
         const article = await service.publish(id);
-        res.json({ success: true, data: toAdminResponse(env, article) });
+        res.json({ success: true, data: await respond(article) });
       } catch (err) {
         next(err);
       }
@@ -102,7 +126,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
       try {
         const id = requireUuidParam(req, 'id');
         const article = await service.unpublish(id);
-        res.json({ success: true, data: toAdminResponse(env, article) });
+        res.json({ success: true, data: await respond(article) });
       } catch (err) {
         next(err);
       }
@@ -113,7 +137,7 @@ export function createArticleController(service: ArticleService, env: MediaUrlEn
         const id = requireUuidParam(req, 'id');
         const body = articleScheduleRequestSchema.parse(req.body);
         const article = await service.schedule(id, new Date(body.publishedAt));
-        res.json({ success: true, data: toAdminResponse(env, article) });
+        res.json({ success: true, data: await respond(article) });
       } catch (err) {
         next(err);
       }

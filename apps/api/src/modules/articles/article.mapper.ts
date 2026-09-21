@@ -61,8 +61,17 @@ export function toPublicDetail(env: MediaUrlEnv, article: ArticleWithRelations):
   };
 }
 
-/** The admin-facing shape: everything public gets, plus authoring state and `bodyJson`. */
-export function toAdminResponse(env: MediaUrlEnv, article: ArticleWithRelations): ArticleAdminResponse {
+/**
+ * The admin-facing shape: everything public gets, plus authoring state and `bodyJson`.
+ * `isHyperlocalSpotlight` is computed by the caller (`article.controller.ts`), not derived from
+ * `article` itself — the spotlight lives in its own singleton table, not on the article row
+ * (specs/hyperlocal-spotlight/spec.md - "Spotlight flag is not stored on the article row").
+ */
+export function toAdminResponse(
+  env: MediaUrlEnv,
+  article: ArticleWithRelations,
+  isHyperlocalSpotlight: boolean,
+): ArticleAdminResponse {
   return {
     id: article.id,
     title: article.title,
@@ -83,6 +92,7 @@ export function toAdminResponse(env: MediaUrlEnv, article: ArticleWithRelations)
     publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
     createdAt: article.createdAt.toISOString(),
     updatedAt: article.updatedAt.toISOString(),
+    isHyperlocalSpotlight,
   };
 }
 

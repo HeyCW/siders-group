@@ -37,12 +37,27 @@ describe('articleCreateRequestSchema', () => {
     const rejected = articleCreateRequestSchema.safeParse({ title: 'T', keywords: 'a'.repeat(501) });
     expect(rejected.success).toBe(false);
   });
+
+  it('accepts isHyperlocalSpotlight true and false, and leaves it absent when omitted', () => {
+    expect(articleCreateRequestSchema.parse({ title: 'T', isHyperlocalSpotlight: true }).isHyperlocalSpotlight).toBe(
+      true,
+    );
+    expect(articleCreateRequestSchema.parse({ title: 'T', isHyperlocalSpotlight: false }).isHyperlocalSpotlight).toBe(
+      false,
+    );
+    expect(articleCreateRequestSchema.parse({ title: 'T' }).isHyperlocalSpotlight).toBeUndefined();
+  });
 });
 
 describe('articleUpdateRequestSchema', () => {
   it('allows a manual slug override', () => {
     const parsed = articleUpdateRequestSchema.parse({ slug: 'custom-slug' });
     expect(parsed.slug).toBe('custom-slug');
+  });
+
+  it('accepts isHyperlocalSpotlight on its own, with no other field required', () => {
+    const parsed = articleUpdateRequestSchema.parse({ isHyperlocalSpotlight: false });
+    expect(parsed.isHyperlocalSpotlight).toBe(false);
   });
 });
 
@@ -54,6 +69,13 @@ describe('articleAutosaveRequestSchema', () => {
 
   it('has no status field at all — autosave cannot change status', () => {
     const result = articleAutosaveRequestSchema.safeParse({ title: 'T', status: 'published' });
+    expect(result.success).toBe(false);
+  });
+
+  it('has no isHyperlocalSpotlight field at all — autosave cannot move the spotlight even if a client tries', () => {
+    // specs/hyperlocal-spotlight/spec.md - "Autosave never changes the spotlight": structurally
+    // rejected, not silently dropped.
+    const result = articleAutosaveRequestSchema.safeParse({ title: 'T', isHyperlocalSpotlight: true });
     expect(result.success).toBe(false);
   });
 

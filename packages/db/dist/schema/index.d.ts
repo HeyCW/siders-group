@@ -7,6 +7,7 @@ export * from './anakUsaha.js';
 export * from './articles.js';
 export * from './taxonomy.js';
 export * from './homeCuration.js';
+export * from './hyperlocalSpotlight.js';
 export * from './partners.js';
 export * from './guidePicks.js';
 export * from './engagement.js';

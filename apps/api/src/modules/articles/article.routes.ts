@@ -7,6 +7,7 @@ import { createArticleService } from './article.service.js';
 import { createArticleController, createPublicArticleController } from './article.controller.js';
 import { requirePermission, requirePublic } from '../../middleware/authorize.js';
 import { publicReadRateLimiter } from '../../middleware/rateLimit.js';
+import { createHyperlocalSpotlightRepository } from '../hyperlocalSpotlight/hyperlocalSpotlight.repository.js';
 
 /**
  * Admin article endpoints, mounted at `/admin/articles`. Every route is gated by
@@ -18,7 +19,8 @@ export function articleRoutes(db: Database, env: Env) {
   const router = Router();
   const repository = createArticleRepository(db);
   const service = createArticleService(repository, env, createLogger(env));
-  const controller = createArticleController(service, env);
+  const spotlightRepository = createHyperlocalSpotlightRepository(db);
+  const controller = createArticleController(service, env, spotlightRepository);
 
   router.post('/', requirePermission('news.manage'), controller.create);
   router.get('/', requirePermission('news.manage'), controller.list);

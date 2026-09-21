@@ -26,6 +26,10 @@ import { createScheduledPublishJob } from './modules/articles/scheduledPublishWo
 import { categoryRoutes } from './modules/categories/category.routes.js';
 import { anakUsahaRoutes } from './modules/anak-usaha/anakUsaha.routes.js';
 import { curationRoutes, publicHomeRoutes } from './modules/curation/curation.routes.js';
+import {
+  hyperlocalSpotlightRoutes,
+  publicHyperlocalSpotlightRoutes,
+} from './modules/hyperlocalSpotlight/hyperlocalSpotlight.routes.js';
 import { partnerRoutes, publicPartnerRoutes } from './modules/partners/partner.routes.js';
 import { guidePickRoutes, publicGuidePickRoutes } from './modules/guidePicks/guidePick.routes.js';
 import { publicEngagementRoutes } from './modules/engagement/engagement.routes.js';
@@ -73,6 +77,8 @@ export function createServer(): Express {
   app.use('/anak-usaha', anakUsahaRoutes(db, env));
   app.use('/admin/curation', curationRoutes(db, env));
   app.use('/home', publicHomeRoutes(db, env));
+  app.use('/admin/hyperlocal-spotlight', hyperlocalSpotlightRoutes(db, env));
+  app.use('/home/hyperlocal-spotlight', publicHyperlocalSpotlightRoutes(db, env));
   app.use('/admin/partners', partnerRoutes(db, env));
   app.use('/partners', publicPartnerRoutes(db, env));
   app.use('/admin/guide-picks', guidePickRoutes(db, env));

@@ -31,6 +31,15 @@ export const articleWriteFieldsSchema = z.object({
     seoTitle: z.string().max(200).optional(),
     seoDescription: z.string().max(500).optional(),
     keywords: z.string().max(500).optional(),
+    /**
+     * Settable on create and update only — never on autosave, which has its own separate,
+     * narrower schema below that has no field of this name at all
+     * (specs/hyperlocal-spotlight/spec.md - "Autosave never changes the spotlight"). `true` makes
+     * this article the hyperlocal spotlight's editor pick, releasing whichever article held it
+     * before; `false` releases it if this article currently holds it and is a no-op otherwise;
+     * omitted leaves the spotlight untouched.
+     */
+    isHyperlocalSpotlight: z.boolean().optional(),
 });
 export const articleCreateRequestSchema = articleWriteFieldsSchema.strict();
 export const articleUpdateRequestSchema = articleWriteFieldsSchema.partial().strict();
@@ -153,4 +162,11 @@ export const articleAdminResponseSchema = z.object({
     publishedAt: z.string().datetime().nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
+    /**
+     * Whether this article is currently the hyperlocal spotlight's stored editor pick. `false`
+     * both when no article holds it and when a *different* article does — it reflects only this
+     * article's own state, never the automatic newest-article fallback
+     * (specs/hyperlocal-spotlight/spec.md - "The flag reflects only an editor pick").
+     */
+    isHyperlocalSpotlight: z.boolean(),
 });
