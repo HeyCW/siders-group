@@ -24,7 +24,8 @@ precedent this change follows for keeping the spotlight out of autosave.
 - Put the decision in the article editor, where the editorial judgement is already happening.
 - Reuse the existing visibility rule (`isPubliclyVisible`) and the `news.manage` permission
   unchanged.
-- Keep the empty slot a first-class, ordinary state — the section simply does not render.
+- Keep an unset slot a first-class, ordinary state: the section falls back to the newest published
+  article rather than disappearing, so the home page never shows a hole.
 
 **Non-Goals:**
 - Any notion of locality (city, region, coordinates, geo tags). The slot is global and the article
@@ -59,6 +60,31 @@ layer knows it writes a different table.
 standalone `PUT /admin/hyperlocal-spotlight` as the primary write (a second write surface for one
 decision, and not what the editor asked for).
 
+### An unset slot means "newest article", resolved at read time
+
+The spotlight has two layers: an optional explicit pick (the slot row) and an automatic fallback
+(the newest publicly visible article). A read resolves the explicit pick when there is one and it
+is publicly visible; otherwise it resolves the fallback. The section is blank only when the site
+has no publicly visible article at all.
+
+The fallback is **computed on read, never written into the slot**. Writing "the newest article at
+the time of the uncheck" into the slot would freeze it: the next article to publish would not take
+over, and the section would quietly drift into showing an old story that no editor chose. Reading
+it live keeps it current, and keeps one meaning for a row in the slot — *an editor picked this* —
+rather than two indistinguishable ones.
+
+"Newest" reuses the ordering the home feed already backfills with: `listPublished` on
+`ArticleRepository`, newest `published_at` first, through the same canonical visibility predicate
+as every other public read. No second definition of "newest" and no second visibility rule.
+
+This also covers the cases that would otherwise need their own handling: the explicit pick is a
+draft or a future-scheduled article, the pick was unpublished, the pick was hard-deleted. In each,
+the read simply falls through to the fallback, and the pick — where it still exists — takes over
+again the moment it becomes publicly visible.
+
+*Alternative rejected:* persisting the fallback on uncheck (above — it goes stale, and it makes an
+automatic pick indistinguishable from an editorial one in storage).
+
 ### Checking the box is a move, not an add
 
 Saving an article with the box checked replaces whatever the slot held. The previous holder is not
@@ -66,9 +92,9 @@ touched in any other way — not unpublished, not removed from `home_curation`, 
 this silently demotes another article, the editor shows the current holder next to the checkbox
 before the save, so taking the spotlight is a visible choice rather than a discovery.
 
-Unchecking the box on the article that currently holds the slot empties it. Unchecking on an
-article that does not hold it is a no-op, not an error — otherwise every ordinary save of every
-other article would fail.
+Unchecking the box on the article that currently holds the slot removes the explicit pick, and the
+spotlight falls back to the newest published article. Unchecking on an article that does not hold
+it is a no-op, not an error — otherwise every ordinary save of every other article would fail.
 
 ### One transaction with the article save
 
@@ -87,16 +113,19 @@ slug and status out of autosave.
 ### Public read is a separate endpoint, not a field on the home feed
 
 `GET /home/hyperlocal-spotlight` is its own public, rate-limited read returning
-`{ "article": ArticlePublicCard | null }`. Folding it into `GET /home` would make the feed's
+`{ "article": ArticlePublicCard | null, "isEditorPick": boolean }` — resolved pick plus whether an
+editor chose it or it came from the fallback. Folding it into `GET /home` would make the feed's
 limit/backfill arithmetic answer two questions at once, and would force every feed consumer to
 care about a section it may not render. The cost is one extra request from the home page, paid in
 parallel with the guide-pick and partner reads it already issues.
 
-### Article deletion empties the slot
+### Article deletion clears the pick
 
 `article_id` references `articles.id` with `ON DELETE CASCADE`, for the same reason `home_curation`
 uses it: articles are hard-deleted in this system, so without a cascade the slot would point at
-nothing. The slot becoming empty is a valid state, so the cascade needs no compensating write.
+nothing. An unset slot is a valid state that resolves to the fallback, so the cascade needs no
+compensating write — deleting the spotlighted article hands the spotlight to the newest published
+article on the next read.
 
 ### Independence from the curated feed is deliberate
 

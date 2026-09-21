@@ -20,7 +20,7 @@ Staff holding `news.manage` SHALL be able to create a new article, which starts 
 - **THEN** whichever article holds the hyperlocal spotlight still holds it, and the autosave succeeds
 
 ### Requirement: Article metadata
-Articles SHALL support SEO metadata (title and description), a featured image referenced from the media library, zero or more categories, zero or more tags, an author derived from the authenticated staff member, creation/update/publication timestamps, and a hyperlocal spotlight flag settable on create and update. The spotlight flag SHALL be presented as an article field in the admin API while the spotlight itself is stored as a single global slot, so that setting it on one article releases it from any other.
+Articles SHALL support SEO metadata (title and description), a featured image referenced from the media library, zero or more categories, zero or more tags, an author derived from the authenticated staff member, creation/update/publication timestamps, and a hyperlocal spotlight flag settable on create and update. The spotlight flag SHALL be presented as an article field in the admin API while the spotlight itself is stored as a single global slot, so that setting it on one article releases it from any other, and unsetting it returns the spotlight to the newest published article rather than emptying it.
 
 #### Scenario: Save SEO metadata
 - **WHEN** a staff member sets an SEO title and description on an article
@@ -37,3 +37,7 @@ Articles SHALL support SEO metadata (title and description), a featured image re
 #### Scenario: Spotlight flag is not stored on the article row
 - **WHEN** the articles table is inspected after an article is spotlighted
 - **THEN** it carries no spotlight column, and the spotlight is recorded in its own single-slot storage
+
+#### Scenario: Unsetting the flag does not blank the section
+- **WHEN** a staff member unsets the hyperlocal spotlight flag on the article holding it and saves
+- **THEN** the save succeeds and the hyperlocal spotlight resolves to the most recently published article

@@ -25,6 +25,13 @@ storage, so "exactly one" is structural rather than a convention.
   previous holder is not deleted, unpublished, or otherwise altered, it simply stops being
   spotlighted. The editor shows which article currently holds the spotlight before the save, so
   taking it is never a surprise.
+- **The spotlight is never blank.** With no explicit pick — never set, unchecked, deleted, or
+  holding an article that is not publicly visible — the section falls back to the newest published
+  article, resolved at read time from the same newest-first ordering the home feed's chronological
+  backfill already uses. The fallback is not stored, so it stays current as articles publish
+  instead of freezing whichever article was newest at the moment of the uncheck.
+- Unchecking the box on the article holding the spotlight therefore hands the spotlight to the
+  newest published article rather than emptying the section.
 - The spotlight rides the existing article write endpoints (`POST /admin/articles`,
   `PATCH /admin/articles/:id`), which already require `news.manage` — the same permission
   `home-curation` uses. No new permission catalog entry, and no separate spotlight write endpoint.
@@ -33,14 +40,17 @@ storage, so "exactly one" is structural rather than a convention.
 - Autosave deliberately cannot touch the spotlight, matching the existing narrower autosave schema
   that structurally cannot change an article's slug or status.
 - Any article status may be spotlighted, including `draft` and `scheduled`. An invisible pick is
-  stored and held but contributes nothing to public output until it becomes publicly visible, with
-  no second editorial action.
-- A small admin read (`GET /admin/hyperlocal-spotlight`) tells the editor which article currently
-  holds the slot, so the checkbox can warn before taking it. There is no admin write endpoint.
-- Public read (`GET /home/hyperlocal-spotlight`) serves the spotlighted article as a public card,
-  or an empty result when the slot is empty or its article is not publicly visible.
+  held as the explicit pick but shows nothing publicly until it becomes publicly visible — the
+  fallback covers the section meanwhile — and it takes over at its scheduled time with no second
+  editorial action.
+- A small admin read (`GET /admin/hyperlocal-spotlight`) tells the editor which article is
+  currently spotlighted **and whether that is an explicit pick or the automatic newest-article
+  fallback**, so the checkbox can say what it would displace. There is no admin write endpoint.
+- Public read (`GET /home/hyperlocal-spotlight`) serves the spotlighted article as a public card —
+  the explicit pick when it is publicly visible, otherwise the newest published article — and
+  reports no article only when the site has no publicly visible article at all.
 - The public home page gains a Hyperlocal section above the existing showcase, rendering nothing
-  at all when the slot is empty.
+  at all only in that no-published-articles case.
 - Locality is **not** modeled: no city, region, or geo field is added anywhere. "Hyperlocal" is
   the section's editorial identity, and the pick is any article the newsroom judges to fit.
 - The spotlight is deliberately independent of the curated home feed: the same article may occupy

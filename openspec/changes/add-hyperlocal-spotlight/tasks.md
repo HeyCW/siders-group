@@ -34,8 +34,14 @@
       `get()` (join to article for status/publishedAt), `set(articleId, userId, tx)` and
       `clearIfHeldBy(articleId, tx)`, all accepting the caller's transaction
 - [ ] 3.2 Add `hyperlocalSpotlight.service.ts` + `hyperlocalSpotlight.mapper.ts` +
-      `hyperlocalSpotlight.controller.ts` for the two reads; decide public visibility with
-      `isPubliclyVisible` from `article.repository.ts` — no second visibility rule
+      `hyperlocalSpotlight.controller.ts` for the two reads. Resolution order: editor pick when
+      stored *and* publicly visible, else the newest published article via the existing
+      `articleRepository.listPublished({ limit: 1 })` — the same newest-first, same-visibility
+      query the home feed backfills with. Decide visibility with `isPubliclyVisible` from
+      `article.repository.ts` — no second visibility rule, no second definition of "newest".
+- [ ] 3.2a Never write the fallback into the slot — it is resolved per read, so a newly published
+      article takes over with no write. Both read shapes carry `isEditorPick` so admin and web can
+      tell a chosen pick from an automatic one.
 - [ ] 3.3 Add `hyperlocalSpotlight.routes.ts`: admin `GET /admin/hyperlocal-spotlight` behind
       `requirePermission('news.manage')`, public `GET /home/hyperlocal-spotlight` behind
       `requirePublic()` + `publicReadRateLimiter`, mirroring `curation.routes.ts`. No write route.
@@ -44,8 +50,9 @@
 ## 4. API — the flag on article writes
 
 - [ ] 4.1 In `article.service.ts`, handle `isHyperlocalSpotlight` on create and update inside the
-      existing article transaction: `true` → `set()` (which replaces the previous holder),
-      `false` → `clearIfHeldBy(thisArticle)`, omitted → no spotlight write at all
+      existing article transaction: `true` → `set()` (which replaces the previous pick),
+      `false` → `clearIfHeldBy(thisArticle)` (the spotlight then resolves by fallback — no
+      compensating write), omitted → no spotlight write at all
 - [ ] 4.2 On create, order the slot write after the article insert within the same transaction
 - [ ] 4.3 Include the flag in the admin article read/mapper (`article.mapper.ts`), resolved from
       the slot, not from an article column
@@ -54,15 +61,21 @@
 ## 5. API tests
 
 - [ ] 5.1 One test per spec scenario: set at creation, set on update, move from A to B, A otherwise
-      untouched, re-save holder keeps it, unset on holder clears, unset on non-holder is a no-op,
-      omitted flag leaves the slot alone
+      untouched, re-save pick keeps it, unset on the pick releases it, unset on a non-pick is a
+      no-op, omitted flag leaves the slot alone
 - [ ] 5.2 Atomicity: a rejected article save moves nothing; a failed slot write persists no article
       change
 - [ ] 5.3 Autosave fires repeatedly on the holder and the slot is unchanged
-- [ ] 5.4 Status behavior: draft/scheduled held but absent publicly, scheduled goes live at its
-      time, unpublish hides publicly without releasing the slot
-- [ ] 5.5 Article hard-delete cascades the slot empty; concurrent spotlight saves both succeed
-- [ ] 5.6 Curated-list independence both ways, including both holding the same article
+- [ ] 5.4 Fallback resolution: no pick resolves to the newest published article; publishing a newer
+      article moves the fallback with no write; an editor pick outranks a newer article; releasing
+      a pick hands the spotlight to the newest article and does not freeze it; no published
+      articles at all resolves to nothing without erroring
+- [ ] 5.5 Status behavior: a draft/scheduled pick is held while the public read shows the fallback,
+      the pick takes over at its scheduled time, unpublishing returns the public spotlight to the
+      fallback without releasing the pick
+- [ ] 5.6 Article hard-delete releases the pick and the spotlight continues on the newest article;
+      concurrent spotlight saves both succeed
+- [ ] 5.7 Curated-list independence both ways, including both holding the same article
 
 ## 6. Admin UI
 
@@ -72,27 +85,34 @@
       existing SEO/metadata fields, bound to `isHyperlocalSpotlight` on explicit save only —
       never in the autosave payload built around line 120
 - [ ] 6.3 Same checkbox in `NewArticlePage.tsx` for create
-- [ ] 6.4 Next to the checkbox, show the current holder: "Currently: <title>" when another article
-      holds it, "Currently: none" when empty, and a set state when this article holds it — so
+- [ ] 6.4 Next to the checkbox, show what the spotlight currently shows and where it came from:
+      "Currently: <title>" for another article's editor pick, "Currently: <title> — automatic,
+      newest article" when no pick is stored, and a set state when this article is the pick — so
       taking the spotlight names what it displaces
-- [ ] 6.5 Tests: checkbox reflects held/not-held/empty, names the other holder, sets on create,
-      sets on update, clears on update, is absent from autosave payloads, and a rejected save
-      leaves the displayed state unchanged
+- [ ] 6.5 When the box is unchecked on the article that holds it, state that the spotlight returns
+      to the newest published article — never wording that implies the section goes blank
+- [ ] 6.6 Tests: checkbox reflects pick/not-pick, names the other pick, distinguishes fallback from
+      editor pick, sets on create, sets on update, releases on update, is absent from autosave
+      payloads, and a rejected save leaves the displayed state unchanged
 
 ## 7. Public web page
 
 - [ ] 7.1 Add `apps/web/src/components/home/HyperlocalSpotlight.tsx` — single-article section,
-      returns `null` when there is no article (same guard style as `GuideOfWeek.tsx`)
+      returns `null` only when the read resolved no article at all (same guard style as
+      `GuideOfWeek.tsx`). A fallback article renders identically to an editor pick — `isEditorPick`
+      is not surfaced to readers.
 - [ ] 7.2 Add the public fetch to `apps/web/src/lib/api.ts` and call it from `HomePage.tsx`
       alongside the existing guide-pick/partner loads, rendering the section above `Showcase`
 - [ ] 7.3 Failed or empty spotlight read leaves every other section rendering — no thrown error, no
       placeholder
-- [ ] 7.4 Tests: renders a filled spotlight, renders nothing when empty, renders nothing when the
-      read fails
+- [ ] 7.4 Tests: renders an editor pick, renders a fallback article identically, renders nothing
+      when no article resolves, renders nothing when the read fails
 
 ## 8. Verification
 
 - [ ] 8.1 `pnpm build`, `pnpm lint`, `pnpm test` clean, no TypeScript errors
-- [ ] 8.2 Walk it in the running app: spotlight a draft (absent publicly, checkbox set in admin),
-      publish it (appears with no second write), spotlight another article (first one silently
-      loses it, nothing else about it changes), delete the holder (slot empties)
+- [ ] 8.2 Walk it in the running app: spotlight a draft (public section shows the newest article
+      meanwhile, checkbox set in admin), publish it (takes over with no second write), spotlight
+      another article (the first silently loses the pick, nothing else about it changes), uncheck
+      it (section shows the newest article), publish something newer (section follows it), delete
+      the pick (section continues on the newest article)
