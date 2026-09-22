@@ -95,5 +95,11 @@ export function buildCommandItems(handlers: {
       keywords: ['video', 'embed', 'youtube', 'vimeo'],
       command: (props) => handlers.onVideoCommand(props),
     },
+    {
+      title: 'Internal note',
+      icon: '⚑',
+      keywords: ['note', 'internal', 'todo', 'editor', 'flag'],
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('internalNote').run(),
+    },
   ];
 }

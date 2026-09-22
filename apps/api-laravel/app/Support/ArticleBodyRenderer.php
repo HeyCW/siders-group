@@ -21,15 +21,24 @@ class ArticleBodyRenderer
 
     private const ALIGN_VALUES = ['left', 'center', 'right'];
 
-    /** Renders sanitized, semantic HTML from a Tiptap/ProseMirror document. Never throws on
-     *  malformed input — a body that fails to parse as a document renders as an empty body. */
-    public static function render(mixed $bodyJson): string
+    /**
+     * Renders sanitized, semantic HTML from a Tiptap/ProseMirror document. Never throws on
+     * malformed input — a body that fails to parse as a document renders as an empty body.
+     *
+     * `$mode` is `'public'` by default: everything stored or served to a reader uses this mode,
+     * in which `internalNote` is simply not a case the renderer reaches, falling to the same
+     * `default => ''` every other unrecognized node type does. `'preview'` is used only by the
+     * staff preview endpoint, rendering at request time rather than reading the stored
+     * `body_html` (specs/article-management/spec.md - "The staff preview is the one read that
+     * re-renders").
+     */
+    public static function render(mixed $bodyJson, string $mode = 'public'): string
     {
         if (! is_array($bodyJson)) {
             return '';
         }
 
-        return self::renderNode($bodyJson);
+        return self::renderNode($bodyJson, $mode);
     }
 
     private static function escapeHtml(string $value): string
@@ -140,9 +149,12 @@ class ArticleBodyRenderer
     }
 
     /** @param array<string, mixed> $node */
-    private static function renderChildren(array $node): string
+    private static function renderChildren(array $node, string $mode): string
     {
-        return implode('', array_map(self::renderNode(...), self::nodeArray($node['content'] ?? null)));
+        return implode('', array_map(
+            fn (array $n) => self::renderNode($n, $mode),
+            self::nodeArray($node['content'] ?? null),
+        ));
     }
 
     /** @param array<string, mixed> $node */
@@ -180,38 +192,54 @@ class ArticleBodyRenderer
     }
 
     /** @param array<string, mixed> $node */
-    private static function renderTableCell(array $node, string $tag): string
+    private static function renderTableCell(array $node, string $tag, string $mode): string
     {
         $colspan = self::sanitizePositiveInt($node['attrs']['colspan'] ?? null, 1000);
         $rowspan = self::sanitizePositiveInt($node['attrs']['rowspan'] ?? null, 1000);
         $colspanAttr = $colspan !== null && $colspan > 1 ? " colspan=\"{$colspan}\"" : '';
         $rowspanAttr = $rowspan !== null && $rowspan > 1 ? " rowspan=\"{$rowspan}\"" : '';
 
-        return "<{$tag}{$colspanAttr}{$rowspanAttr}>".self::renderChildren($node)."</{$tag}>";
+        return "<{$tag}{$colspanAttr}{$rowspanAttr}>".self::renderChildren($node, $mode)."</{$tag}>";
+    }
+
+    /**
+     * Content an editor writes for other staff — rendered only in preview mode. In public mode
+     * this is never reached by any distinct code path; it is handled by the same
+     * `default => ''` arm in `renderNode()` that every unrecognized node type falls to
+     * (design.md - "Public safety comes from the renderer's deny-by-default, not from a strip
+     * step"). The "Internal note" label itself is CSS-generated content
+     * (`.internal-note::before` in the admin app's `index.css`), not emitted here.
+     *
+     * @param  array<string, mixed>  $node
+     */
+    private static function renderInternalNote(array $node, string $mode): string
+    {
+        return '<aside class="internal-note" data-internal-note="true">'.self::renderChildren($node, $mode).'</aside>';
     }
 
     /** @param array<string, mixed> $node */
-    private static function renderNode(array $node): string
+    private static function renderNode(array $node, string $mode): string
     {
         return match ($node['type'] ?? null) {
-            'doc' => self::renderChildren($node),
+            'doc' => self::renderChildren($node, $mode),
             'text' => self::renderText($node),
-            'paragraph' => '<p>'.self::renderChildren($node).'</p>',
-            'heading' => self::renderHeading($node),
-            'blockquote' => '<blockquote>'.self::renderChildren($node).'</blockquote>',
+            'paragraph' => '<p>'.self::renderChildren($node, $mode).'</p>',
+            'heading' => self::renderHeading($node, $mode),
+            'blockquote' => '<blockquote>'.self::renderChildren($node, $mode).'</blockquote>',
             'codeBlock' => self::renderCodeBlock($node),
-            'bulletList' => '<ul>'.self::renderChildren($node).'</ul>',
-            'orderedList' => self::renderOrderedList($node),
-            'listItem' => '<li>'.self::renderChildren($node).'</li>',
-            'taskList' => '<ul class="task-list">'.self::renderChildren($node).'</ul>',
-            'taskItem' => self::renderTaskItem($node),
-            'table' => '<table><tbody>'.self::renderChildren($node).'</tbody></table>',
-            'tableRow' => '<tr>'.self::renderChildren($node).'</tr>',
-            'tableCell' => self::renderTableCell($node, 'td'),
-            'tableHeader' => self::renderTableCell($node, 'th'),
+            'bulletList' => '<ul>'.self::renderChildren($node, $mode).'</ul>',
+            'orderedList' => self::renderOrderedList($node, $mode),
+            'listItem' => '<li>'.self::renderChildren($node, $mode).'</li>',
+            'taskList' => '<ul class="task-list">'.self::renderChildren($node, $mode).'</ul>',
+            'taskItem' => self::renderTaskItem($node, $mode),
+            'table' => '<table><tbody>'.self::renderChildren($node, $mode).'</tbody></table>',
+            'tableRow' => '<tr>'.self::renderChildren($node, $mode).'</tr>',
+            'tableCell' => self::renderTableCell($node, 'td', $mode),
+            'tableHeader' => self::renderTableCell($node, 'th', $mode),
             'image' => self::renderImage($node),
             'horizontalRule' => '<hr>',
             'video' => self::renderVideo($node),
+            'internalNote' => $mode === 'preview' ? self::renderInternalNote($node, $mode) : '',
             // Unrecognized node type: omit it and its content entirely. There is no safe way to
             // infer semantics for a type this renderer was never taught.
             default => '',
@@ -219,15 +247,15 @@ class ArticleBodyRenderer
     }
 
     /** @param array<string, mixed> $node */
-    private static function renderHeading(array $node): string
+    private static function renderHeading(array $node, string $mode): string
     {
         $level = self::sanitizePositiveInt($node['attrs']['level'] ?? null, 3);
         $tag = $level !== null ? (self::HEADING_TAGS[$level] ?? null) : null;
         if ($tag === null) {
-            return '<p>'.self::renderChildren($node).'</p>';
+            return '<p>'.self::renderChildren($node, $mode).'</p>';
         }
 
-        return "<{$tag}>".self::renderChildren($node)."</{$tag}>";
+        return "<{$tag}>".self::renderChildren($node, $mode)."</{$tag}>";
     }
 
     /** @param array<string, mixed> $node */
@@ -242,21 +270,21 @@ class ArticleBodyRenderer
     }
 
     /** @param array<string, mixed> $node */
-    private static function renderOrderedList(array $node): string
+    private static function renderOrderedList(array $node, string $mode): string
     {
         $start = self::sanitizePositiveInt($node['attrs']['start'] ?? null, 100000);
         $startAttr = $start !== null && $start !== 1 ? " start=\"{$start}\"" : '';
 
-        return "<ol{$startAttr}>".self::renderChildren($node).'</ol>';
+        return "<ol{$startAttr}>".self::renderChildren($node, $mode).'</ol>';
     }
 
     /** @param array<string, mixed> $node */
-    private static function renderTaskItem(array $node): string
+    private static function renderTaskItem(array $node, string $mode): string
     {
         $checked = ($node['attrs']['checked'] ?? null) === true;
         $checkedAttr = $checked ? ' checked' : '';
         $checkedStr = $checked ? 'true' : 'false';
 
-        return "<li class=\"task-item\" data-checked=\"{$checkedStr}\"><input type=\"checkbox\" disabled{$checkedAttr}>".self::renderChildren($node).'</li>';
+        return "<li class=\"task-item\" data-checked=\"{$checkedStr}\"><input type=\"checkbox\" disabled{$checkedAttr}>".self::renderChildren($node, $mode).'</li>';
     }
 }

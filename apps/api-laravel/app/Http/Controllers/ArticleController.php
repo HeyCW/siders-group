@@ -104,7 +104,7 @@ class ArticleController extends Controller
      *  status — lets staff preview a draft before it's published. */
     public function preview(string $id): JsonResponse
     {
-        return response()->json(['data' => ArticlePresenter::public(Article::findOrFail($id))]);
+        return response()->json(['data' => ArticlePresenter::preview(Article::findOrFail($id))]);
     }
 
     // --- Public ---
