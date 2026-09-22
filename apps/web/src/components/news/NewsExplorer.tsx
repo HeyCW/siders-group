@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { AnakUsahaResponse, ArticlePublicCard, CategoryResponse } from '@siders/contracts';
-import { getArticles } from '../../lib/api';
+import { getArticles, getHyperlocalSpotlight } from '../../lib/api';
 import { NEWS_PAGE_SIZE } from '../../lib/newsPageSize';
 import {
   NEWS_DATE_OPTIONS,
@@ -76,6 +76,11 @@ export function NewsExplorer({
   const activeDateTo = searchParams.get('dateTo') ?? undefined;
 
   const [articles, setArticles] = useState<ArticlePublicCard[]>([]);
+  // The hyperlocal spotlight's resolved article — the editor pick when one is publicly visible,
+  // otherwise the newest published article (specs/hyperlocal-spotlight/spec.md). Fetched
+  // independently of the filtered article list below, since it's a single global slot rather
+  // than a slice of this page's own results.
+  const [spotlightArticle, setSpotlightArticle] = useState<ArticlePublicCard | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -102,6 +107,24 @@ export function NewsExplorer({
     return () => clearTimeout(timer);
   }, [query]);
 
+  // Fetched once — the spotlight is a single global slot, not scoped to any filter on this page,
+  // so it never needs to re-fetch when the filters change. A failed read degrades to no featured
+  // slot rather than breaking the page (specs/hyperlocal-spotlight/spec.md - "A failed spotlight
+  // read does not break the page").
+  useEffect(() => {
+    let cancelled = false;
+    getHyperlocalSpotlight()
+      .then((result) => {
+        if (!cancelled) setSpotlightArticle(result.article);
+      })
+      .catch(() => {
+        if (!cancelled) setSpotlightArticle(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const activeCategories = categories.filter((c) => activeCategorySlugs.includes(c.slug));
   const activeAnakUsaha = anakUsahaOptions.filter((a) => activeAnakUsahaSlugs.includes(a.slug));
   const activeDateLabel = NEWS_DATE_OPTIONS.find((o) => o.value === activeDateOption)?.label;
@@ -111,8 +134,8 @@ export function NewsExplorer({
     Boolean(activeDateOption) ||
     debouncedQuery !== '';
 
-  const featured = !hasFilters && articles.length > 0 ? articles[0] : undefined;
-  const gridItems = featured ? articles.slice(1) : articles;
+  const featured = !hasFilters ? (spotlightArticle ?? undefined) : undefined;
+  const gridItems = featured ? articles.filter((article) => article.id !== featured.id) : articles;
 
   // One key string per distinct filter combination, used below to re-fetch whenever any of them
   // changes.

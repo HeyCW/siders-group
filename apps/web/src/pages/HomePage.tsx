@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { ArticlePublicCard, PublicGuidePick, PublicPartner } from '@siders/contracts';
-import { getGuidePicks, getHomeFeed, getHyperlocalSpotlight, getPartners } from '../lib/api';
+import { getGuidePicks, getHomeFeed, getPartners } from '../lib/api';
 import { Container } from '../components/layout/Container';
 import { Hero } from '../components/home/Hero';
 import { IntroBlurb } from '../components/home/IntroBlurb';
 import { StatsBand } from '../components/home/StatsBand';
 import { ConnectedPlatforms } from '../components/home/ConnectedPlatforms';
 import { GuideOfWeek } from '../components/home/GuideOfWeek';
-import { HyperlocalSpotlight } from '../components/home/HyperlocalSpotlight';
 import { Showcase } from '../components/home/Showcase';
 import { AnakUsahaTiles } from '../components/home/AnakUsahaTiles';
 import { PartnerGrid } from '../components/home/PartnerGrid';
@@ -26,7 +25,6 @@ export function HomePage() {
   const [articles, setArticles] = useState<ArticlePublicCard[]>([]);
   const [partners, setPartners] = useState<PublicPartner[]>([]);
   const [guides, setGuides] = useState<PublicGuidePick[]>([]);
-  const [spotlightArticle, setSpotlightArticle] = useState<ArticlePublicCard | null>(null);
   const [anakUsahaBrands, setAnakUsahaBrands] = useState(presentedAnakUsaha([]));
 
   useEffect(() => {
@@ -64,15 +62,6 @@ export function HomePage() {
       .catch(() => {
         if (!cancelled) setGuides([]);
       });
-    // A failed or empty read degrades to no section, exactly like guide picks and partners above
-    // (specs/hyperlocal-spotlight/spec.md - "A failed spotlight read does not break the page").
-    getHyperlocalSpotlight()
-      .then((result) => {
-        if (!cancelled) setSpotlightArticle(result.article);
-      })
-      .catch(() => {
-        if (!cancelled) setSpotlightArticle(null);
-      });
     getAnakUsahaList()
       .then((result) => {
         if (!cancelled) setAnakUsahaBrands(presentedAnakUsaha(result));
@@ -102,9 +91,6 @@ export function HomePage() {
 
       <Container>
         <GuideOfWeek guides={guides} />
-      </Container>
-      <Container>
-        <HyperlocalSpotlight article={spotlightArticle} />
       </Container>
       <Container>
         <Showcase articles={articles} />

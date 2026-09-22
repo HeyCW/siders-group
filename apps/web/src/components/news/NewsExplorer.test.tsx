@@ -18,14 +18,17 @@ vi.mock('react-router-dom', async (importOriginal) => ({
 }));
 
 const getArticlesMock = vi.fn();
+const getHyperlocalSpotlightMock = vi.fn();
 vi.mock('../../lib/api.js', () => ({
   getArticles: (...args: unknown[]) => getArticlesMock(...args),
+  getHyperlocalSpotlight: (...args: unknown[]) => getHyperlocalSpotlightMock(...args),
 }));
 
 afterEach(() => {
   cleanup();
   navigate.mockClear();
   getArticlesMock.mockReset();
+  getHyperlocalSpotlightMock.mockReset();
   currentParams = new URLSearchParams();
 });
 
@@ -66,6 +69,7 @@ async function renderExplorer(
 ) {
   currentParams = new URLSearchParams(params);
   getArticlesMock.mockResolvedValueOnce(firstPage);
+  getHyperlocalSpotlightMock.mockResolvedValue({ article: null, isEditorPick: false });
   const result = render(
     <MemoryRouter>
       <NewsExplorer categories={categories} anakUsahaOptions={anakUsahaOptions} />
@@ -218,5 +222,51 @@ describe('NewsExplorer', () => {
     await renderExplorer({ category: 'kuliner', anakUsaha: 'sidersvox', date: '7d' });
     fireEvent.click(screen.getByRole('button', { name: 'Hapus semua' }));
     expect(navigate).toHaveBeenCalledWith('/news');
+  });
+
+  it('features the hyperlocal spotlight article rather than the newest fetched article', async () => {
+    const spotlight = makeArticle({ title: 'Editor pick article' });
+    const newest = makeArticle({ title: 'Newest fetched article' });
+    currentParams = new URLSearchParams();
+    getArticlesMock.mockResolvedValueOnce([newest]);
+    getHyperlocalSpotlightMock.mockResolvedValue({ article: spotlight, isEditorPick: true });
+
+    render(
+      <MemoryRouter>
+        <NewsExplorer categories={categories} anakUsahaOptions={anakUsahaOptions} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
+    await screen.findByText('Editor pick article');
+
+    expect(screen.getByText(/Featured ·/)).toBeInTheDocument();
+    expect(screen.getByText('Editor pick article')).toBeInTheDocument();
+    expect(screen.getByText('Newest fetched article')).toBeInTheDocument();
+  });
+
+  it('does not duplicate the spotlight article in the grid when it is also in the fetched list', async () => {
+    const spotlight = makeArticle({ title: 'Shared article' });
+    currentParams = new URLSearchParams();
+    getArticlesMock.mockResolvedValueOnce([spotlight]);
+    getHyperlocalSpotlightMock.mockResolvedValue({ article: spotlight, isEditorPick: true });
+
+    render(
+      <MemoryRouter>
+        <NewsExplorer categories={categories} anakUsahaOptions={anakUsahaOptions} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument());
+    await screen.findByText(/Featured ·/);
+
+    expect(screen.getAllByText('Shared article')).toHaveLength(1);
+  });
+
+  it('hides the featured slot while any filter is active', async () => {
+    const spotlight = makeArticle({ title: 'Editor pick article' });
+    getHyperlocalSpotlightMock.mockResolvedValue({ article: spotlight, isEditorPick: true });
+
+    await renderExplorer({ category: 'kuliner' });
+
+    expect(screen.queryByText(/Featured ·/)).not.toBeInTheDocument();
   });
 });
