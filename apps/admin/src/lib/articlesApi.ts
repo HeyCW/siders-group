@@ -14,10 +14,25 @@ interface Envelope<T> {
   data: T;
 }
 
+interface PagedEnvelope<T> extends Envelope<T> {
+  meta?: { total: number };
+}
+
+const LIST_PAGE_SIZE = 100;
+
 export const articlesApi = {
-  list(status?: ArticleStatus): Promise<ArticleAdminResponse[]> {
-    const query = status ? `?status=${status}` : '';
-    return apiFetch<Envelope<ArticleAdminResponse[]>>(`/admin/articles${query}`).then((r) => r.data);
+  /** Every article, not just the API's first page — walks the pages until `meta.total` is reached. */
+  async list(status?: ArticleStatus): Promise<ArticleAdminResponse[]> {
+    const all: ArticleAdminResponse[] = [];
+    for (let page = 1; ; page++) {
+      const params = new URLSearchParams({ page: String(page), perPage: String(LIST_PAGE_SIZE) });
+      if (status) params.set('status', status);
+
+      const res = await apiFetch<PagedEnvelope<ArticleAdminResponse[]>>(`/admin/articles?${params}`);
+      all.push(...res.data);
+
+      if (res.data.length === 0 || all.length >= (res.meta?.total ?? 0)) return all;
+    }
   },
 
   get(id: string): Promise<ArticleAdminResponse> {

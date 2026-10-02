@@ -30,7 +30,7 @@ class ArticleController extends Controller
         $articles = Article::with(['author', 'categories', 'anakUsaha', 'featuredMedia'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderByDesc('created_at')
-            ->paginate((int) $request->query('perPage', 20));
+            ->paginate(max(1, min((int) $request->query('perPage', 20), 100)));
 
         // One lookup for the whole page, not one per article.
         $spotlightId = $this->spotlightService->getPickArticleId();
