@@ -9,6 +9,8 @@ use App\Exceptions\SlugConflictException;
 use App\Models\Article;
 use App\Services\Contracts\DeployNotifierInterface;
 use App\Support\ArticleBodyRenderer;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -237,6 +239,40 @@ class ArticleService
         }
 
         return $article;
+    }
+
+    /**
+     * The public, offset-paged article list — filter shape from PublicArticleIndexRequest. `id`
+     * breaks ties on `published_at` so paging never repeats or skips an article across requests
+     * (specs/public-news-api/spec.md - "Stable ordering across pages").
+     *
+     * @return Collection<int, Article>
+     */
+    public function listPublic(array $filter): Collection
+    {
+        $direction = $filter['order'] === 'oldest' ? 'asc' : 'desc';
+
+        return Article::with(['categories', 'featuredMedia', 'anakUsaha', 'author'])
+            ->publiclyVisible()
+            ->when($filter['categorySlugs'], fn (Builder $q, array $slugs) => $q->whereHas('categories', fn (Builder $c) => $c->whereIn('slug', $slugs)))
+            ->when($filter['anakUsahaSlugs'], fn (Builder $q, array $slugs) => $q->whereHas('anakUsaha', fn (Builder $a) => $a->whereIn('slug', $slugs)))
+            ->when($filter['publishedAfter'], fn (Builder $q, string $after) => $q->where('published_at', '>=', Carbon::parse($after)->utc()))
+            ->when($filter['publishedBefore'], fn (Builder $q, string $before) => $q->where('published_at', '<=', Carbon::parse($before)->utc()))
+            ->when($filter['excludeIds'], fn (Builder $q, array $ids) => $q->whereNotIn('id', $ids))
+            ->when($filter['q'], function (Builder $q, string $raw) {
+                $term = '%'.addcslashes($raw, '%_\\').'%';
+
+                // Grouped, so the three OR branches cannot leak out and widen the
+                // `publiclyVisible()` condition into "visible OR title matches".
+                return $q->where(fn (Builder $w) => $w->where('title', 'like', $term)
+                    ->orWhere('excerpt', 'like', $term)
+                    ->orWhere('keywords', 'like', $term));
+            })
+            ->orderBy('published_at', $direction)
+            ->orderBy('id', $direction)
+            ->skip($filter['offset'])
+            ->take($filter['limit'])
+            ->get();
     }
 
     private function resolveSlug(?string $requestedSlug, ?string $title, ?string $ignoreId = null): string

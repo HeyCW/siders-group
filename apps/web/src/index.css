@@ -82,6 +82,26 @@
 /* `::first-letter` only reaches a block-level descendant when applied directly to it, so this
    targets the article body's first paragraph specifically — a Tailwind `first-letter:` utility
    on the wrapping div would not reach inside a nested `<p>`. */
+/* Tailwind's preflight strips list markers; restore them for editor-authored lists. Tiptap wraps
+   each item's text in a <p>, so that inner paragraph drops the body's paragraph spacing. */
+.article-body ul,
+.article-body ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.article-body ul {
+  list-style: disc;
+}
+
+.article-body ol {
+  list-style: decimal;
+}
+
+.article-body li > p {
+  margin-bottom: 0.25rem;
+}
+
 .article-body > p:first-of-type::first-letter {
   float: left;
   font-family: var(--font-serif), Georgia, serif;
