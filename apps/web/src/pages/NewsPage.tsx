@@ -6,13 +6,6 @@ import { NewsExplorer } from '../components/news/NewsExplorer';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { useMetaDescription } from '../lib/useMetaDescription';
 
-/**
- * Of the four anak usaha sub-brands (`0010_bored_silhouette.sql`), only Surabaya Siders and
- * Jakarta Siders publish news articles — Siders Culture and SidersVox never carry articles, so
- * they're excluded from the "Group Companies" filter on this page.
- */
-const ARTICLE_ANAK_USAHA_SLUGS = ['surabaya-siders', 'jakarta-siders'];
-
 export function NewsPage() {
   useDocumentTitle('Hyperlocal News — Siders');
   useMetaDescription(
@@ -29,7 +22,9 @@ export function NewsPage() {
       .then(([categoryList, anakUsahaList]) => {
         if (cancelled) return;
         setCategories(categoryList);
-        setAnakUsahaOptions(anakUsahaList.filter((entry) => ARTICLE_ANAK_USAHA_SLUGS.includes(entry.slug)));
+        // Every anak perusahaan managed in admin is a filter option — any of them can be set on
+        // an article, so none is excluded here.
+        setAnakUsahaOptions(anakUsahaList);
       })
       .finally(() => {
         if (!cancelled) setLoadingCatalogs(false);

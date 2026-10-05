@@ -2,45 +2,135 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://sidersmedia.com/siders/</loc>
-    <lastmod>2026-09-22</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://sidersmedia.com/siders/news</loc>
-    <lastmod>2026-09-22</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://sidersmedia.com/siders/team</loc>
-    <lastmod>2026-09-22</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://sidersmedia.com/siders/contact</loc>
-    <lastmod>2026-09-22</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://sidersmedia.com/siders/surabaya-siders/</loc>
-    <lastmod>2026-09-22</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://sidersmedia.com/siders/jakarta-siders/</loc>
-    <lastmod>2026-09-22</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://sidersmedia.com/siders/siders-vox/</loc>
-    <lastmod>2026-09-22</lastmod>
+    <lastmod>2026-10-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/bigmo-dilaporkan-komnas-pa-dugaan-eksploitasi-anak-promosi-vape</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/timnas-indonesia-hajar-bangladesh-9-2-lolos-final-fifa-asean-cup-2026</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/agus-gumiwang-dinas-as-sehari-sebelum-reshuffle</loc>
+    <lastmod>2026-10-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/bahlil-dilantik-menko-hilirisasi-transisi-energi-rangkap-menteri-esdm</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/listyo-sigit-akan-dilantik-jadi-ksp</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/sport-station-buka-grand-city-mall-surabaya</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/thriftopia-family-thrift-festival-vol-3-surabaya</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/kampungkecil-surabayavibesbali</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/eks-rektor-uinsa-diperiksa-dua-kejari-surabaya</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/mahasiswa-ui-21-tahun-taklukkan-ironman-70-3</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/daniel-marthin-jakarta-bantu-indonesia-samakan-kedudukan</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/demo-buruh-jakarta-24-september-2026-11-tuntutan</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/kasus-influenza-a-meningkat-di-surabaya</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/super-new-moon-pesisir-surabaya-terancam-banjir-rob</loc>
+    <lastmod>2026-09-23</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://sidersmedia.com/siders/news/dinkes-dki-kasus-ispa-jakarta-naik-15-7-persen</loc>
+    <lastmod>2026-09-23</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://sidersmedia.com/siders/news/daftar-hari-libur-nasional-dan-cuti-bersama-2027</loc>
